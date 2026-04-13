@@ -14,6 +14,7 @@ import {
   errorMessage,
   hasProjectPermissions,
   latestRootSession,
+  startupAutoselectDirectory,
   workspaceKey,
 } from "./helpers"
 
@@ -103,6 +104,16 @@ describe("layout deep links", () => {
 })
 
 describe("layout workspace helpers", () => {
+  test("uses backend default directory for startup autoselect", () => {
+    expect(typeof startupAutoselectDirectory).toBe("function")
+    expect(startupAutoselectDirectory?.(true, "/Users/demo/PawWork")).toBe("/Users/demo/PawWork")
+  })
+
+  test("skips startup autoselect when disabled or missing a backend directory", () => {
+    expect(startupAutoselectDirectory?.(false, "/Users/demo/PawWork")).toBeUndefined()
+    expect(startupAutoselectDirectory?.(true, undefined)).toBeUndefined()
+  })
+
   test("normalizes trailing slash in workspace key", () => {
     expect(workspaceKey("/tmp/demo///")).toBe("/tmp/demo")
     expect(workspaceKey("C:\\tmp\\demo\\\\")).toBe("C:/tmp/demo")

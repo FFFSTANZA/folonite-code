@@ -95,3 +95,8 @@ export const effectiveWorkspaceOrder = (local: string, dirs: string[], persisted
 
   return [...result, ...live.values()]
 }
+
+export const startupAutoselectDirectory = (enabled: boolean, backendDirectory?: string) => {
+  if (!enabled) return
+  return backendDirectory || undefined
+}

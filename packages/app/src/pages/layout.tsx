@@ -69,6 +69,7 @@ import {
   effectiveWorkspaceOrder,
   errorMessage,
   latestRootSession,
+  startupAutoselectDirectory,
   sortedRootSessions,
   workspaceKey,
 } from "./layout/helpers"
@@ -574,22 +575,24 @@ export default function Layout(props: ParentProps) {
 
     return projects.find((p) => p.worktree === root)
   })
-
   const [autoselecting] = createResource(async () => {
     await ready.promise
     await layout.ready.promise
-    if (!untrack(() => state.autoselect)) return
-
-    const list = layout.projects.list()
-    const last = server.projects.last()
-
-    if (list.length === 0) {
-      if (!last) return
-      await openProject(last, true)
-    } else {
-      const next = list.find((project) => project.worktree === last) ?? list[0]
-      if (!next) return
-      await openProject(next.worktree, true)
+    // Wait for globalSync bootstrap to populate path.directory
+    if (!globalSync.ready) {
+      await new Promise<void>((resolve) => {
+        const stop = setInterval(() => {
+          if (globalSync.ready) {
+            clearInterval(stop)
+            resolve()
+          }
+        }, 50)
+      })
+    }
+    const dir = startupAutoselectDirectory(untrack(() => state.autoselect), globalSync.data.path.directory)
+    if (!dir) return
+    await openProject(dir, true)
+  })
     }
   })
 

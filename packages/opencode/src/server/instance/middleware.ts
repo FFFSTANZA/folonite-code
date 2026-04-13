@@ -1,5 +1,8 @@
 import type { MiddlewareHandler } from "hono"
 import type { UpgradeWebSocket } from "hono/ws"
+import { mkdirSync } from "fs"
+import os from "os"
+import path from "path"
 import { getAdaptor } from "@/control-plane/adaptors"
 import { WorkspaceID } from "@/control-plane/schema"
 import { Workspace } from "@/control-plane/workspace"
@@ -46,16 +49,25 @@ async function getSessionWorkspace(url: URL) {
 
 export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): MiddlewareHandler {
   return async (c, next) => {
-    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || process.cwd()
-    const directory = Filesystem.resolve(
-      (() => {
-        try {
-          return decodeURIComponent(raw)
-        } catch {
-          return raw
-        }
-      })(),
-    )
+    const pawworkDefault = path.join(os.homedir(), "PawWork")
+    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || pawworkDefault
+    const decoded = (() => {
+      try {
+        return decodeURIComponent(raw)
+      } catch {
+        return raw
+      }
+    })()
+
+    if (!c.req.query("directory") && !c.req.header("x-opencode-directory")) {
+      try {
+        mkdirSync(pawworkDefault, { recursive: true })
+      } catch {
+        // Ignore: home may be unwritable or path may be a regular file
+      }
+    }
+
+    const directory = Filesystem.resolve(decoded)
 
     const url = new URL(c.req.url)
 

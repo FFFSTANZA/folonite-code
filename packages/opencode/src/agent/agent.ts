@@ -86,19 +86,24 @@ export namespace Agent {
           const defaults = Permission.fromConfig({
             "*": "allow",
             doom_loop: "ask",
-            external_directory: {
-              "*": "ask",
-              ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
-            },
             question: "deny",
             plan_enter: "deny",
             plan_exit: "deny",
-            // mirrors github.com/github/gitignore Node.gitignore pattern for .env files
-            read: {
+            bash: {
               "*": "allow",
-              "*.env": "ask",
-              "*.env.*": "ask",
-              "*.env.example": "allow",
+              "sudo *": "deny",
+              "dd *": "deny",
+              "mkfs*": "deny",
+              "chmod *": "deny",
+              "kill *": "deny",
+              "rm *": "deny",
+              "rmdir *": "deny",
+              "unlink *": "deny",
+              "find * -delete*": "deny",
+            },
+            external_directory: {
+              "*": "allow",
+              ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
             },
           })
 
@@ -279,6 +284,7 @@ export namespace Agent {
           }
 
           const get = Effect.fnUntraced(function* (agent: string) {
+            yield* Effect.void
             return agents[agent]
           })
 
@@ -364,7 +370,7 @@ export namespace Agent {
                   )),
               {
                 role: "user",
-                content: `Create an agent configuration based on this request: \"${input.description}\".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.name).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
+                content: `Create an agent configuration based on this request: "${input.description}".\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existing.map((i) => i.name).join(", ")}\n  Return ONLY the JSON object, no other text, do not wrap in backticks`,
               },
             ],
             model: language,
