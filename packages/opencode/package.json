@@ -3,7 +3,7 @@
   "version": "1.4.3",
   "name": "opencode",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "scripts": {
     "prepare": "effect-language-service patch || true",
