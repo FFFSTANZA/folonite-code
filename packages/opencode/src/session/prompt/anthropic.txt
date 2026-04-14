@@ -6,7 +6,7 @@ IMPORTANT: You must NEVER generate or guess URLs for the user unless you are con
 
 If the user asks for help or wants to give feedback:
 - ctrl+p to list available actions
-- To give feedback, report issues at https://github.com/AstroHan/pawwork/issues
+- To give feedback, report issues at https://github.com/Astro-Han/pawwork/issues
 
 # Tone and style
 - Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked.
