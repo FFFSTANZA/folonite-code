@@ -1,26 +1,49 @@
 # 爪印 PawWork
 
-AI work agent for everyone (每个人的 AI 工作 agent)
+开箱即用的 AI 工作站。下载，打开，开始干活。
 
 ---
 
-**Status: Early development. Currently dogfooding with internal team.**
+PawWork 是一个桌面 AI 工作站，专为非技术知识工作者设计。不需要 API Key，不需要命令行，不需要任何配置。
 
----
+- **下载即用** — 内置工具链，不需要 brew/pip/npm
+- **免费模型** — 自带免费 AI 模型，零配置开聊
+- **桌面应用** — macOS / Windows，原生体验
 
-PawWork is a desktop AI agent built for non-technical knowledge workers. Download and use, no API key or configuration required. It ships with free models via OpenCode Zen out of the box.
+## 下载
 
-Planned features include Show Case (guided task templates for common work scenarios), Channel (connections to Feishu and DingTalk), local file operations, and web search.
+> v1.0 准备中。Watch 这个 repo 获取发布通知。
 
-PawWork is a fork of [OpenCode](https://github.com/anomalyco/opencode) (Electron + SolidJS).
+<!--
+macOS (Apple Silicon): [pawwork-mac-arm64.dmg](https://github.com/AstroHan/pawwork/releases/latest)
+Windows (x64): [pawwork-win-x64.exe](https://github.com/AstroHan/pawwork/releases/latest)
+-->
 
-## Development
+### macOS 首次打开
+
+PawWork 暂未完成 Apple 签名。首次打开时：
+右键点击应用 → 打开 → 在弹窗中确认「打开」。
+
+## 内置工具
+
+- **Office 文档** — 创建和编辑 .docx / .xlsx / .pptx（via officecli）
+- 更多工具持续添加中
+
+## 从源码构建
+
+需要 [Bun](https://bun.sh) v1.2+。
 
 ```bash
+git clone https://github.com/AstroHan/pawwork.git
+cd pawwork
 bun install
-bun run dev:electron   # or: cd packages/desktop-electron && bun run dev
+cd packages/desktop-electron && bun run dev
 ```
+
+## 致谢
+
+PawWork fork 自 [OpenCode](https://github.com/anomalyco/opencode)（MIT license）。
 
 ## License
 
-MIT. Based on [OpenCode](https://github.com/anomalyco/opencode) by anomalyco.
+MIT
