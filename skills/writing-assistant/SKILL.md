@@ -12,9 +12,9 @@ Use this skill when the user wants help writing or rewriting business content.
 - Use for emails, reports, plans, announcements, summaries, and work copy.
 - If the request is mostly file transformation or analysis, finish that work first and only use this skill for the writing pass.
 
-## AskUserQuestion Flow
+## question Flow
 
-Use AskUserQuestion to collect:
+Use question to collect:
 
 1. What are they writing, email, weekly update, announcement, report, or copy?
 2. Who is the audience?

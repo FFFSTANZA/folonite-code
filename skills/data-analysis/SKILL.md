@@ -12,9 +12,9 @@ Use this skill when the user wants analysis, summaries, charts, comparisons, or 
 - Use for spreadsheets, csv, tsv, charting, KPI summaries, comparisons, and report outputs.
 - If the user mainly needs copywriting or a memo, do the analysis here first and hand off final prose tone to `writing-assistant` only if needed.
 
-## AskUserQuestion Flow
+## question Flow
 
-Use AskUserQuestion to confirm:
+Use question to confirm:
 
 1. Which file or files contain the data?
 2. What question should the analysis answer?

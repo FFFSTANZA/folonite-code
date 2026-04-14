@@ -13,9 +13,9 @@ Use this skill when the user wants to create, edit, convert, clean up, or extrac
 - Do not use for pure writing requests without source files. Route those to `writing-assistant`.
 - Do not guess the target format from the input extension alone. Follow the requested output.
 
-## AskUserQuestion Flow
+## question Flow
 
-Use AskUserQuestion to collect the missing execution constraints before touching files. Ask for:
+Use question to collect the missing execution constraints before touching files. Ask for:
 
 1. Which file or files are the source material?
 2. What output format do they want, docx, xlsx, pptx, pdf, or plain text?
