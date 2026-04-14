@@ -54,6 +54,7 @@ export const dict = {
   "command.session.new": "新建会话",
 
   "command.file.open": "打开文件",
+  "command.file.revealInFolder": "打开文件夹",
 
   "command.tab.close": "关闭标签页",
 
@@ -67,6 +68,8 @@ export const dict = {
   "command.fileTree.toggle": "切换文件树",
 
   "command.review.toggle": "切换审查",
+  "session.panel.files": "文件",
+  "session.panel.changes": "变更",
 
   "command.terminal.new": "新建终端",
   "command.terminal.new.description": "创建新的终端标签页",
@@ -532,7 +535,14 @@ export const dict = {
   "session.revertDock.collapse": "折叠已回滚消息",
   "session.revertDock.expand": "展开已回滚消息",
   "session.revertDock.restore": "恢复消息",
-  "session.new.title": "构建任何东西",
+  "session.new.title": "今天想做什么？",
+  "session.new.subtitle": "选择一个场景开始，或直接输入你的需求",
+  "session.new.card.document.title": "处理文档",
+  "session.new.card.document.description": "编辑、转换并提取 Word、Excel、PowerPoint 和 PDF 文件内容。",
+  "session.new.card.analysis.title": "分析数据",
+  "session.new.card.analysis.description": "汇总表格、生成图表，并回答文件里的业务问题。",
+  "session.new.card.writing.title": "开始写作",
+  "session.new.card.writing.description": "起草邮件、报告、方案和更成熟的工作文案。",
   "session.new.worktree.main": "主分支",
   "session.new.worktree.mainWithBranch": "主分支（{{branch}}）",
   "session.new.worktree.create": "创建新的 worktree",

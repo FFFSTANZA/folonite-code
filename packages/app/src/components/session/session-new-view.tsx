@@ -1,89 +1,92 @@
-import { Show, createMemo } from "solid-js"
-import { DateTime } from "luxon"
-import { useSync } from "@/context/sync"
+import { For, createSignal } from "solid-js"
 import { useSDK } from "@/context/sdk"
+import { useLocal } from "@/context/local"
 import { useLanguage } from "@/context/language"
-import { Icon } from "@opencode-ai/ui/icon"
+import { useNavigate } from "@solidjs/router"
+import { base64Encode } from "@opencode-ai/util/encode"
+import { showToast } from "@opencode-ai/ui/toast"
 import { Mark } from "@opencode-ai/ui/logo"
-import { getDirectory, getFilename } from "@opencode-ai/util/path"
+import { pawworkSkillCards, type PawworkSkillName } from "./pawwork-skill-meta"
 
-const MAIN_WORKTREE = "main"
-const CREATE_WORKTREE = "create"
-const ROOT_CLASS = "size-full flex flex-col"
-
-interface NewSessionViewProps {
-  worktree: string
-}
-
-export function NewSessionView(props: NewSessionViewProps) {
-  const sync = useSync()
+export function NewSessionView() {
   const sdk = useSDK()
+  const local = useLocal()
   const language = useLanguage()
+  const navigate = useNavigate()
+  const [pending, setPending] = createSignal<PawworkSkillName>()
 
-  const sandboxes = createMemo(() => sync.project?.sandboxes ?? [])
-  const options = createMemo(() => [MAIN_WORKTREE, ...sandboxes(), CREATE_WORKTREE])
-  const current = createMemo(() => {
-    const selection = props.worktree
-    if (options().includes(selection)) return selection
-    return MAIN_WORKTREE
-  })
-  const projectRoot = createMemo(() => sync.project?.worktree ?? sdk.directory)
-  const isWorktree = createMemo(() => {
-    const project = sync.project
-    if (!project) return false
-    return sdk.directory !== project.worktree
-  })
+  const start = async (name: PawworkSkillName) => {
+    if (pending()) return
 
-  const label = (value: string) => {
-    if (value === MAIN_WORKTREE) {
-      if (isWorktree()) return language.t("session.new.worktree.main")
-      const branch = sync.data.vcs?.branch
-      if (branch) return language.t("session.new.worktree.mainWithBranch", { branch })
-      return language.t("session.new.worktree.main")
+    const agent = local.agent.current()
+    const model = local.model.current()
+
+    if (!agent || !model) {
+      showToast({
+        title: language.t("prompt.toast.modelAgentRequired.title"),
+        description: language.t("prompt.toast.modelAgentRequired.description"),
+      })
+      return
     }
 
-    if (value === CREATE_WORKTREE) return language.t("session.new.worktree.create")
+    setPending(name)
+    let created: { id: string } | undefined
 
-    return getFilename(value)
+    try {
+      created = await sdk.client.session.create({ skill: name }).then((res) => res.data ?? undefined)
+      if (!created) throw new Error(language.t("prompt.toast.sessionCreateFailed.description"))
+
+      local.session.promote(sdk.directory, created.id)
+      navigate(`/${base64Encode(sdk.directory)}/session/${created.id}`)
+
+      await sdk.client.session.command({
+        sessionID: created.id,
+        command: name,
+        arguments: "",
+        agent: agent.name,
+        model: `${model.provider.id}/${model.id}`,
+        variant: local.model.variant.current() ?? undefined,
+        parts: [],
+      })
+    } catch (error) {
+      if (created?.id) {
+        await sdk.client.session.delete({ sessionID: created.id }).catch(() => undefined)
+        navigate(`/${base64Encode(sdk.directory)}/session`)
+      }
+
+      showToast({
+        title: language.t("prompt.toast.commandSendFailed.title"),
+        description: error instanceof Error ? error.message : language.t("common.requestFailed"),
+      })
+    } finally {
+      setPending(undefined)
+    }
   }
 
   return (
-    <div class={ROOT_CLASS}>
-      <div class="h-12 shrink-0" aria-hidden />
-      <div class="flex-1 px-6 pb-30 flex items-center justify-center text-center">
-        <div class="w-full max-w-200 flex flex-col items-center text-center gap-4">
-          <div class="flex flex-col items-center gap-6">
-            <Mark class="w-10" />
-            <div class="text-20-medium text-text-strong">{language.t("session.new.title")}</div>
-          </div>
-          <div class="w-full flex flex-col gap-4 items-center">
-            <div class="flex items-start justify-center gap-3 min-h-5">
-              <div class="text-12-medium text-text-weak select-text leading-5 min-w-0 max-w-160 break-words text-center">
-                {getDirectory(projectRoot())}
-                <span class="text-text-strong">{getFilename(projectRoot())}</span>
-              </div>
-            </div>
-            <div class="flex items-start justify-center gap-1.5 min-h-5">
-              <Icon name="branch" size="small" class="mt-0.5 shrink-0" />
-              <div class="text-12-medium text-text-weak select-text leading-5 min-w-0 max-w-160 break-words text-center">
-                {label(current())}
-              </div>
-            </div>
-            <Show when={sync.project}>
-              {(project) => (
-                <div class="flex items-start justify-center gap-3 min-h-5">
-                  <div class="text-12-medium text-text-weak leading-5 min-w-0 max-w-160 break-words text-center">
-                    {language.t("session.new.lastModified")}&nbsp;
-                    <span class="text-text-strong">
-                      {DateTime.fromMillis(project().time.updated ?? project().time.created)
-                        .setLocale(language.intl())
-                        .toRelative()}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </Show>
-          </div>
+    <div class="size-full flex items-center justify-center px-6 pb-30">
+      <div class="w-full max-w-200 flex flex-col items-center gap-6 text-center">
+        <Mark class="w-10" />
+        <div class="flex flex-col gap-2">
+          <h1 class="text-24-medium text-text-strong">{language.t("session.new.title")}</h1>
+          <p class="text-14-regular text-text-weak">{language.t("session.new.subtitle")}</p>
+        </div>
+        <div class="grid w-full max-w-170 gap-3 md:grid-cols-3">
+          <For each={pawworkSkillCards}>
+            {(card) => (
+              <button
+                type="button"
+                data-skill-card={card.name}
+                class="rounded-2xl border border-border-weak-base bg-surface-raised-strong p-4 text-left transition-colors hover:bg-surface-raised-base-hover disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={pending() === card.name}
+                onClick={() => void start(card.name)}
+              >
+                <div class="text-24 leading-none">{card.emoji}</div>
+                <div class="mt-3 text-16-medium text-text-strong">{language.t(card.titleKey)}</div>
+                <div class="mt-1 text-14-regular text-text-weak">{language.t(card.descriptionKey)}</div>
+              </button>
+            )}
+          </For>
         </div>
       </div>
     </div>
