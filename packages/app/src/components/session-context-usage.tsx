@@ -19,11 +19,11 @@ interface SessionContextUsageProps {
 
 function openSessionContext(args: {
   view: ReturnType<ReturnType<typeof useLayout>["view"]>
-  layout: ReturnType<typeof useLayout>
   tabs: ReturnType<ReturnType<typeof useLayout>["tabs"]>
 }) {
-  if (!args.view.reviewPanel.opened()) args.view.reviewPanel.open()
-  if (args.layout.fileTree.opened() && args.layout.fileTree.tab() !== "all") args.layout.fileTree.setTab("all")
+  if (!args.view.sidePanel.opened()) args.view.sidePanel.open()
+  args.view.sidePanel.setTab("changes")
+  if (args.view.sidePanel.explorer.tab() !== "all") args.view.sidePanel.explorer.setTab("all")
   args.tabs.open("context")
   args.tabs.setActive("context")
 }
@@ -67,7 +67,6 @@ export function SessionContextUsage(props: SessionContextUsageProps) {
     }
     openSessionContext({
       view: view(),
-      layout,
       tabs: tabs(),
     })
   }

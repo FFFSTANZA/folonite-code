@@ -25,6 +25,12 @@ export type Platform = {
   /** Open a local path in a local app (desktop only) */
   openPath?(path: string, app?: string): Promise<void>
 
+  /** Reveal a local path in the system file browser (desktop only) */
+  showItemInFolder?(path: string): Promise<void>
+
+  /** Return file existence and size for local paths (desktop only) */
+  statPaths?(paths: string[]): Promise<Record<string, { size: number; exists: boolean }>>
+
   /** Restart the app  */
   restart(): Promise<void>
 

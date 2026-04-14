@@ -7,6 +7,7 @@ import {
   Show,
   Match,
   Switch,
+  createResource,
   createMemo,
   createEffect,
   createComputed,
@@ -54,6 +55,7 @@ import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { deriveArtifactFiles, nextFilesPanelAutoOpen } from "@/pages/session/files-tab-state"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
@@ -398,13 +400,11 @@ export default function Page() {
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const size = createSizing()
-  const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
-  const desktopFileTreeOpen = createMemo(() => isDesktop() && layout.fileTree.opened())
-  const desktopSidePanelOpen = createMemo(() => desktopReviewOpen() || desktopFileTreeOpen())
+  const desktopReviewOpen = createMemo(() => isDesktop() && view().sidePanel.opened())
+  const desktopSidePanelOpen = createMemo(() => desktopReviewOpen())
   const sessionPanelWidth = createMemo(() => {
     if (!desktopSidePanelOpen()) return "100%"
-    if (desktopReviewOpen()) return `${layout.session.width()}px`
-    return `calc(100% - ${layout.fileTree.width()}px)`
+    return `${layout.session.width()}px`
   })
   const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
 
@@ -426,7 +426,8 @@ export default function Page() {
   }
 
   const openReviewPanel = () => {
-    if (!view().reviewPanel.opened()) view().reviewPanel.open()
+    if (!view().sidePanel.opened()) view().sidePanel.open()
+    if (view().sidePanel.tab() !== "changes") view().sidePanel.setTab("changes")
   }
 
   const info = createMemo(() => (params.id ? sync.session.get(params.id) : undefined))
@@ -651,6 +652,23 @@ export default function Page() {
   }, desktopReviewOpen())
 
   const turnDiffs = createMemo(() => list(lastUserMessage()?.summary?.diffs))
+  const [artifactHistory, { refetch: refetchArtifactHistory }] = createResource(
+    () => params.id,
+    (sessionID) => sdk.client.session.artifacts({ sessionID }).then((res) => res.data ?? []).catch(() => []),
+  )
+  const artifactFiles = createMemo(() => {
+    const history = artifactHistory() ?? []
+    if (history.length > 0) return deriveArtifactFiles(sdk.directory, history)
+
+    return deriveArtifactFiles(
+      sdk.directory,
+      turnDiffs()
+        .flatMap((diff) => {
+          if (diff.status !== "added" && diff.status !== "modified") return []
+          return [{ file: diff.file, kind: diff.status as "added" | "modified" }]
+        }),
+    )
+  })
   const nogit = createMemo(() => !!sync.project && sync.project.vcs !== "git")
   const changesOptions = createMemo<ChangeMode[]>(() => {
     const list: ChangeMode[] = []
@@ -1056,10 +1074,39 @@ export default function Page() {
 
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
   const wantsReview = createMemo(() =>
-    isDesktop()
-      ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
-      : store.mobileTab === "changes",
+    isDesktop() ? desktopReviewOpen() && view().sidePanel.tab() === "changes" && activeTab() === "review" : store.mobileTab === "changes",
   )
+
+  createEffect(() => {
+    if (!params.id) return
+    turnDiffs()
+    void refetchArtifactHistory()
+  })
+
+  createEffect(() => {
+    const id = params.id
+    if (!id) return
+    if (sync.data.session_diff[id] === undefined) return
+    void refetchArtifactHistory()
+  })
+
+  createEffect(() => {
+    if (!params.id) return
+
+    const next = nextFilesPanelAutoOpen(
+      {
+        seenAdded: view().sidePanel.filesAutoOpenSeen(),
+        dismissed: view().sidePanel.filesAutoOpenDismissed(),
+      },
+      turnDiffs(),
+    )
+
+    if (next.open) {
+      view().sidePanel.setTab("files")
+      view().sidePanel.open()
+    }
+    view().sidePanel.setAutoOpenState(next)
+  })
 
   createEffect(() => {
     const list = changesOptions()
@@ -1090,8 +1137,8 @@ export default function Page() {
     ),
   )
 
-  const fileTreeTab = () => layout.fileTree.tab()
-  const setFileTreeTab = (value: "changes" | "all") => layout.fileTree.setTab(value)
+  const fileTreeTab = () => view().sidePanel.explorer.tab()
+  const setFileTreeTab = (value: "changes" | "all") => view().sidePanel.explorer.setTab(value)
 
   const [tree, setTree] = createStore({
     reviewScroll: undefined as HTMLDivElement | undefined,
@@ -1389,7 +1436,8 @@ export default function Page() {
   createEffect(() => {
     const dir = sdk.directory
     if (!isDesktop()) return
-    if (!layout.fileTree.opened()) return
+    if (!view().sidePanel.opened()) return
+    if (view().sidePanel.tab() !== "changes") return
     if (sync.status === "loading") return
 
     fileTreeTab()
@@ -1970,7 +2018,7 @@ export default function Page() {
                 </Show>
               </Match>
               <Match when={true}>
-                <NewSessionView worktree={newSessionWorktree()} />
+                <NewSessionView />
               </Match>
             </Switch>
           </div>
@@ -2049,6 +2097,7 @@ export default function Page() {
           hasReview={hasReview}
           reviewCount={reviewCount}
           reviewPanel={reviewPanel}
+          files={artifactFiles}
           activeDiff={tree.activeDiff}
           focusReviewDiff={focusReviewDiff}
           reviewSnap={ui.reviewSnap}

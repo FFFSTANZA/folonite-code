@@ -442,12 +442,12 @@ export function SessionHeader() {
                     <Button
                       variant="ghost"
                       class="group/review-toggle titlebar-icon w-8 h-6 p-0 box-border"
-                      onClick={() => view().reviewPanel.toggle()}
+                      onClick={() => view().sidePanel.toggleTab("changes")}
                       aria-label={language.t("command.review.toggle")}
-                      aria-expanded={view().reviewPanel.opened()}
+                      aria-expanded={view().sidePanel.opened()}
                       aria-controls="review-panel"
                     >
-                      <Icon size="small" name={view().reviewPanel.opened() ? "review-active" : "review"} />
+                      <Icon size="small" name={view().sidePanel.opened() && view().sidePanel.tab() === "changes" ? "review-active" : "review"} />
                     </Button>
                   </TooltipKeybind>
 
@@ -458,18 +458,18 @@ export function SessionHeader() {
                     <Button
                       variant="ghost"
                       class="titlebar-icon w-8 h-6 p-0 box-border"
-                      onClick={() => layout.fileTree.toggle()}
+                      onClick={() => view().sidePanel.toggleTab("files")}
                       aria-label={language.t("command.fileTree.toggle")}
-                      aria-expanded={layout.fileTree.opened()}
-                      aria-controls="file-tree-panel"
+                      aria-expanded={view().sidePanel.opened() && view().sidePanel.tab() === "files"}
+                      aria-controls="review-panel"
                     >
                       <div class="relative flex items-center justify-center size-4">
                         <Icon
                           size="small"
-                          name={layout.fileTree.opened() ? "file-tree-active" : "file-tree"}
+                          name={view().sidePanel.opened() && view().sidePanel.tab() === "files" ? "file-tree-active" : "file-tree"}
                           classList={{
-                            "text-icon-strong": layout.fileTree.opened(),
-                            "text-icon-weak": !layout.fileTree.opened(),
+                            "text-icon-strong": view().sidePanel.opened() && view().sidePanel.tab() === "files",
+                            "text-icon-weak": !(view().sidePanel.opened() && view().sidePanel.tab() === "files"),
                           }}
                         />
                       </div>

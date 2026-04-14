@@ -1,5 +1,5 @@
 import { createStore, reconcile } from "solid-js/store"
-import { createEffect, createMemo } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { persisted } from "@/utils/persist"
 
@@ -49,6 +49,7 @@ export const sansDefault = "System Sans"
 const monoFallback =
   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
 const sansFallback = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+const pawworkSansFallback = "system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif"
 
 const monoBase = monoFallback
 const sansBase = sansFallback
@@ -82,6 +83,13 @@ export function monoFontFamily(font: string | undefined) {
 
 export function sansFontFamily(font: string | undefined) {
   return stack(font, sansBase)
+}
+
+export function resolveSansFontFamily(input: { themeID?: string; font?: string }) {
+  const font = input.font?.trim()
+  if (font) return sansFontFamily(font)
+  if (input.themeID === "pawwork") return pawworkSansFallback
+  return sansFontFamily(undefined)
 }
 
 const defaultSettings: Settings = {
@@ -128,12 +136,29 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   name: "Settings",
   init: () => {
     const [store, setStore, _, ready] = persisted("settings.v3", createStore<Settings>(defaultSettings))
+    const [themeID, setThemeID] = createSignal<string | undefined>()
+
+    onMount(() => {
+      if (typeof document === "undefined") return
+      const root = document.documentElement
+      const syncTheme = () => setThemeID(root.dataset.theme)
+      syncTheme()
+      const observer = new MutationObserver(syncTheme)
+      observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] })
+      onCleanup(() => observer.disconnect())
+    })
 
     createEffect(() => {
       if (typeof document === "undefined") return
       const root = document.documentElement
       root.style.setProperty("--font-family-mono", monoFontFamily(store.appearance?.mono))
-      root.style.setProperty("--font-family-sans", sansFontFamily(store.appearance?.sans))
+      root.style.setProperty(
+        "--font-family-sans",
+        resolveSansFontFamily({
+          themeID: themeID(),
+          font: store.appearance?.sans,
+        }),
+      )
     })
 
     createEffect(() => {

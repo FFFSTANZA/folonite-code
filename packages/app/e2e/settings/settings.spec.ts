@@ -16,6 +16,18 @@ import {
   settingsUpdatesStartupSelector,
 } from "../selectors"
 
+test("new installs start with the PawWork theme", async ({ page, gotoSession }) => {
+  await page.addInitScript(() => {
+    localStorage.removeItem("opencode-theme-id")
+    localStorage.removeItem("opencode-color-scheme")
+  })
+
+  await gotoSession()
+
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "pawwork")
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light")
+})
+
 test("smoke settings dialog opens, switches tabs, closes", async ({ page, gotoSession }) => {
   await gotoSession()
 
@@ -54,6 +66,13 @@ test("changing language updates settings labels", async ({ page, gotoSession }) 
 })
 
 test("changing color scheme persists in localStorage", async ({ page, gotoSession }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("settings-color-scheme-init")) return
+    localStorage.setItem("opencode-theme-id", "oc-2")
+    localStorage.setItem("opencode-color-scheme", "light")
+    sessionStorage.setItem("settings-color-scheme-init", "1")
+  })
+
   await gotoSession()
 
   const dialog = await openSettings(page)
@@ -224,7 +243,7 @@ test("typing a UI font with spaces persists and updates CSS variable", async ({ 
   const initialCodeFamily = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue("--font-family-mono").trim(),
   )
-  expect(initialFontFamily).toContain("ui-sans-serif")
+  expect(initialFontFamily).toContain("system-ui")
 
   const next = "Test Sans"
 
@@ -351,11 +370,18 @@ test("clearing the UI font field restores the default placeholder and stack", as
   const fontFamily = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue("--font-family-sans").trim(),
   )
-  expect(fontFamily).toContain("ui-sans-serif")
+  expect(fontFamily).toContain("system-ui")
   expect(fontFamily).not.toContain("Reset Sans")
 })
 
 test("color scheme, code font, and UI font rehydrate after reload", async ({ page, gotoSession }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("settings-rehydrate-init")) return
+    localStorage.setItem("opencode-theme-id", "oc-2")
+    localStorage.setItem("opencode-color-scheme", "light")
+    sessionStorage.setItem("settings-rehydrate-init", "1")
+  })
+
   await gotoSession()
 
   const dialog = await openSettings(page)
