@@ -5,37 +5,49 @@ description: Use when user wants analysis, charts, summaries, or reports from sp
 
 # Data Analysis
 
-Analyze local data files: xlsx, csv, tsv. Produce summaries, charts, or reports. If user mainly needs prose, do analysis here first, hand off tone to `writing-assistant`.
+Analyze structured local data and return conclusions, charts, or updated files.
 
-## Clarify Before Acting
-
-Use `question` if the business question is vague. Skip when the request is already specific.
-
-- Which file(s) contain the data
-- What question should the analysis answer
-- Desired output: report, chart image, updated spreadsheet, or all three
-- Key dimensions, metrics, or date ranges
-
-## Tool Selection
-
-| Task | Tool |
-|------|------|
-| xlsx with formulas/structure | `officecli` |
-| csv/tsv parsing, reshaping | Node.js |
-| Chart/image output | `sharp` |
-
-Stay within local files and bundled tools.
+<GATE>
+Do NOT start analyzing until you understand the data and the question. Ask clarifying questions first, then act.
+</GATE>
 
 ## Workflow
 
-1. Inspect schema: tables, sheets, columns
-2. Flag data-quality issues (missing values, duplicates, mixed units)
-3. Run aggregation or comparison
-4. Produce requested outputs
-5. State the main finding first, then supporting detail
+1. **Clarify** - Ask the user what they need before touching any data.
+2. **Execute** - Inspect the data, run the analysis, and produce the requested outputs.
+3. **Verify** - Check that the findings and deliverables match the user's request.
 
-## Guardrails
+## Step 1: Clarify
 
-- Data incomplete or suspicious → call it out explicitly, don't smooth over
-- Chart can't render cleanly → return analysis table, explain what blocked it
-- Workbook too complex for safe rewriting → write a separate output file
+Ask the user the following before acting:
+
+- **Data source** — Is it a spreadsheet (xlsx/csv), a database export, or will they describe the data in chat?
+- **Output** — Do they want a summary report, a chart or visualization, an updated spreadsheet, or some combination?
+- **Business question** — What question should the analysis answer? Confirm key metrics, dimensions, and date ranges when they matter.
+
+## Step 2: Execute
+
+| Task | Tool |
+| --- | --- |
+| xlsx with formulas or workbook structure | `officecli` |
+| csv or tsv parsing, reshaping, aggregation | Node.js |
+| Chart or image output | `sharp` |
+
+Execution rules:
+- Inspect sheets, tables, columns, and units before calculating anything.
+- Flag data-quality problems, such as missing values, duplicates, mixed units, or suspicious totals.
+- Keep analysis steps traceable so the result can be checked.
+- If workbook rewriting is risky, write a separate output file instead of overwriting the source.
+
+## Step 3: Verify
+
+Before reporting back:
+- Recheck the main finding against the underlying data.
+- Confirm each requested output was produced.
+- Call out any data-quality issue that changes confidence in the answer.
+- State the main finding first, then supporting detail.
+
+## Language
+
+Reply in the user's locale (shown in system environment as "User locale").
+If no locale is shown, match the language used in the user's request.

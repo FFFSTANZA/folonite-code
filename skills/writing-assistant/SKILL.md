@@ -5,36 +5,52 @@ description: Use when user wants to draft or revise work writing like emails, re
 
 # Writing Assistant
 
-Draft and revise business content. If the request is mostly file transformation or analysis, finish that first, use this skill only for the writing pass.
+Draft or revise business writing without inventing facts, commitments, or details.
 
-## Clarify Before Acting
-
-Use `question` if ambiguous. Skip when the request is already specific.
-
-- Content type (email, report, announcement, plan, copy)
-- Audience
-- Tone (concise, warm, formal, direct, persuasive)
-- Length or structure constraints
-
-If source notes are thin, ask for missing facts before drafting.
+<GATE>
+Do NOT start drafting until you understand what the user needs. Ask clarifying questions first, then write.
+</GATE>
 
 ## Workflow
 
-1. Identify content type and audience
-2. Extract facts, constraints, deadlines from user's notes
-3. If input is thin, propose structure before writing long-form
-4. Draft in requested tone
-5. Tighten: remove filler, verify every claim is from provided material
+1. **Clarify** - Ask the user what they need before writing anything.
+2. **Execute** - Extract the facts, choose the right structure, and draft in the requested tone.
+3. **Verify** - Check the draft for factual fidelity, tone, and usability.
 
-## Working Rules
+## Step 1: Clarify
 
-- Default: clear wording, short paragraphs
-- Preserve facts from source notes, tighten wording
-- Never invent facts, names, numbers, or commitments
-- Return polished copy, not brainstorming fragments (unless user asks for outline)
+Ask the user the following before acting:
 
-## Guardrails
+- **Content type** — Email, report or memo, announcement, or plan/proposal?
+- **Tone** — Formal, conversational, concise and direct, or persuasive?
+- **Key points** — Will they provide details now, should you draft from what they already said, or should you ask more questions first? Always ask this, even when input seems sufficient.
+- **Constraints** — Any length, audience, structure, or deadline requirements.
 
-- Missing facts → ask, don't hallucinate
-- Two plausible tones → give stronger default first, mention alternative
-- Mixed drafting + strategy → separate final copy from advice so output is immediately usable
+If the user chooses to provide details later, wait for their next message before proceeding to draft.
+
+## Step 2: Execute
+
+| Situation | Approach |
+| --- | --- |
+| User already provided complete notes | Draft directly from the provided facts |
+| Existing draft needs revision | Preserve the facts, tighten wording, improve structure |
+| Notes are thin or incomplete | Ask follow-up questions before writing full copy |
+
+Execution rules:
+- Extract all facts, constraints, deadlines, names, and commitments from the user's material.
+- Preserve facts from the source and improve clarity, structure, and tone.
+- Do not invent missing facts, names, numbers, or commitments.
+- Return usable copy unless the user explicitly asked for an outline or options.
+
+## Step 3: Verify
+
+Before reporting back:
+- Check that every concrete claim comes from the user's material.
+- Re-read for the requested tone, audience, and structure.
+- Remove filler, repetition, and vague phrasing.
+- If facts are still missing, say what is missing instead of guessing.
+
+## Language
+
+Reply in the user's locale (shown in system environment as "User locale").
+If no locale is shown, match the language used in the user's request.

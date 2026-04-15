@@ -5,35 +5,49 @@ description: Use when user wants to create, edit, convert, or extract from Word,
 
 # Document Processing
 
-Process office documents: docx, xlsx, pptx, pdf, csv. Pure writing requests without source files → `writing-assistant`.
+Handle document creation, editing, conversion, and extraction for local office files.
 
-## Clarify Before Acting
-
-Use `question` if ambiguous. Skip when the request is already specific.
-
-- Source file(s) and target format
-- New file, edit, or conversion
-- What must stay unchanged (layout, formulas, branding)
-
-## Tool Selection
-
-| Format | Tool |
-|--------|------|
-| docx, xlsx, pptx | `officecli` |
-| PDF merge/split/fill/extract | `pdf-lib` |
-| Mixed formats | Decide final output format first |
+<GATE>
+Do NOT start working on files until you understand what the user needs. Ask clarifying questions first, then act.
+</GATE>
 
 ## Workflow
 
-1. Inspect source files, confirm requested output
-2. Choose least-destructive toolchain for the file type
-3. Make the edit or conversion
-4. Verify output matches constraints
-5. Report what changed and where the file was saved
+1. **Clarify** - Ask the user what they need before touching any files.
+2. **Execute** - Choose the least-destructive toolchain, then perform the task.
+3. **Verify** - Check the output against the user's constraints and report the result.
 
-## Guardrails
+## Step 1: Clarify
 
-- Conversion would destroy formulas/layout/comments → explain tradeoff, offer alternative
-- Formatting fidelity uncertain → warn before finalizing
-- File can't be parsed → name the file, switch to closest safe fallback
-- Save output in current workspace unless user specifies a path
+Ask the user the following before acting:
+
+- **Task type** — Are they creating a new document, editing an existing one, converting between formats, or extracting content?
+- **Source** — Will they upload or specify files, or should you reuse files from a previous step?
+- **Constraints** — Anything that must stay unchanged: layout, formulas, comments, branding, slide order.
+
+## Step 2: Execute
+
+| Format or task | Tool |
+| --- | --- |
+| docx, xlsx, pptx | `officecli` |
+| PDF merge, split, fill, extract | `pdf-lib` |
+| Mixed formats | Decide the final output format first, then use the safest path |
+
+Execution rules:
+- Inspect the source files before editing or converting them.
+- Prefer edits that preserve the original structure over destructive conversions.
+- If a conversion risks losing formulas, layout, comments, or branding, explain the tradeoff before finalizing.
+- Save the output in the current workspace unless the user gave a different path.
+
+## Step 3: Verify
+
+Before reporting back:
+- Confirm the output file exists and is in the expected format.
+- Check the requested constraints, such as layout, formulas, branding, or extracted sections.
+- If fidelity is uncertain, say exactly what could not be verified.
+- Report what changed and where the output was saved.
+
+## Language
+
+Reply in the user's locale (shown in system environment as "User locale").
+If no locale is shown, match the language used in the user's request.

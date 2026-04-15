@@ -558,6 +558,7 @@ export type UserMessage = {
     modelID: string
     variant?: string
   }
+  locale?: string
   system?: string
   tools?: {
     [key: string]: boolean
@@ -3674,6 +3675,7 @@ export type SessionPromptData = {
       modelID: string
     }
     agent?: string
+    locale?: string
     noReply?: boolean
     /**
      * @deprecated tools and permissions have been merged, you can set permissions on the session itself now
@@ -3874,6 +3876,7 @@ export type SessionPromptAsyncData = {
       modelID: string
     }
     agent?: string
+    locale?: string
     noReply?: boolean
     /**
      * @deprecated tools and permissions have been merged, you can set permissions on the session itself now
@@ -3923,6 +3926,7 @@ export type SessionCommandData = {
     messageID?: string
     agent?: string
     model?: string
+    locale?: string
     arguments: string
     command: string
     variant?: string

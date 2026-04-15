@@ -474,3 +474,58 @@ test("returns bundled skill roots for source and dist layouts", () => {
   const distRoots = Skill.builtinRoots("/repo/packages/opencode/dist/node/skill")
   expect(distRoots).toContain("/repo/skills")
 })
+
+test("bundled productivity skills enforce clarify-first workflow and locale guidance", async () => {
+  await using tmp = await tmpdir({ git: true })
+
+  const original = processWithResourcesPath.resourcesPath
+  Object.defineProperty(process, "resourcesPath", { value: undefined, configurable: true })
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const skills = await Skill.all()
+        const getContent = (name: string) => skills.find((item) => item.name === name)?.content ?? ""
+
+        const assertSharedStructure = (content: string) => {
+          expect(content).toContain("<GATE>")
+          expect(content).toContain("## Workflow")
+          expect(content).toContain("1. **Clarify**")
+          expect(content).toContain("2. **Execute**")
+          expect(content).toContain("3. **Verify**")
+          expect(content).toContain("## Step 1: Clarify")
+          expect(content).toContain("## Step 2: Execute")
+          expect(content).toContain("## Step 3: Verify")
+          expect(content).toContain("## Language")
+          expect(content).toContain('Reply in the user\'s locale (shown in system environment as "User locale").')
+          // Skills must NOT hardcode tool names or JSON schemas — models pick the
+          // right tool from the tool list at runtime
+          expect(content).not.toContain("```json")
+          expect(content).not.toContain("`question` tool")
+        }
+
+        const documentProcessing = getContent("document-processing")
+        assertSharedStructure(documentProcessing)
+        expect(documentProcessing).toContain("**Task type**")
+        expect(documentProcessing).toContain("**Source**")
+        expect(documentProcessing).toContain("**Constraints**")
+
+        const dataAnalysis = getContent("data-analysis")
+        assertSharedStructure(dataAnalysis)
+        expect(dataAnalysis).toContain("**Data source**")
+        expect(dataAnalysis).toContain("**Output**")
+        expect(dataAnalysis).toContain("**Business question**")
+
+        const writingAssistant = getContent("writing-assistant")
+        assertSharedStructure(writingAssistant)
+        expect(writingAssistant).toContain("**Content type**")
+        expect(writingAssistant).toContain("**Tone**")
+        expect(writingAssistant).toContain("**Key points**")
+        expect(writingAssistant).toContain("wait for their next message")
+      },
+    })
+  } finally {
+    Object.defineProperty(process, "resourcesPath", { value: original, configurable: true })
+  }
+})
