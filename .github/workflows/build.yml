@@ -3,24 +3,98 @@ name: build
 on:
   workflow_dispatch:
     inputs:
+      phase:
+        description: "Workflow phase"
+        required: false
+        type: choice
+        options:
+          - full
+          - submit
+          - finalize
+        default: full
       channel:
         description: "Build channel"
         required: false
         type: choice
         options:
           - dev
+          - beta
           - prod
         default: dev
+      arch:
+        description: "Target architecture"
+        required: false
+        type: choice
+        options:
+          - arm64
+        default: arm64
+      source_run_id:
+        description: "Run ID from the submit phase"
+        required: false
+        type: string
+      source_run_attempt:
+        description: "Run attempt from the submit phase"
+        required: false
+        type: string
+      source_ref:
+        description: "Git ref from the submit phase"
+        required: false
+        type: string
+      source_sha:
+        description: "Git SHA from the submit phase"
+        required: false
+        type: string
+      source_workflow_ref:
+        description: "Workflow tag created during the submit phase"
+        required: false
+        type: string
+      source_workflow_sha:
+        description: "Workflow commit SHA loaded during the submit phase"
+        required: false
+        type: string
+      submission_id:
+        description: "Apple notarization submission ID"
+        required: false
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.phase || 'submit' }}
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
+  create-snapshot-tag:
+    if: ${{ inputs.phase == 'submit' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      workflow_ref: ${{ steps.create.outputs.workflow_ref }}
+      workflow_sha: ${{ steps.create.outputs.workflow_sha }}
+    steps:
+      - id: create
+        run: |
+          set -euo pipefail
+
+          workflow_ref="workflow-snapshot-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${{ inputs.arch || 'arm64' }}"
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/${workflow_ref}" \
+            -f sha="${GITHUB_SHA}"
+          echo "workflow_ref=$workflow_ref" >> "$GITHUB_OUTPUT"
+          echo "workflow_sha=$GITHUB_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   build-electron:
+    needs:
+      - create-snapshot-tag
+    if: ${{ always() && (needs.create-snapshot-tag.result == 'success' || needs.create-snapshot-tag.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
@@ -42,13 +116,69 @@ jobs:
     runs-on: ${{ matrix.host }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Validate Selected Arch
+        run: |
+          set -euo pipefail
 
-      - uses: oven-sh/setup-bun@v2
+          if [ "$SELECTED_ARCH" != "arm64" ]; then
+            echo "Unsupported arch: $SELECTED_ARCH"
+            exit 1
+          fi
+        env:
+          SELECTED_ARCH: ${{ inputs.arch || 'arm64' }}
+
+      - name: Validate finalize inputs
+        if: ${{ inputs.phase == 'finalize' }}
+        run: |
+          set -euo pipefail
+
+          for value_name in SOURCE_RUN_ID SOURCE_RUN_ATTEMPT SOURCE_REF SOURCE_SHA SOURCE_WORKFLOW_REF SOURCE_WORKFLOW_SHA SOURCE_ARCH SUBMISSION_ID; do
+            if [ -z "${!value_name}" ]; then
+              echo "$value_name is required for finalize"
+              exit 1
+            fi
+          done
+
+          if [ "$SOURCE_ARCH" != "${{ matrix.arch_label }}" ]; then
+            echo "Finalize arch mismatch: expected $SOURCE_ARCH, got ${{ matrix.arch_label }}"
+            exit 1
+          fi
+
+          if [ "$GITHUB_REF_NAME" != "$SOURCE_WORKFLOW_REF" ]; then
+            echo "Finalize workflow ref mismatch: expected $SOURCE_WORKFLOW_REF, got $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+          if [ "$GITHUB_WORKFLOW_SHA" != "$SOURCE_WORKFLOW_SHA" ]; then
+            echo "Finalize workflow SHA mismatch: expected $SOURCE_WORKFLOW_SHA, got $GITHUB_WORKFLOW_SHA"
+            exit 1
+          fi
+        env:
+          SOURCE_ARCH: ${{ inputs.arch }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ inputs.source_run_attempt }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_WORKFLOW_REF: ${{ inputs.source_workflow_ref }}
+          SOURCE_WORKFLOW_SHA: ${{ inputs.source_workflow_sha }}
+          SUBMISSION_ID: ${{ inputs.submission_id }}
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        if: ${{ inputs.phase != 'finalize' }}
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        if: ${{ inputs.phase == 'finalize' }}
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_sha }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: "1.3.11"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
 
@@ -85,6 +215,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build Electron app
+        if: ${{ inputs.phase != 'finalize' }}
         run: bun run build
         working-directory: packages/desktop-electron
         env:
@@ -97,15 +228,65 @@ jobs:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
 
       - name: Package signed app
-        if: runner.os == 'macOS'
+        if: ${{ runner.os == 'macOS' && (inputs.phase == 'submit' || inputs.phase == 'full') }}
         run: npx electron-builder --mac dir --${{ matrix.arch_label }} --publish never --config electron-builder.config.ts
         working-directory: packages/desktop-electron
         timeout-minutes: 30
         env:
           OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
 
-      - name: Notarize app
-        if: runner.os == 'macOS'
+      - name: Prepare signed app artifact
+        if: ${{ runner.os == 'macOS' && inputs.phase == 'submit' }}
+        run: |
+          set -euo pipefail
+
+          case "$OPENCODE_CHANNEL" in
+            dev) APP_NAME="PawWork Dev" ;;
+            beta) APP_NAME="PawWork Beta" ;;
+            prod) APP_NAME="PawWork" ;;
+            *) echo "Unsupported channel: $OPENCODE_CHANNEL"; exit 1 ;;
+          esac
+
+          case "${{ matrix.arch_label }}" in
+            arm64) APP_OUT_DIR="dist/mac-arm64" ;;
+            x64) APP_OUT_DIR="dist/mac" ;;
+            *) echo "Unsupported arch: ${{ matrix.arch_label }}"; exit 1 ;;
+          esac
+
+          APP_PATH="$APP_OUT_DIR/$APP_NAME.app"
+          ARTIFACT_DIR="$RUNNER_TEMP/notarization-state"
+          mkdir -p "$ARTIFACT_DIR"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ARTIFACT_DIR/signed-app.zip"
+
+          cat >"$ARTIFACT_DIR/notarization-metadata.json" <<EOF
+          {
+            "channel": "$OPENCODE_CHANNEL",
+            "arch": "${{ matrix.arch_label }}",
+            "app_name": "$APP_NAME",
+            "source_run_id": "${{ github.run_id }}",
+            "source_run_attempt": "${{ github.run_attempt }}",
+            "source_ref": "${{ github.ref_name }}",
+            "source_sha": "${{ github.sha }}",
+            "source_workflow_ref": "${{ needs.create-snapshot-tag.outputs.workflow_ref }}",
+            "source_workflow_sha": "${{ needs.create-snapshot-tag.outputs.workflow_sha }}"
+          }
+          EOF
+        working-directory: packages/desktop-electron
+        env:
+          OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
+
+      - name: Upload signed app artifact
+        if: ${{ runner.os == 'macOS' && inputs.phase == 'submit' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pawwork-signed-app-${{ inputs.channel || 'dev' }}-${{ matrix.arch_label }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/notarization-state/signed-app.zip
+            ${{ runner.temp }}/notarization-state/notarization-metadata.json
+
+      - name: Submit notarization
+        id: submit_notarization
+        if: ${{ runner.os == 'macOS' && (inputs.phase == 'submit' || inputs.phase == 'full') }}
         run: |
           set -euo pipefail
 
@@ -164,12 +345,123 @@ jobs:
             echo "Non-retryable notarytool submit failure on attempt $submit_attempt"
             exit "$status"
           done
+          echo "submission_id=$submission_id" >> "$GITHUB_OUTPUT"
+        working-directory: packages/desktop-electron
+        timeout-minutes: 30
+        env:
+          OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
+          APPLE_API_KEY: ${{ runner.temp }}/apple-api-key.p8
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
+      - name: Download signed app artifact
+        if: ${{ runner.os == 'macOS' && inputs.phase == 'finalize' && inputs.arch == matrix.arch_label }}
+        run: |
+          set -euo pipefail
+
+          DOWNLOAD_DIR="$RUNNER_TEMP/finalize-download"
+          ARTIFACT_NAME="pawwork-signed-app-${OPENCODE_CHANNEL}-${{ matrix.arch_label }}-${SOURCE_RUN_ID}-${SOURCE_RUN_ATTEMPT}"
+          mkdir -p "$DOWNLOAD_DIR"
+          gh run download "$SOURCE_RUN_ID" --repo "${GITHUB_REPOSITORY}" --name "$ARTIFACT_NAME" --dir "$DOWNLOAD_DIR"
+
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          metadata_path = pathlib.Path(os.environ["DOWNLOAD_DIR"]) / "notarization-metadata.json"
+          metadata = json.loads(metadata_path.read_text())
+          expected = {
+              "channel": os.environ["OPENCODE_CHANNEL"],
+              "arch": os.environ["ARCH_LABEL"],
+              "source_run_id": os.environ["SOURCE_RUN_ID"],
+              "source_run_attempt": os.environ["SOURCE_RUN_ATTEMPT"],
+              "source_ref": os.environ["SOURCE_REF"],
+              "source_sha": os.environ["SOURCE_SHA"],
+              "source_workflow_ref": os.environ["SOURCE_WORKFLOW_REF"],
+              "source_workflow_sha": os.environ["SOURCE_WORKFLOW_SHA"],
+          }
+
+          mismatches = []
+          for key, expected_value in expected.items():
+              actual_value = metadata.get(key)
+              if actual_value != expected_value:
+                  mismatches.append(f"{key}: expected {expected_value!r}, got {actual_value!r}")
+
+          if mismatches:
+              print("Artifact metadata mismatch:")
+              for mismatch in mismatches:
+                  print(f"  - {mismatch}")
+              sys.exit(1)
+
+          PY
+
+          case "${{ matrix.arch_label }}" in
+            arm64) APP_OUT_DIR="dist/mac-arm64" ;;
+            x64) APP_OUT_DIR="dist/mac" ;;
+            *) echo "Unsupported arch: ${{ matrix.arch_label }}"; exit 1 ;;
+          esac
+
+          case "$OPENCODE_CHANNEL" in
+            dev) APP_NAME="PawWork Dev" ;;
+            beta) APP_NAME="PawWork Beta" ;;
+            prod) APP_NAME="PawWork" ;;
+            *) echo "Unsupported channel: $OPENCODE_CHANNEL"; exit 1 ;;
+          esac
+
+          rm -rf "$APP_OUT_DIR"
+          mkdir -p "$APP_OUT_DIR"
+          ditto -x -k "$DOWNLOAD_DIR/signed-app.zip" "$APP_OUT_DIR"
+          echo "Restored $APP_NAME.app from artifact $ARTIFACT_NAME"
+        working-directory: packages/desktop-electron
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ARCH_LABEL: ${{ matrix.arch_label }}
+          DOWNLOAD_DIR: ${{ runner.temp }}/finalize-download
+          OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ inputs.source_run_attempt }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_WORKFLOW_REF: ${{ inputs.source_workflow_ref }}
+          SOURCE_WORKFLOW_SHA: ${{ inputs.source_workflow_sha }}
+
+      - name: Finalize notarization
+        if: ${{ runner.os == 'macOS' && (inputs.phase == 'finalize' || inputs.phase == 'full') && inputs.arch == matrix.arch_label }}
+        run: |
+          set -euo pipefail
+
+          case "$OPENCODE_CHANNEL" in
+            dev) APP_NAME="PawWork Dev" ;;
+            beta) APP_NAME="PawWork Beta" ;;
+            prod) APP_NAME="PawWork" ;;
+            *) echo "Unsupported channel: $OPENCODE_CHANNEL"; exit 1 ;;
+          esac
+
+          case "${{ matrix.arch_label }}" in
+            arm64) APP_OUT_DIR="dist/mac-arm64" ;;
+            x64) APP_OUT_DIR="dist/mac" ;;
+            *) echo "Unsupported arch: ${{ matrix.arch_label }}"; exit 1 ;;
+          esac
+
+          APP_PATH="$APP_OUT_DIR/$APP_NAME.app"
+          if [ -n "${INPUT_SUBMISSION_ID}" ]; then
+            submission_id="$INPUT_SUBMISSION_ID"
+          else
+            submission_id="$SUBMITTED_SUBMISSION_ID"
+          fi
+          if [ -z "$submission_id" ]; then
+            echo "submission_id is required"
+            exit 1
+          fi
+          auth_args=(--key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER")
           deadline=$((SECONDS + 5400))
 
           while true; do
             if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "Timed out waiting for notarization for submission $submission_id"
+              echo "Timed out waiting for notarization for submission $submission_id during finalize"
               exit 1
             fi
 
@@ -185,13 +477,13 @@ jobs:
 
             if [ "$status" -ne 0 ]; then
               if grep -Eq 'NSURLErrorDomain Code=-1009|The Internet connection appears to be offline|No network route' "$info_out" "$info_err"; then
-                echo "Transient notarytool info network error, retrying after 60 seconds"
+                echo "Transient notarytool info network error during finalize, retrying after 60 seconds"
                 sleep 60
                 continue
               fi
 
               cat "$info_out" || true
-              echo "Non-retryable notarytool info failure"
+              echo "Non-retryable notarytool info failure during finalize"
               exit "$status"
             fi
 
@@ -218,12 +510,14 @@ jobs:
         timeout-minutes: 120
         env:
           OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
+          INPUT_SUBMISSION_ID: ${{ inputs.submission_id }}
+          SUBMITTED_SUBMISSION_ID: ${{ steps.submit_notarization.outputs.submission_id }}
           APPLE_API_KEY: ${{ runner.temp }}/apple-api-key.p8
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
       - name: Package notarized artifacts
-        if: runner.os == 'macOS'
+        if: ${{ runner.os == 'macOS' && (inputs.phase == 'finalize' || inputs.phase == 'full') && inputs.arch == matrix.arch_label }}
         run: |
           set -euo pipefail
 
@@ -242,21 +536,110 @@ jobs:
 
           APP_PATH="$APP_OUT_DIR/$APP_NAME.app"
 
-          npx electron-builder --mac dmg zip --${{ matrix.arch_label }} --prepackaged "$APP_PATH" --publish never --config electron-builder.config.ts
+          npx electron-builder --mac dmg zip --${{ matrix.arch_label }} --prepackaged "$APP_PATH" --publish never --config.mac.sign=./script/skip-mac-sign.cjs --config.mac.notarize=false --config electron-builder.config.ts
         working-directory: packages/desktop-electron
         timeout-minutes: 30
         env:
           OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
 
+      - name: Verify notarized artifacts
+        if: ${{ runner.os == 'macOS' && (inputs.phase == 'finalize' || inputs.phase == 'full') && inputs.arch == matrix.arch_label }}
+        run: |
+          set -euo pipefail
+
+          case "$OPENCODE_CHANNEL" in
+            dev) APP_NAME="PawWork Dev" ;;
+            beta) APP_NAME="PawWork Beta" ;;
+            prod) APP_NAME="PawWork" ;;
+            *) echo "Unsupported channel: $OPENCODE_CHANNEL"; exit 1 ;;
+          esac
+
+          verify_dir="$RUNNER_TEMP/verify-notarized-artifacts"
+          rm -rf "$verify_dir"
+          mkdir -p "$verify_dir"
+
+          dmg_count=$(find dist -maxdepth 1 -name '*.dmg' | wc -l | tr -d ' ')
+          if [ "$dmg_count" -eq 0 ]; then
+            echo "Expected at least one dmg artifact in dist/"
+            exit 1
+          fi
+
+          while IFS= read -r dmg_path; do
+            codesign --verify --verbose=2 "$dmg_path"
+          done < <(find dist -maxdepth 1 -name '*.dmg')
+
+          zip_path=$(find dist -maxdepth 1 -name '*.zip' | head -n 1 || true)
+          if [ -z "$zip_path" ]; then
+            echo "Expected a zip artifact in dist/"
+            exit 1
+          fi
+
+          ditto -x -k "$zip_path" "$verify_dir"
+          xcrun stapler validate -v "$verify_dir/$APP_NAME.app"
+
+          mount_base="$RUNNER_TEMP/verify-dmg-mounts"
+          rm -rf "$mount_base"
+          mkdir -p "$mount_base"
+
+          while IFS= read -r dmg_path; do
+            mount_dir="$mount_base/$(basename "$dmg_path" .dmg)"
+            mkdir -p "$mount_dir"
+
+            attach_plist="$RUNNER_TEMP/$(basename "$dmg_path").attach.plist"
+            hdiutil attach "$dmg_path" -mountpoint "$mount_dir" -nobrowse -readonly -plist > "$attach_plist"
+
+            mounted_app=$(find "$mount_dir" -maxdepth 2 -name '*.app' | head -n 1 || true)
+            if [ -z "$mounted_app" ]; then
+              echo "Expected a mounted app bundle inside $dmg_path"
+              hdiutil detach "$mount_dir" -quiet || true
+              exit 1
+            fi
+
+            xcrun stapler validate -v "$mounted_app"
+            codesign --verify --deep --strict --verbose=2 "$mounted_app"
+
+            hdiutil detach "$mount_dir" -quiet
+            rm -f "$attach_plist"
+          done < <(find dist -maxdepth 1 -name '*.dmg')
+        working-directory: packages/desktop-electron
+        timeout-minutes: 30
+        env:
+          OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
+
+      - name: Summarize submit phase
+        if: ${{ runner.os == 'macOS' && inputs.phase == 'submit' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Notarization Submitted
+
+          - Submission ID: `${{ steps.submit_notarization.outputs.submission_id }}`
+          - Source run ID: `${{ github.run_id }}`
+          - Source run attempt: `${{ github.run_attempt }}`
+          - Source ref: `${{ github.ref_name }}`
+          - Source sha: `${{ github.sha }}`
+          - Arch: `${{ matrix.arch_label }}`
+          - Workflow ref: `${{ needs.create-snapshot-tag.outputs.workflow_ref }}`
+          - Workflow sha: `${{ needs.create-snapshot-tag.outputs.workflow_sha }}`
+          - Artifact name: `pawwork-signed-app-${{ inputs.channel || 'dev' }}-${{ matrix.arch_label }}-${{ github.run_id }}-${{ github.run_attempt }}`
+
+          To finalize later, run:
+
+          \`gh workflow run build.yml --repo ${{ github.repository }} --ref ${{ needs.create-snapshot-tag.outputs.workflow_ref }} -f phase=finalize -f channel=${{ inputs.channel || 'dev' }} -f arch=${{ matrix.arch_label }} -f source_run_id=${{ github.run_id }} -f source_run_attempt=${{ github.run_attempt }} -f source_ref=${{ github.ref_name }} -f source_sha=${{ github.sha }} -f source_workflow_ref=${{ needs.create-snapshot-tag.outputs.workflow_ref }} -f source_workflow_sha=${{ needs.create-snapshot-tag.outputs.workflow_sha }} -f submission_id=${{ steps.submit_notarization.outputs.submission_id }}\`
+          EOF
+
       - name: Package app
-        if: runner.os != 'macOS'
+        if: ${{ runner.os != 'macOS' && inputs.phase != 'finalize' }}
         run: npx electron-builder ${{ matrix.platform_flag }} --publish never --config electron-builder.config.ts
         working-directory: packages/desktop-electron
         timeout-minutes: 60
         env:
           OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ runner.os == 'macOS' && (inputs.phase == 'finalize' || inputs.phase == 'full') && inputs.arch == matrix.arch_label }}
         with:
           name: pawwork-${{ runner.os }}-${{ matrix.arch_label }}
           path: |
@@ -265,3 +648,31 @@ jobs:
             packages/desktop-electron/dist/*.exe
             packages/desktop-electron/dist/*.AppImage
             packages/desktop-electron/dist/*.deb
+
+  cleanup-snapshot-tag:
+    needs:
+      - build-electron
+    if: ${{ inputs.phase == 'finalize' && needs.build-electron.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: |
+          set -euo pipefail
+
+          case "$SOURCE_WORKFLOW_REF" in
+            workflow-snapshot-*) ;;
+            *)
+              echo "Refusing to delete non-snapshot tag: $SOURCE_WORKFLOW_REF"
+              exit 1
+              ;;
+          esac
+
+          gh api \
+            --method DELETE \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/git/refs/tags/${SOURCE_WORKFLOW_REF}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SOURCE_WORKFLOW_REF: ${{ inputs.source_workflow_ref }}
