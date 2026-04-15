@@ -476,6 +476,53 @@ it.live("loop continues when finish is tool-calls", () =>
   ),
 )
 
+it.live("write tool keeps runtime context during prompt runs", () =>
+  Effect.gen(function* () {
+    const prompt = yield* SessionPrompt.Service
+    const llm = yield* TestLLMServer
+
+    yield* provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const sessions = yield* Session.Service
+          const session = yield* sessions.create({
+            title: "Write context",
+            permission: [{ permission: "*", pattern: "*", action: "allow" }],
+          })
+          const file = path.join(dir, "probe.txt")
+
+          yield* prompt.prompt({
+            sessionID: session.id,
+            agent: "build",
+            noReply: true,
+            parts: [{ type: "text", text: "write a probe file" }],
+          })
+          yield* llm.tool("write", { filePath: file, content: "probe" })
+          yield* llm.text("done")
+
+          const result = yield* prompt.loop({ sessionID: session.id })
+          expect(result.info.role).toBe("assistant")
+
+          const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+          const tool = msgs
+            .flatMap((msg) => msg.parts)
+            .find(
+              (part): part is CompletedToolPart =>
+                part.type === "tool" && part.tool === "write" && part.state.status === "completed",
+            )
+          expect(tool).toBeDefined()
+          if (!tool) throw new Error("Expected completed write tool part")
+
+          expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("probe")
+          expect(tool.state.output).toContain("Wrote file successfully.")
+          expect(tool.state.output).not.toContain("No context found for instance")
+          expect(result.parts.some((part) => part.type === "text" && part.text === "done")).toBe(true)
+        }),
+      { git: true, config: providerCfg(llm.url) },
+    )
+  }),
+)
+
 unix(
   "shell keeps runtime context when prompt service is initialized outside instance",
   () =>

@@ -9,14 +9,21 @@ import { WorkspaceContext } from "@/control-plane/workspace-context"
 export const memoMap = Layer.makeMemoMapUnsafe()
 
 export function attach<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
+  let attached = effect
+
   try {
     const ctx = Instance.current
-    const workspaceID = WorkspaceContext.workspaceID
-    return effect.pipe(Effect.provideService(InstanceRef, ctx), Effect.provideService(WorkspaceRef, workspaceID))
+    attached = attached.pipe(Effect.provideService(InstanceRef, ctx))
   } catch (err) {
     if (!(err instanceof LocalContext.NotFound)) throw err
   }
-  return effect
+
+  const workspaceID = WorkspaceContext.workspaceID
+  if (workspaceID) {
+    attached = attached.pipe(Effect.provideService(WorkspaceRef, workspaceID))
+  }
+
+  return attached
 }
 
 export function makeRuntime<I, S, E>(service: Context.Service<I, S>, layer: Layer.Layer<I, E>) {

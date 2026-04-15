@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test"
 import { Context, Effect, Layer, Logger } from "effect"
+import { WorkspaceID } from "../../src/control-plane/schema"
+import { WorkspaceContext } from "../../src/control-plane/workspace-context"
 import { AppRuntime } from "../../src/effect/app-runtime"
 import { InstanceRef } from "../../src/effect/instance-ref"
+import { WorkspaceRef } from "../../src/effect/instance-ref"
 import { EffectLogger } from "../../src/effect/logger"
 import { makeRuntime } from "../../src/effect/run-service"
 import { Instance } from "../../src/project/instance"
@@ -58,4 +61,17 @@ test("AppRuntime attaches InstanceRef from ALS", async () => {
   })
 
   expect(dir).toBe(tmp.path)
+})
+
+test("AppRuntime attaches WorkspaceRef from ALS", async () => {
+  const workspaceID = WorkspaceID.ascending()
+
+  const restored = await WorkspaceContext.provide({
+    workspaceID,
+    fn: () => AppRuntime.runPromise(Effect.gen(function* () {
+      return yield* WorkspaceRef
+    })),
+  })
+
+  expect(restored).toBe(workspaceID)
 })
