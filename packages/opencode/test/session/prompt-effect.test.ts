@@ -476,6 +476,45 @@ it.live("loop continues when finish is tool-calls", () =>
   ),
 )
 
+unix(
+  "shell keeps runtime context when prompt service is initialized outside instance",
+  () =>
+    withSh(() =>
+      Effect.gen(function* () {
+        const prompt = yield* SessionPrompt.Service
+
+        yield* provideTmpdirInstance(
+          () =>
+            Effect.gen(function* () {
+              const sessions = yield* Session.Service
+              const chat = yield* sessions.create({ title: "Pinned" })
+
+              const fiber = yield* prompt
+                .shell({ sessionID: chat.id, agent: "build", command: "printf first && sleep 0.2 && printf second" })
+                .pipe(Effect.forkChild)
+
+              yield* Effect.promise(async () => {
+                const start = Date.now()
+                while (Date.now() - start < 5000) {
+                  const msgs = await MessageV2.filterCompacted(MessageV2.stream(chat.id))
+                  const taskMsg = msgs.find((item) => item.info.role === "assistant")
+                  const tool = taskMsg ? toolPart(taskMsg.parts) : undefined
+                  if (tool?.state.status === "running" && tool.state.metadata?.output.includes("first")) return
+                  await new Promise((done) => setTimeout(done, 20))
+                }
+                throw new Error("timed out waiting for running shell metadata")
+              })
+
+              const exit = yield* Fiber.await(fiber)
+              expect(Exit.isSuccess(exit)).toBe(true)
+            }),
+          { git: true, config: cfg },
+        )
+      }),
+    ),
+  30_000,
+)
+
 it.live("loop continues when finish is stop but assistant has tool parts", () =>
   provideTmpdirServer(
     Effect.fnUntraced(function* ({ llm }) {
