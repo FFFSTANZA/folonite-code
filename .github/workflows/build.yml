@@ -52,6 +52,14 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Import code signing certificate
+        if: runner.os == 'macOS'
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          keychain: build
+          p12-file-base64: ${{ secrets.CSC_LINK }}
+          p12-password: ${{ secrets.CSC_KEY_PASSWORD }}
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
