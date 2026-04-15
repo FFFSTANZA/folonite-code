@@ -7,6 +7,7 @@ import { base64Encode } from "@opencode-ai/util/encode"
 import { showToast } from "@opencode-ai/ui/toast"
 import { Mark } from "@opencode-ai/ui/logo"
 import { pawworkSkillCards, type PawworkSkillName } from "./pawwork-skill-meta"
+import { buildSkillSessionCommandInput } from "./session-new-view-command"
 
 export function NewSessionView() {
   const sdk = useSDK()
@@ -39,15 +40,16 @@ export function NewSessionView() {
       local.session.promote(sdk.directory, created.id)
       navigate(`/${base64Encode(sdk.directory)}/session/${created.id}`)
 
-      await sdk.client.session.command({
-        sessionID: created.id,
-        command: name,
-        arguments: "",
-        agent: agent.name,
-        model: `${model.provider.id}/${model.id}`,
-        variant: local.model.variant.current() ?? undefined,
-        parts: [],
-      })
+      await sdk.client.session.command(
+        buildSkillSessionCommandInput({
+          sessionID: created.id,
+          command: name,
+          agent: agent.name,
+          model: `${model.provider.id}/${model.id}`,
+          variant: local.model.variant.current() ?? undefined,
+          locale: language.intl(),
+        }),
+      )
     } catch (error) {
       if (created?.id) {
         await sdk.client.session.delete({ sessionID: created.id }).catch(() => undefined)
