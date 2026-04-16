@@ -113,7 +113,7 @@ export namespace Filesystem {
    */
   export function normalizePath(p: string): string {
     if (process.platform !== "win32") return p
-    const resolved = win32.normalize(win32.resolve(windowsPath(p)))
+    const resolved = normalizeWindowsAbsolutePath(windowsPath(p))
     try {
       return realpathSync.native(resolved)
     } catch {
@@ -134,7 +134,7 @@ export namespace Filesystem {
   // Also resolves symlinks so that callers using the result as a cache key
   // always get the same canonical path for a given physical directory.
   export function resolve(p: string): string {
-    const resolved = pathResolve(windowsPath(p))
+    const resolved = process.platform === "win32" ? normalizeWindowsAbsolutePath(windowsPath(p)) : pathResolve(p)
     try {
       return normalizePath(realpathSync(resolved))
     } catch (e) {
@@ -155,6 +155,40 @@ export namespace Filesystem {
         // WSL paths are typically /mnt/<drive>/...
         .replace(/^\/mnt\/([a-zA-Z])(?:\/|$)/, (_, drive) => `${drive.toUpperCase()}:/`)
     )
+  }
+
+  function normalizeWindowsAbsolutePath(p: string) {
+    const existing = resolveRootedWindowsVariant(p)
+    return win32.normalize(existing ?? win32.resolve(p))
+  }
+
+  function resolveRootedWindowsVariant(p: string) {
+    if (!/^[\\/](?![\\/])/.test(p)) return
+    const suffix = p.replace(/^[\\/]+/, "").replaceAll("/", "\\")
+    for (const root of windowsDriveRoots()) {
+      const candidate = win32.join(root, suffix)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+
+  function windowsDriveRoots() {
+    const result: string[] = []
+    const seen = new Set<string>()
+    const push = (input?: string) => {
+      if (!input) return
+      const match = input.match(/^([A-Za-z]:)/)
+      if (!match) return
+      const root = match[1].toUpperCase()
+      if (seen.has(root)) return
+      seen.add(root)
+      result.push(root + "\\")
+    }
+    push(process.cwd())
+    push(process.env.SystemDrive)
+    for (let code = 65; code <= 90; code++) {
+      push(String.fromCharCode(code) + ":")
+    }
+    return result
   }
 
   function comparablePath(p: string) {

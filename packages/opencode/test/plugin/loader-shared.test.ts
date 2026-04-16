@@ -13,6 +13,7 @@ const { PluginLoader } = await import("../../src/plugin/loader")
 const { readPackageThemes } = await import("../../src/plugin/shared")
 const { Instance } = await import("../../src/project/instance")
 const { Npm } = await import("../../src/npm")
+const { Config } = await import("../../src/config/config")
 
 afterAll(() => {
   if (disableDefault === undefined) {
@@ -699,6 +700,52 @@ describe("plugin.loader.shared", () => {
 
     await load(tmp.path)
     expect(await Bun.file(tmp.extra.mark).text()).toBe("ok")
+  })
+
+  test("does not wait for auto-discovered file plugins when config-scoped deps already exist", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        const configDir = path.join(dir, ".opencode")
+        const pluginsDir = path.join(configDir, "plugins")
+        const depDir = path.join(configDir, "node_modules", "demo-dep")
+        const pluginFile = path.join(pluginsDir, "demo.ts")
+        const mark = path.join(dir, "demo.txt")
+
+        await fs.mkdir(pluginsDir, { recursive: true })
+        await fs.mkdir(depDir, { recursive: true })
+        await Bun.write(
+          path.join(depDir, "package.json"),
+          JSON.stringify({ name: "demo-dep", type: "module", exports: "./index.js" }),
+        )
+        await Bun.write(path.join(depDir, "index.js"), 'export const ready = "ok"\n')
+        await Bun.write(
+          pluginFile,
+          [
+            'import { ready } from "demo-dep"',
+            "export default {",
+            '  id: "demo.auto",',
+            "  server: async () => {",
+            `    await Bun.write(${JSON.stringify(mark)}, ready)`,
+            "    return {}",
+            "  },",
+            "}",
+            "",
+          ].join("\n"),
+        )
+
+        return { mark }
+      },
+    })
+
+    const wait = spyOn(Config, "waitForDependencies").mockResolvedValue()
+
+    try {
+      await load(tmp.path)
+      expect(wait).not.toHaveBeenCalled()
+      expect(await Bun.file(tmp.extra.mark).text()).toBe("ok")
+    } finally {
+      wait.mockRestore()
+    }
   })
 
   test("loads object plugin via plugin.server", async () => {

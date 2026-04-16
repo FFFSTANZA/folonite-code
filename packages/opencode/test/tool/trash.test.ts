@@ -40,6 +40,9 @@ const ctx = {
   ask: () => Effect.void,
 }
 
+const glob = (p: string) =>
+  process.platform === "win32" ? AppFileSystem.normalizePathPattern(p) : p.replaceAll("\\", "/")
+
 afterEach(async () => {
   await Instance.disposeAll()
 })
@@ -119,7 +122,7 @@ describe("tool.trash", () => {
 
           expect(trashCalls).toEqual([[filepath]])
           expect(requests.find((item) => item.permission === "external_directory")?.patterns).toEqual([
-            path.join(outer, "*").replaceAll("\\", "/"),
+            glob(path.join(outer, "*")),
           ])
           expect(requests.find((item) => item.permission === "trash")?.patterns).toEqual([filepath])
         }),

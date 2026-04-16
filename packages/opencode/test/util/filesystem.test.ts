@@ -592,6 +592,13 @@ describe("filesystem", () => {
       expect(Filesystem.resolve(`/mnt/${drive}`)).toBe(Filesystem.resolve(`${drive.toUpperCase()}:/`))
     })
 
+    test("resolves drive-less rooted paths to an existing drive on Windows", async () => {
+      if (process.platform !== "win32") return
+      await using tmp = await tmpdir()
+      const alt = tmp.path.slice(2).replaceAll("\\", "/").toLowerCase()
+      expect(Filesystem.resolve(alt)).toBe(Filesystem.normalizePath(tmp.path))
+    })
+
     test("resolves symlinked directory to canonical path", async () => {
       await using tmp = await tmpdir()
       const target = path.join(tmp.path, "real")

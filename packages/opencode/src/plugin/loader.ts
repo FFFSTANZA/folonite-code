@@ -144,6 +144,7 @@ export namespace PluginLoader {
     items: Config.PluginOrigin[]
     kind: PluginKind
     wait?: () => Promise<void>
+    shouldRetry?: (origin: Config.PluginOrigin) => Promise<boolean>
     finish?: (load: Loaded, origin: Config.PluginOrigin, retry: boolean) => Promise<R | undefined>
     missing?: (value: Missing, origin: Config.PluginOrigin, retry: boolean) => Promise<R | undefined>
     report?: Report
@@ -151,24 +152,34 @@ export namespace PluginLoader {
 
   export async function loadExternal<R = Loaded>(input: Input<R>): Promise<R[]> {
     const candidates = input.items.map((origin) => ({ origin, plan: plan(origin.spec) }))
-    const list: Array<Promise<R | undefined>> = []
+    const list: Array<Promise<{ value: R | undefined; retryable: boolean }>> = []
     for (const candidate of candidates) {
-      list.push(attempt(candidate, input.kind, false, input.finish, input.missing, input.report))
+      list.push(
+        attempt(candidate, input.kind, false, input.finish, input.missing, input.report).then((value) => ({
+          value,
+          retryable: value === undefined,
+        })),
+      )
     }
     const out = await Promise.all(list)
     if (input.wait) {
       let deps: Promise<void> | undefined
       for (let i = 0; i < candidates.length; i++) {
-        if (out[i] !== undefined) continue
+        if (out[i]?.value !== undefined) continue
         const candidate = candidates[i]
         if (!candidate || pluginSource(candidate.plan.spec) !== "file") continue
+        const retryable = input.shouldRetry ? await input.shouldRetry(candidate.origin) : out[i]?.retryable
+        if (!retryable) continue
         deps ??= input.wait()
         await deps
-        out[i] = await attempt(candidate, input.kind, true, input.finish, input.missing, input.report)
+        out[i] = {
+          value: await attempt(candidate, input.kind, true, input.finish, input.missing, input.report),
+          retryable: false,
+        }
       }
     }
     const ready: R[] = []
-    for (const item of out) if (item !== undefined) ready.push(item)
+    for (const item of out) if (item?.value !== undefined) ready.push(item.value)
     return ready
   }
 }
