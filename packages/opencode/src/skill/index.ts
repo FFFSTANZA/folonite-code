@@ -73,6 +73,16 @@ export namespace Skill {
     return process.cwd()
   }
 
+  function resolveBuiltinRoot(baseDir: string, rel: string) {
+    // Tests pass POSIX-style fixture paths even on Windows, so preserve POSIX
+    // resolution for synthetic "/repo/..." inputs while keeping native
+    // resolution for real Windows paths.
+    if (baseDir.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(baseDir)) {
+      return path.posix.resolve(baseDir, rel, "skills")
+    }
+    return path.resolve(baseDir, rel, "skills")
+  }
+
   export function builtinRoots(baseDir?: string) {
     const resolvedBaseDir = builtinBaseDir(baseDir)
     const roots = new Set<string>()
@@ -80,7 +90,7 @@ export namespace Skill {
       roots.add(path.join(processWithResourcesPath.resourcesPath, "skills"))
     }
     for (const rel of ["../../../..", "../../../../.."]) {
-      roots.add(path.resolve(resolvedBaseDir, rel, "skills"))
+      roots.add(resolveBuiltinRoot(resolvedBaseDir, rel))
     }
     return [...roots]
   }

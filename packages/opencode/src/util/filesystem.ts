@@ -2,7 +2,7 @@ import { chmod, mkdir, readFile, stat as statFile, writeFile } from "fs/promises
 import { createWriteStream, existsSync, statSync } from "fs"
 import { lookup } from "mime-types"
 import { realpathSync } from "fs"
-import { dirname, join, relative, resolve as pathResolve, win32 } from "path"
+import { dirname, isAbsolute as pathIsAbsolute, join, relative, resolve as pathResolve, win32 } from "path"
 import { Readable } from "stream"
 import { pipeline } from "stream/promises"
 import { Glob } from "./glob"
@@ -156,14 +156,36 @@ export namespace Filesystem {
         .replace(/^\/mnt\/([a-zA-Z])(?:\/|$)/, (_, drive) => `${drive.toUpperCase()}:/`)
     )
   }
+
+  function comparablePath(p: string) {
+    if (process.platform !== "win32") return pathResolve(p)
+    return win32.normalize(win32.resolve(windowsPath(p)))
+  }
+
+  function comparableRelative(from: string, to: string) {
+    if (process.platform !== "win32") return relative(from, to)
+    return win32.relative(from, to)
+  }
+
+  function isContainedRelative(rel: string) {
+    if (!rel || rel === ".") return true
+    const absolute = process.platform === "win32" ? win32.isAbsolute(rel) : pathIsAbsolute(rel)
+    if (absolute) return false
+    return rel !== ".." && !rel.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`)
+  }
+
   export function overlaps(a: string, b: string) {
-    const relA = relative(a, b)
-    const relB = relative(b, a)
-    return !relA || !relA.startsWith("..") || !relB || !relB.startsWith("..")
+    const left = comparablePath(a)
+    const right = comparablePath(b)
+    const relA = comparableRelative(left, right)
+    const relB = comparableRelative(right, left)
+    return isContainedRelative(relA) || isContainedRelative(relB)
   }
 
   export function contains(parent: string, child: string) {
-    return !relative(parent, child).startsWith("..")
+    const base = comparablePath(parent)
+    const target = comparablePath(child)
+    return isContainedRelative(comparableRelative(base, target))
   }
 
   export async function findUp(

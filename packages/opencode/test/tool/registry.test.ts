@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import path from "path"
 import fs from "fs/promises"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { ToolRegistry } from "../../src/tool/registry"
+import { Npm } from "../../src/npm"
 
 afterEach(async () => {
   await Instance.disposeAll()
@@ -153,6 +154,56 @@ describe("tool.registry", () => {
         expect(ids).toContain("cowsay")
       },
     })
+  })
+
+  test("waits for config-scoped dependencies before importing local tools with bare imports", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        const toolsDir = path.join(dir, ".opencode", "tools")
+        await fs.mkdir(toolsDir, { recursive: true })
+
+        await Bun.write(
+          path.join(toolsDir, "late.ts"),
+          [
+            "import { ready } from 'late-dep'",
+            "export default {",
+            "  description: 'tool that waits for dependencies',",
+            "  args: {},",
+            "  execute: async () => ready,",
+            "}",
+            "",
+          ].join("\n"),
+        )
+      },
+    })
+
+    const install = spyOn(Npm, "install").mockImplementation(async (dir: string) => {
+      const pkgDir = path.join(dir, "node_modules", "late-dep")
+      await fs.mkdir(pkgDir, { recursive: true })
+      await Bun.write(
+        path.join(pkgDir, "package.json"),
+        JSON.stringify({
+          name: "late-dep",
+          type: "module",
+          exports: "./index.js",
+        }),
+      )
+      await Bun.write(path.join(pkgDir, "index.js"), 'export const ready = "hello"\n')
+    })
+
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const ids = await ToolRegistry.ids()
+          expect(ids).toContain("late")
+        },
+      })
+      expect(install.mock.calls.some(([dir]) => path.normalize(dir) === path.normalize(path.join(tmp.path, ".opencode"))))
+        .toBe(true)
+    } finally {
+      install.mockRestore()
+    }
   })
 
   test("skips disabled tools before importing them", async () => {

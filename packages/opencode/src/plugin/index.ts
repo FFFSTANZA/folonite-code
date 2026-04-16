@@ -1,4 +1,5 @@
 import type { Hooks, PluginInput, Plugin as PluginInstance, PluginModule } from "@opencode-ai/plugin"
+import { fileURLToPath } from "url"
 import { Config } from "../config/config"
 import { Bus } from "../bus"
 import { Log } from "../util/log"
@@ -16,11 +17,14 @@ import { EffectLogger } from "@/effect/logger"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
 import { errorMessage } from "@/util/error"
+import { Filesystem } from "@/util/filesystem"
 import { PluginLoader } from "./loader"
 import { parsePluginSpecifier, readPluginId, readV1Plugin, resolvePluginId } from "./shared"
 
 export namespace Plugin {
   const log = Log.create({ service: "plugin" })
+  const DEPENDENCY_IMPORT =
+    /(?:^|\n)\s*(?:import\s+(?:[^"'`]+\s+from\s+)?|export\s+[^"'`]+\s+from\s+)["']([^./"'`][^"'`]*)["']|import\s*\(\s*["']([^./"'`][^"'`]*)["']\s*\)|require\(\s*["']([^./"'`][^"'`]*)["']\s*\)/m
 
   type State = {
     hooks: Hooks[]
@@ -154,12 +158,25 @@ export namespace Plugin {
           if (Flag.OPENCODE_PURE && cfg.plugin_origins?.length) {
             log.info("skipping external plugins in pure mode", { count: cfg.plugin_origins.length })
           }
-          if (plugins.length) yield* config.waitForDependencies()
+          const shouldWaitForFilePluginDeps = yield* Effect.promise(async () => {
+            for (const item of plugins) {
+              const spec = Config.pluginSpecifier(item.spec)
+              if (!spec.startsWith("file://")) continue
+              const file = fileURLToPath(spec)
+              const stat = await Filesystem.statAsync(file)
+              if (!stat?.isFile()) continue
+              const text = await Filesystem.readText(file).catch(() => "")
+              if (DEPENDENCY_IMPORT.test(text)) return true
+            }
+            return false
+          })
+          if (shouldWaitForFilePluginDeps) yield* config.waitForDependencies()
 
           const loaded = yield* Effect.promise(() =>
             PluginLoader.loadExternal({
               items: plugins,
               kind: "server",
+              wait: () => Config.waitForDependencies(),
               report: {
                 start(candidate) {
                   log.info("loading plugin", { path: candidate.plan.spec })

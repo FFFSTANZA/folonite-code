@@ -52,6 +52,8 @@ import { Skill } from "../skill"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
+  const DEPENDENCY_IMPORT =
+    /(?:^|\n)\s*(?:import\s+(?:[^"'`]+\s+from\s+)?|export\s+[^"'`]+\s+from\s+)["']([^./"'`][^"'`]*)["']|import\s*\(\s*["']([^./"'`][^"'`]*)["']\s*\)|require\(\s*["']([^./"'`][^"'`]*)["']\s*\)/m
 
   type TaskDef = Tool.InferDef<typeof TaskTool>
   type ReadDef = Tool.InferDef<typeof ReadTool>
@@ -163,7 +165,7 @@ export namespace ToolRegistry {
           )
           const cfg = yield* config.get()
           const rules = Permission.fromConfig(cfg.permission ?? {})
-          if (matches.length) yield* config.waitForDependencies()
+          let depsReady = false
           for (const match of matches) {
             const namespace = path.basename(match, path.extname(match))
             const text = yield* Effect.promise(() => Bun.file(match).text())
@@ -177,9 +179,12 @@ export namespace ToolRegistry {
               ...Permission.disabled(ids, rules),
             ])
             if (ids.length && ids.every((id) => disabled.has(id))) continue
-            const mod = yield* Effect.promise(
-              () => import(process.platform === "win32" ? match : pathToFileURL(match).href),
-            )
+            const spec = process.platform === "win32" ? match : pathToFileURL(match).href
+            if (!depsReady && DEPENDENCY_IMPORT.test(text)) {
+              depsReady = true
+              yield* config.waitForDependencies()
+            }
+            const mod = yield* Effect.promise(() => import(spec))
             for (const [id, def] of Object.entries<ToolDefinition>(mod)) {
               custom.push(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
             }
