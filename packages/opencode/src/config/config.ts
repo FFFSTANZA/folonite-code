@@ -146,7 +146,8 @@ export namespace Config {
 
   export async function installDependencies(dir: string, input?: InstallInput) {
     if (!(await isWritable(dir))) return
-    await using _ = await Flock.acquire(`config-install:${Filesystem.resolve(dir)}`, {
+    const key = process.platform === "win32" ? "config-install:win32" : `config-install:${Filesystem.resolve(dir)}`
+    await using _ = await Flock.acquire(key, {
       signal: input?.signal,
       onWait: (tick) =>
         input?.waitTick?.({
