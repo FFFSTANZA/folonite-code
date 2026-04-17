@@ -63,7 +63,7 @@ concurrency:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
 
 jobs:
   create-snapshot-tag:
@@ -536,11 +536,12 @@ jobs:
 
           APP_PATH="$APP_OUT_DIR/$APP_NAME.app"
 
-          npx electron-builder --mac dmg zip --${{ matrix.arch_label }} --prepackaged "$APP_PATH" --publish never --config.mac.sign=./script/skip-mac-sign.cjs --config.mac.notarize=false --config electron-builder.config.ts
+          npx electron-builder --mac dmg zip --${{ matrix.arch_label }} --prepackaged "$APP_PATH" --publish always --config.mac.sign=./script/skip-mac-sign.cjs --config.mac.notarize=false --config electron-builder.config.ts
         working-directory: packages/desktop-electron
         timeout-minutes: 30
         env:
           OPENCODE_CHANNEL: ${{ inputs.channel || 'dev' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify notarized artifacts
         if: ${{ runner.os == 'macOS' && (inputs.phase == 'finalize' || inputs.phase == 'full') && inputs.arch == matrix.arch_label }}

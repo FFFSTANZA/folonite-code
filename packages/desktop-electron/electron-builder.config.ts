@@ -105,7 +105,7 @@ function getConfig() {
         appId: "ai.pawwork.desktop.beta",
         productName: "PawWork Beta",
         protocols: { name: "PawWork Beta", schemes: ["pawwork"] },
-        publish: { provider: "github", owner: "AstroHan", repo: "pawwork-beta", channel: "latest" },
+        publish: { provider: "github", owner: "Astro-Han", repo: "pawwork-beta", channel: "latest" },
         rpm: { packageName: "pawwork-beta" },
       }
     }
@@ -115,7 +115,7 @@ function getConfig() {
         appId: "ai.pawwork.desktop",
         productName: "PawWork",
         protocols: { name: "PawWork", schemes: ["pawwork"] },
-        publish: { provider: "github", owner: "AstroHan", repo: "pawwork", channel: "latest" },
+        publish: { provider: "github", owner: "Astro-Han", repo: "pawwork", channel: "latest" },
         rpm: { packageName: "pawwork" },
       }
     }
