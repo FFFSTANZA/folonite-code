@@ -28,8 +28,8 @@ macOS (Apple Silicon): **[下载 .dmg](https://github.com/Astro-Han/pawwork/rele
 
 ### macOS 首次打开
 
-PawWork 暂未完成 Apple 签名。首次打开时：
-右键点击应用 > 打开 > 在弹窗中确认「打开」。
+GitHub Releases 提供的构建会经过 Apple 签名和公证。
+如果首次打开时 macOS 仍然弹出警告，请重新下载最新 release 产物后再试。
 
 ## 适合谁用
 

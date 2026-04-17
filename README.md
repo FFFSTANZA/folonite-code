@@ -28,8 +28,8 @@ macOS (Apple Silicon): **[Download .dmg](https://github.com/Astro-Han/pawwork/re
 
 ### macOS first launch
 
-PawWork is not yet signed with Apple Developer ID. On first launch:
-Right-click the app > Open > confirm "Open" in the dialog.
+GitHub Releases builds go through Apple code signing and notarization in the release workflow.
+If macOS still shows a warning on first launch, re-download the latest release artifact and try again.
 
 ## Who This Is For
 
