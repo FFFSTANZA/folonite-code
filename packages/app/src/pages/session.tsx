@@ -2119,6 +2119,10 @@ export default function Page() {
           size={size}
         />
       </div>
+
+      <Show when={!isDesktop()}>
+        <TerminalPanel />
+      </Show>
     </div>
   )
 }

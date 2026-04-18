@@ -1,4 +1,5 @@
 import { useNavigate } from "@solidjs/router"
+import { createMediaQuery } from "@solid-primitives/media"
 import { useCommand, type CommandOption } from "@/context/command"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { previewSelectedLines } from "@opencode-ai/ui/pierre/selection-bridge"
@@ -46,6 +47,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const layout = useLayout()
   const navigate = useNavigate()
   const { params, tabs, view } = useSessionLayout()
+  const isDesktop = createMediaQuery("(min-width: 768px)")
 
   const info = () => {
     const id = params.id
@@ -245,12 +247,20 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
 
   const openTerminal = () => {
     if (terminal.all().length > 0) terminal.new()
+    if (!isDesktop()) {
+      view().terminal.open()
+      return
+    }
     view().sidePanel.open()
     view().sidePanel.setTab("terminal")
     view().terminal.open()
   }
 
   const toggleTerminal = () => {
+    if (!isDesktop()) {
+      view().terminal.toggle()
+      return
+    }
     const open = view().sidePanel.opened() && view().sidePanel.tab() === "terminal"
     if (open) {
       view().sidePanel.close()

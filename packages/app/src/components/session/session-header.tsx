@@ -8,6 +8,7 @@ import { Spinner } from "@opencode-ai/ui/spinner"
 import { showToast } from "@opencode-ai/ui/toast"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { getFilename } from "@opencode-ai/util/path"
+import { createMediaQuery } from "@solid-primitives/media"
 import { createEffect, createMemo, For, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocation } from "@solidjs/router"
@@ -139,6 +140,7 @@ export function SessionHeader() {
   const terminal = useTerminal()
   const location = useLocation()
   const { params, view } = useSessionLayout()
+  const isDesktop = createMediaQuery("(min-width: 768px)")
 
   const projectDirectory = createMemo(() => decode64(params.dir) ?? "")
   const project = createMemo(() => {
@@ -200,6 +202,17 @@ export function SessionHeader() {
   })
 
   const toggleTerminal = () => {
+    if (!isDesktop()) {
+      const next = !view().terminal.opened()
+      view().terminal.toggle()
+      if (!next) return
+
+      const id = terminal.active()
+      if (!id) return
+      focusTerminalById(id)
+      return
+    }
+
     const open = view().sidePanel.opened() && view().sidePanel.tab() === "terminal"
     if (open) {
       view().sidePanel.close()
@@ -434,7 +447,7 @@ export function SessionHeader() {
               </Show>
               <div class="flex items-center gap-1">
                 <Show
-                  when={onSessionRoute()}
+                  when={onSessionRoute() && isDesktop()}
                   fallback={
                     <Tooltip placement="bottom" value={language.t("status.popover.trigger")}>
                       <StatusPopover />
@@ -475,12 +488,24 @@ export function SessionHeader() {
                     class="group/terminal-toggle titlebar-icon w-8 h-6 p-0 box-border shrink-0"
                     onClick={toggleTerminal}
                     aria-label={language.t("command.terminal.toggle")}
-                    aria-expanded={view().sidePanel.opened() && view().sidePanel.tab() === "terminal"}
-                    aria-controls="right-panel"
+                    aria-expanded={
+                      isDesktop()
+                        ? view().sidePanel.opened() && view().sidePanel.tab() === "terminal"
+                        : view().terminal.opened()
+                    }
+                    aria-controls={isDesktop() ? "right-panel" : "terminal-panel"}
                   >
                     <Icon
                       size="small"
-                      name={view().sidePanel.opened() && view().sidePanel.tab() === "terminal" ? "terminal-active" : "terminal"}
+                      name={
+                        isDesktop()
+                          ? view().sidePanel.opened() && view().sidePanel.tab() === "terminal"
+                            ? "terminal-active"
+                            : "terminal"
+                          : view().terminal.opened()
+                            ? "terminal-active"
+                            : "terminal"
+                      }
                     />
                   </Button>
                 </TooltipKeybind>

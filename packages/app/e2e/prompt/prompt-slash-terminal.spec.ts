@@ -23,3 +23,21 @@ test("/terminal opens the right-panel terminal tab", async ({ page, gotoSession 
   await expect(page.locator("#terminal-panel")).toBeVisible()
   await expect(embeddedTerminalTabs).toHaveCount(1)
 })
+
+test("mobile /terminal opens the bottom terminal panel", async ({ page, gotoSession }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await gotoSession()
+
+  const prompt = page.locator(promptSelector)
+  const terminal = page.locator(terminalSelector)
+  const rightPanel = page.locator("#right-panel")
+
+  await expect(terminal).not.toBeVisible()
+
+  await runPromptSlash(page, { prompt, text: "/terminal", id: "terminal.toggle" })
+  await waitTerminalFocusIdle(page, { term: terminal })
+
+  await expect(page.locator("#terminal-panel")).toBeVisible()
+  await expect(terminal).toBeVisible()
+  await expect(rightPanel).toHaveCount(0)
+})

@@ -45,3 +45,15 @@ test("session status button toggles the right panel closed", async ({ page, goto
   await statusButton.click()
   await expect(rightPanel).toHaveAttribute("aria-hidden", "true")
 })
+
+test("mobile session status button still opens the status popover", async ({ page, gotoSession }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await gotoSession()
+
+  const statusButton = page.getByRole("button", { name: "Status" }).first()
+  const popoverBody = page.locator('[data-slot="popover-body"]').filter({ has: page.locator('[data-component="tabs"]') })
+
+  await statusButton.click()
+  await expect(popoverBody).toBeVisible()
+  await expect(popoverBody.getByRole("tab", { name: /servers/i })).toBeVisible()
+})
