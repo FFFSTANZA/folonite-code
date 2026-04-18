@@ -51,3 +51,59 @@ test("desktop side-panel buttons switch between review and files within a unifie
   await expect(rightPanel).toHaveAttribute("aria-hidden", "false")
   await expect(shellTabList.getByRole("tab", { name: "Review", exact: true })).toHaveAttribute("aria-selected", "true")
 })
+
+test("legacy changes side-panel state restores into the review tab", async ({ page, gotoSession, slug }) => {
+  await page.addInitScript(({ slug }) => {
+    const key = "opencode.global.dat:layout"
+    const raw = localStorage.getItem(key)
+    const parsed = (() => {
+      if (!raw) return {}
+      try {
+        return JSON.parse(raw) as Record<string, unknown>
+      } catch {
+        return {}
+      }
+    })()
+
+    const review =
+      parsed.review && typeof parsed.review === "object"
+        ? (parsed.review as Record<string, unknown>)
+        : {}
+
+    const sessionView =
+      parsed.sessionView && typeof parsed.sessionView === "object"
+        ? (parsed.sessionView as Record<string, unknown>)
+        : {}
+
+    const current =
+      sessionView[slug] && typeof sessionView[slug] === "object"
+        ? (sessionView[slug] as Record<string, unknown>)
+        : {}
+
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        ...parsed,
+        review: { ...review, panelOpened: true },
+        sessionView: {
+          ...sessionView,
+          [slug]: {
+            ...current,
+            scroll: current.scroll && typeof current.scroll === "object" ? current.scroll : {},
+            sidePanelTab: "changes",
+          },
+        },
+      }),
+    )
+  }, { slug })
+
+  await gotoSession()
+
+  const rightPanel = page.locator("#right-panel")
+  const shellTabList = rightPanel.getByRole("tablist").first()
+  const reviewToggle = page.getByRole("button", { name: "Toggle review" }).first()
+
+  await expect(rightPanel).toHaveAttribute("aria-hidden", "false")
+  await expect(reviewToggle).toHaveAttribute("aria-expanded", "true")
+  await expect(shellTabList.getByRole("tab", { name: "Review", exact: true })).toHaveAttribute("aria-selected", "true")
+})
