@@ -1,3 +1,5 @@
+/** @jsxImportSource solid-js */
+
 import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -155,7 +157,7 @@ const useMcpToggleMutation = () => {
   }))
 }
 
-export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
+export function StatusPanel(props: { shown: Accessor<boolean> }) {
   const sync = useSync()
   const server = useServer()
   const platform = usePlatform()
@@ -442,4 +444,8 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
       </Tabs>
     </div>
   )
+}
+
+export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
+  return <StatusPanel shown={props.shown} />
 }
