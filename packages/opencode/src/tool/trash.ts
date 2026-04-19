@@ -24,19 +24,19 @@ export const TrashTool = Tool.define(
         Effect.gen(function* () {
           const target = path.isAbsolute(params.path) ? params.path : path.join(Instance.directory, params.path)
           const info = yield* fs.stat(target).pipe(
-            // Only treat ENOENT (file not found) as a soft miss; propagate all other errors
             Effect.catchIf(
               (e) => (e as any)?.cause?.code === "ENOENT" || (e as any)?.reason?._tag === "NotFound",
               () => Effect.succeed(undefined),
             ),
           )
+
+          yield* assertExternalDirectoryEffect(ctx, target, {
+            kind: info?.type === "Directory" ? "directory" : "file",
+          })
+
           if (!info) {
             throw new Error(`Path not found: ${target}`)
           }
-
-          yield* assertExternalDirectoryEffect(ctx, target, {
-            kind: info.type === "Directory" ? "directory" : "file",
-          })
 
           const localTarget = path.relative(Instance.directory, target)
           const permissionPattern = Instance.containsPath(target) ? localTarget : target

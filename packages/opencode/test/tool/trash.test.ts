@@ -106,7 +106,7 @@ describe("tool.trash", () => {
       const filepath = path.join(outer, "outside.txt")
       yield* Effect.promise(() => fs.writeFile(filepath, "outside", "utf-8"))
 
-      yield* provideTmpdirInstance((dir) =>
+      yield* provideTmpdirInstance(() =>
         Effect.gen(function* () {
           const requests: AskRequest[] = []
           yield* run(
@@ -138,5 +138,34 @@ describe("tool.trash", () => {
         expect(trashCalls).toEqual([])
       }),
     ),
+  )
+
+  it.live("asks for external_directory before failing on missing path outside the project", () =>
+    Effect.gen(function* () {
+      const outer = yield* tmpdirScoped()
+      const missing = path.join(outer, "missing.txt")
+
+      yield* provideTmpdirInstance(() =>
+        Effect.gen(function* () {
+          const requests: AskRequest[] = []
+          const exit = yield* run(
+            { path: missing },
+            {
+              ...ctx,
+              ask: (req) =>
+                Effect.sync(() => {
+                  requests.push(req)
+                }),
+            },
+          ).pipe(Effect.exit)
+
+          expect(exit._tag).toBe("Failure")
+          expect(requests.find((item) => item.permission === "external_directory")?.patterns).toEqual([
+            glob(path.join(outer, "*")),
+          ])
+          expect(trashCalls).toEqual([])
+        }),
+      )
+    }),
   )
 })
