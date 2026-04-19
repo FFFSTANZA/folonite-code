@@ -155,7 +155,7 @@ const useMcpToggleMutation = () => {
   }))
 }
 
-export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
+export function StatusPanel(props: { shown: Accessor<boolean> }) {
   const sync = useSync()
   const server = useServer()
   const platform = usePlatform()
@@ -442,4 +442,8 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
       </Tabs>
     </div>
   )
+}
+
+export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
+  return <StatusPanel shown={props.shown} />
 }

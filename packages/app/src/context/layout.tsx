@@ -12,12 +12,21 @@ import { decode64 } from "@/utils/base64"
 import { same } from "@/utils/same"
 import { createScrollPersistence, type SessionScroll } from "./layout-scroll"
 import { createPathHelpers } from "./file/path"
+import { defaultRightPanelTab, type RightPanelTab } from "@/pages/session/right-panel-tabs"
 
 const AVATAR_COLOR_KEYS = ["pink", "mint", "orange", "purple", "cyan", "lime"] as const
 const DEFAULT_SIDEBAR_WIDTH = 344
 const DEFAULT_FILE_TREE_WIDTH = 200
 const DEFAULT_SESSION_WIDTH = 600
 const DEFAULT_TERMINAL_HEIGHT = 280
+export const DEFAULT_RIGHT_PANEL_WIDTH = 340
+export const MIN_RIGHT_PANEL_WIDTH = 300
+export const MAX_RIGHT_PANEL_WIDTH = 520
+
+export function clampRightPanelWidth(raw: number | undefined): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return DEFAULT_RIGHT_PANEL_WIDTH
+  return Math.max(MIN_RIGHT_PANEL_WIDTH, Math.min(MAX_RIGHT_PANEL_WIDTH, raw))
+}
 export type AvatarColorKey = (typeof AVATAR_COLOR_KEYS)[number]
 
 export function getAvatarColors(key?: string) {
@@ -41,7 +50,7 @@ type SessionTabs = {
 type SessionView = {
   scroll: Record<string, SessionScroll>
   reviewOpen?: string[]
-  sidePanelTab?: "files" | "changes"
+  sidePanelTab?: RightPanelTab | "changes"
   filesAutoOpenSeen?: boolean
   filesAutoOpenDismissed?: boolean
   pendingMessage?: string
@@ -73,8 +82,8 @@ export function createSessionKeyReader(sessionKey: string | Accessor<string>, en
   }
 }
 
-export function defaultSidePanelTab(tab?: "files" | "changes") {
-  return tab ?? "files"
+export function defaultSidePanelTab(tab?: RightPanelTab | "changes") {
+  return defaultRightPanelTab(tab)
 }
 
 export function pruneSessionKeys(input: {
@@ -258,6 +267,9 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         },
         session: {
           width: DEFAULT_SESSION_WIDTH,
+        },
+        rightPanel: {
+          width: DEFAULT_RIGHT_PANEL_WIDTH,
         },
         mobileSidebar: {
           opened: false,
@@ -572,7 +584,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       if (sessionTimer !== undefined) window.clearTimeout(sessionTimer)
     })
 
-    return {
+    const layout = {
       ready,
       handoff: {
         tabs: createMemo(() => store.handoff?.tabs),
@@ -695,6 +707,12 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
             return
           }
           setStore("session", "width", width)
+        },
+      },
+      rightPanel: {
+        width: createMemo(() => clampRightPanelWidth(store.rightPanel?.width)),
+        resize(width: number) {
+          setStore("rightPanel", "width", clampRightPanelWidth(width))
         },
       },
       mobileSidebar: {
@@ -833,7 +851,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
               this.open()
             },
             tab: createMemo(() => defaultSidePanelTab(s().sidePanelTab)),
-            setTab(tab: "files" | "changes") {
+            setTab(tab: RightPanelTab | "changes") {
               const session = key()
               if (!store.sessionView[session]) {
                 setStore("sessionView", session, { scroll: {}, sidePanelTab: tab })
@@ -841,7 +859,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
               }
               setStore("sessionView", session, "sidePanelTab", tab)
             },
-            toggleTab(tab: "files" | "changes") {
+            toggleTab(tab: RightPanelTab | "changes") {
               if (reviewPanelOpened() && defaultSidePanelTab(s().sidePanelTab) === tab) {
                 this.close()
                 return
@@ -1024,5 +1042,11 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         }
       },
     }
+
+    if (typeof window !== "undefined" && import.meta.env.DEV) {
+      ;(window as unknown as { __pawworkLayout?: typeof layout }).__pawworkLayout = layout
+    }
+
+    return layout
   },
 })

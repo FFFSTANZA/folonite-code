@@ -348,7 +348,6 @@ export default function Page() {
 
   const [ui, setUi] = createStore({
     pendingMessage: undefined as string | undefined,
-    reviewSnap: false,
     scrollGesture: 0,
     scroll: {
       overflow: false,
@@ -401,11 +400,6 @@ export default function Page() {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const size = createSizing()
   const desktopReviewOpen = createMemo(() => isDesktop() && view().sidePanel.opened())
-  const desktopSidePanelOpen = createMemo(() => desktopReviewOpen())
-  const sessionPanelWidth = createMemo(() => {
-    if (!desktopSidePanelOpen()) return "100%"
-    return `${layout.session.width()}px`
-  })
   const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
 
   function normalizeTab(tab: string) {
@@ -427,7 +421,7 @@ export default function Page() {
 
   const openReviewPanel = () => {
     if (!view().sidePanel.opened()) view().sidePanel.open()
-    if (view().sidePanel.tab() !== "changes") view().sidePanel.setTab("changes")
+    if (view().sidePanel.tab() !== "review") view().sidePanel.setTab("review")
   }
 
   const info = createMemo(() => (params.id ? sync.session.get(params.id) : undefined))
@@ -568,7 +562,6 @@ export default function Page() {
     return key
   }, sessionKey())
 
-  let reviewFrame: number | undefined
   let refreshFrame: number | undefined
   let refreshTimer: number | undefined
   let todoFrame: number | undefined
@@ -637,19 +630,6 @@ export default function Page() {
     if (!untrack(wantsReview)) return
     void loadVcs(mode, true)
   }
-
-  createComputed((prev) => {
-    const open = desktopReviewOpen()
-    if (prev === undefined || prev === open) return open
-
-    if (reviewFrame !== undefined) cancelAnimationFrame(reviewFrame)
-    setUi("reviewSnap", true)
-    reviewFrame = requestAnimationFrame(() => {
-      reviewFrame = undefined
-      setUi("reviewSnap", false)
-    })
-    return open
-  }, desktopReviewOpen())
 
   const turnDiffs = createMemo(() => list(lastUserMessage()?.summary?.diffs))
   const [artifactHistory, { refetch: refetchArtifactHistory }] = createResource(
@@ -1074,7 +1054,7 @@ export default function Page() {
 
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
   const wantsReview = createMemo(() =>
-    isDesktop() ? desktopReviewOpen() && view().sidePanel.tab() === "changes" && activeTab() === "review" : store.mobileTab === "changes",
+    isDesktop() ? desktopReviewOpen() && view().sidePanel.tab() === "review" && activeTab() === "review" : store.mobileTab === "changes",
   )
 
   createEffect(() => {
@@ -1440,7 +1420,7 @@ export default function Page() {
     const dir = sdk.directory
     if (!isDesktop()) return
     if (!view().sidePanel.opened()) return
-    if (view().sidePanel.tab() !== "changes") return
+    if (view().sidePanel.tab() !== "review") return
     if (sync.status === "loading") return
 
     fileTreeTab()
@@ -1923,7 +1903,6 @@ export default function Page() {
   })
 
   onCleanup(() => {
-    if (reviewFrame !== undefined) cancelAnimationFrame(reviewFrame)
     if (refreshFrame !== undefined) cancelAnimationFrame(refreshFrame)
     if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
     if (todoFrame !== undefined) cancelAnimationFrame(todoFrame)
@@ -1964,16 +1943,7 @@ export default function Page() {
         </Show>
 
         {/* Session panel */}
-        <div
-          classList={{
-            "@container relative shrink-0 flex flex-col min-h-0 h-full bg-background-stronger flex-1 md:flex-none": true,
-            "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
-              !size.active() && !ui.reviewSnap,
-          }}
-          style={{
-            width: sessionPanelWidth(),
-          }}
-        >
+        <div class="@container relative min-w-0 flex flex-col min-h-0 h-full bg-background-stronger flex-1">
           <div class="flex-1 min-h-0 overflow-hidden">
             {(() => {
               const renderComposerRegion = (variant: "session" | "home") => (
@@ -2087,20 +2057,6 @@ export default function Page() {
             })()}
           </div>
 
-          <Show when={desktopReviewOpen()}>
-            <div onPointerDown={() => size.start()}>
-              <ResizeHandle
-                direction="horizontal"
-                size={layout.session.width()}
-                min={450}
-                max={typeof window === "undefined" ? 1000 : window.innerWidth * 0.45}
-                onResize={(width) => {
-                  size.touch()
-                  layout.session.resize(width)
-                }}
-              />
-            </div>
-          </Show>
         </div>
 
         <SessionSidePanel
@@ -2112,14 +2068,16 @@ export default function Page() {
           reviewCount={reviewCount}
           reviewPanel={reviewPanel}
           files={artifactFiles}
+          terminalPanel={() => <TerminalPanel embedded />}
           activeDiff={tree.activeDiff}
           focusReviewDiff={focusReviewDiff}
-          reviewSnap={ui.reviewSnap}
           size={size}
         />
       </div>
 
-      <TerminalPanel />
+      <Show when={!isDesktop()}>
+        <TerminalPanel />
+      </Show>
     </div>
   )
 }
