@@ -30,6 +30,10 @@ import { setSessionHandoff } from "@/pages/session/handoff"
 import type { RightPanelTab } from "@/pages/session/right-panel-tabs"
 import { useSessionLayout } from "@/pages/session/session-layout"
 
+export function formatRightPanelWidth(open: boolean, width: number): string {
+  return open ? `${width}px` : "0px"
+}
+
 type RightPanelShellIconName = "summary" | "folder" | "review" | "terminal"
 
 function RightPanelShellIcon(props: { icon: RightPanelShellIconName }) {
@@ -107,10 +111,7 @@ export function SessionSidePanel(props: {
   const open = createMemo(() => isDesktop() && view().sidePanel.opened())
   const reviewTab = createMemo(() => isDesktop())
   const sidePanelTab = createMemo(() => view().sidePanel.tab())
-  const panelWidth = createMemo(() => {
-    if (!open()) return "0px"
-    return `calc(100% - ${layout.session.width()}px)`
-  })
+  const panelWidth = createMemo(() => formatRightPanelWidth(open(), layout.rightPanel.width()))
   const treeWidth = createMemo(() => `${view().sidePanel.explorer.width()}px`)
 
   const diffFiles = createMemo(() => props.diffs().map((d) => d.file))
@@ -308,7 +309,7 @@ export function SessionSidePanel(props: {
       >
         <div class="size-full border-l border-border-weaker-base">
           <Tabs
-            variant="pill"
+            variant="sidepanel"
             value={sidePanelTab()}
             onChange={setSidePanelTabValue}
             class="h-full flex flex-col"
@@ -337,6 +338,7 @@ export function SessionSidePanel(props: {
                 )}
               </For>
               <div class="flex-1" />
+              <div class="w-10 shrink-0" aria-hidden />
             </Tabs.List>
 
             <Tabs.Content value="status" class="min-h-0 flex-1 overflow-hidden">

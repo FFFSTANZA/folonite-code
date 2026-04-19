@@ -100,3 +100,17 @@ describe("SessionSidePanel", () => {
     expect(typeof fileTabScroll.nextTabListScrollLeft).toBe("function")
   })
 })
+
+describe("formatRightPanelWidth", () => {
+  test("returns \"0px\" when closed", async () => {
+    const { formatRightPanelWidth } = await import("./session-side-panel")
+    expect(formatRightPanelWidth(false, 340)).toBe("0px")
+    expect(formatRightPanelWidth(false, 520)).toBe("0px")
+  })
+
+  test("returns px-suffixed width when open", async () => {
+    const { formatRightPanelWidth } = await import("./session-side-panel")
+    expect(formatRightPanelWidth(true, 340)).toBe("340px")
+    expect(formatRightPanelWidth(true, 520)).toBe("520px")
+  })
+})
