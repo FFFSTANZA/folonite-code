@@ -1,4 +1,10 @@
-import type { Hooks, PluginInput, Plugin as PluginInstance, PluginModule } from "@opencode-ai/plugin"
+import type {
+  Hooks,
+  PluginInput,
+  Plugin as PluginInstance,
+  PluginModule,
+  WorkspaceAdaptor as PluginWorkspaceAdaptor,
+} from "@opencode-ai/plugin"
 import { fileURLToPath } from "url"
 import path from "path"
 import { Config } from "../config/config"
@@ -21,6 +27,8 @@ import { errorMessage } from "@/util/error"
 import { needsConfigDependencies } from "@/config/dependency"
 import { PluginLoader } from "./loader"
 import { parsePluginSpecifier, readPluginId, readV1Plugin, resolvePluginId } from "./shared"
+import { installAdaptor } from "@/control-plane/adaptors"
+import type { Adaptor } from "@/control-plane/types"
 
 export namespace Plugin {
   const log = Log.create({ service: "plugin" })
@@ -141,6 +149,11 @@ export namespace Plugin {
             project: ctx.project,
             worktree: ctx.worktree,
             directory: ctx.directory,
+            experimental_workspace: {
+              register(type: string, adaptor: PluginWorkspaceAdaptor) {
+                installAdaptor(type, adaptor as unknown as Adaptor)
+              },
+            },
             get serverUrl(): URL {
               return Server.url ?? new URL("http://localhost:4096")
             },
