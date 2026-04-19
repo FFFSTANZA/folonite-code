@@ -44,14 +44,15 @@ export namespace Format {
           const formatters: Record<string, Formatter.Info> = {}
 
           const cfg = yield* config.get()
+          const formatterConfig = cfg.formatter && cfg.formatter !== true ? cfg.formatter : {}
 
           if (cfg.formatter !== false) {
             for (const item of Object.values(Formatter)) {
               formatters[item.name] = item
             }
-            for (const [name, item] of Object.entries(cfg.formatter ?? {})) {
+            for (const [name, item] of Object.entries(formatterConfig)) {
               // Ruff and uv are both the same formatter, so disabling either should disable both.
-              if (["ruff", "uv"].includes(name) && (cfg.formatter?.ruff?.disabled || cfg.formatter?.uv?.disabled)) {
+              if (["ruff", "uv"].includes(name) && (formatterConfig.ruff?.disabled || formatterConfig.uv?.disabled)) {
                 // TODO combine formatters so shared backends like Ruff/uv don't need linked disable handling here.
                 delete formatters.ruff
                 delete formatters.uv

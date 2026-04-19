@@ -1024,6 +1024,7 @@ export namespace Config {
         .describe("MCP (Model Context Protocol) server configurations"),
       formatter: z
         .union([
+          z.literal(true),
           z.literal(false),
           z.record(
             z.string(),
@@ -1038,6 +1039,7 @@ export namespace Config {
         .optional(),
       lsp: z
         .union([
+          z.literal(true),
           z.literal(false),
           z.record(
             z.string(),
@@ -1282,6 +1284,11 @@ export namespace Config {
               for (let i = 0; i < list.length; i++) {
                 list[i] = yield* Effect.promise(() => resolvePluginSpec(list[i], options.path))
               }
+            }
+            if (isFile && !data.$schema) {
+              data.$schema = "https://opencode.ai/config.json"
+              const updated = text.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
+              yield* fs.writeFileString(options.path, updated).pipe(Effect.catch(() => Effect.void))
             }
             return data
           }
