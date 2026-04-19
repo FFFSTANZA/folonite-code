@@ -584,7 +584,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       if (sessionTimer !== undefined) window.clearTimeout(sessionTimer)
     })
 
-    return {
+    const layout = {
       ready,
       handoff: {
         tabs: createMemo(() => store.handoff?.tabs),
@@ -1042,5 +1042,11 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         }
       },
     }
+
+    if (typeof window !== "undefined" && import.meta.env.DEV) {
+      ;(window as unknown as { __pawworkLayout?: typeof layout }).__pawworkLayout = layout
+    }
+
+    return layout
   },
 })
