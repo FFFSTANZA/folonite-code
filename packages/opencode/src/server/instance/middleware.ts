@@ -105,7 +105,10 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
       })
     }
 
-    const adaptor = await Workspace.resolveAdaptor(workspace)
+    const adaptor = await Workspace.resolveAdaptor({
+      ...workspace,
+      hint: directory,
+    })
     const target = await adaptor.target(workspace)
 
     if (target.type === "local") {

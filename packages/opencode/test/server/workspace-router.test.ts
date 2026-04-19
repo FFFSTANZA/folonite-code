@@ -533,4 +533,70 @@ describe("workspace router", () => {
         .catch(() => {})
     }
   })
+
+  test("recovers a null-owner non-git workspace from the request directory when there is only one candidate", async () => {
+    await using tmp = await tmpdir()
+
+    const type = "shared"
+    const plugin = path.join(tmp.path, "plugin.ts")
+    const space = path.join(tmp.path, "space")
+    await Bun.write(
+      plugin,
+      [
+        "export default async ({ experimental_workspace }) => {",
+        `  experimental_workspace.register(${JSON.stringify(type)}, {`,
+        '    name: "single",',
+        '    description: "single adaptor",',
+        `    configure(input) { return { ...input, name: "single", branch: null, directory: ${JSON.stringify(space)} } },`,
+        "    async create() {},",
+        "    async remove() {},",
+        `    target() { return { type: "local", directory: ${JSON.stringify(space)} } },`,
+        "  })",
+        "  return {}",
+        "}",
+        "",
+      ].join("\n"),
+    )
+    await Bun.write(
+      path.join(tmp.path, "opencode.json"),
+      JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          plugin: [pathToFileURL(plugin).href],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const workspace = await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Plugin.init()
+        return Workspace.create({
+          type,
+          branch: null,
+          extra: null,
+          projectID: Instance.project.id,
+        })
+      },
+    })
+
+    Database.use((db) =>
+      db.update(WorkspaceTable).set({ owner_directory: null }).where(eq(WorkspaceTable.id, workspace.id)).run(),
+    )
+    await Instance.disposeAll()
+
+    const app = Server.Default().app
+    const response = await app.request(`/path?workspace=${workspace.id}`, {
+      headers: {
+        "x-opencode-directory": tmp.path,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      directory: space,
+    })
+  })
 })

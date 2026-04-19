@@ -40,6 +40,9 @@ export function installAdaptor(projectID: ProjectID, owner: string, type: string
   // This is experimental: mostly used for testing right now, but we
   // will likely allow this in the future. Need to figure out the
   // TypeScript story
+  if (type in BUILTIN) {
+    throw new Error(`Cannot register built-in workspace adaptor: ${type}`)
+  }
 
   const project = CUSTOM.get(projectID) ?? new Map<string, Map<string, Adaptor>>()
   const adaptors = project.get(type) ?? new Map<string, Adaptor>()

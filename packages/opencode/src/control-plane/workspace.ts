@@ -82,13 +82,18 @@ export namespace Workspace {
     extra: Info.shape.extra,
   })
 
-  async function bootstrapAdaptor(input: Pick<StoredInfo, "projectID" | "type" | "owner">, error: unknown) {
+  async function bootstrapAdaptor(
+    input: Pick<StoredInfo, "projectID" | "type" | "owner"> & { hint?: string | null },
+    error: unknown,
+  ) {
     const project = Project.get(input.projectID)
     if (!project) throw error
 
     const candidates = [
       ...new Set(
-        [input.owner, project.worktree, ...project.sandboxes].filter((value): value is string => Boolean(value)),
+        [input.hint, input.owner, project.worktree, ...project.sandboxes].filter(
+          (value): value is string => Boolean(value),
+        ),
       ),
     ]
     let lastError = error
@@ -131,7 +136,7 @@ export namespace Workspace {
     throw lastError
   }
 
-  export async function resolveAdaptor(input: Pick<StoredInfo, "projectID" | "type" | "owner">) {
+  export async function resolveAdaptor(input: Pick<StoredInfo, "projectID" | "type" | "owner"> & { hint?: string | null }) {
     if (input.owner) {
       try {
         return await getAdaptor(input.projectID, input.type, input.owner)
@@ -214,7 +219,7 @@ export namespace Workspace {
       stopSync(id)
 
       const adaptor = await resolveAdaptor(info)
-      adaptor.remove(info)
+      await adaptor.remove(info)
       Database.use((db) => db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run())
       return toInfo(info)
     }

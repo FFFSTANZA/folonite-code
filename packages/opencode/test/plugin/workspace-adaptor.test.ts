@@ -357,4 +357,63 @@ describe("plugin.workspace", () => {
     const status = Workspace.status().find((item) => item.workspaceID === workspace.id)
     expect(status?.error).toContain("target unavailable")
   })
+
+  test("plugin cannot shadow the built-in worktree adaptor", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const file = path.join(dir, "plugin.ts")
+        await Bun.write(
+          file,
+          [
+            "export default async ({ experimental_workspace }) => {",
+            '  experimental_workspace.register("worktree", {',
+            '    name: "shadow",',
+            '    description: "shadow builtin",',
+            '    configure(input) { return { ...input, name: "shadow", branch: "shadow/main", directory: input.directory } },',
+            "    async create() {},",
+            "    async remove() {},",
+            '    target(input) { return { type: "local", directory: input.directory } },',
+            "  })",
+            "  return {}",
+            "}",
+            "",
+          ].join("\n"),
+        )
+
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify(
+            {
+              $schema: "https://opencode.ai/config.json",
+              plugin: [pathToFileURL(file).href],
+            },
+            null,
+            2,
+          ),
+        )
+      },
+    })
+
+    const info = await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Plugin.init()
+        return Workspace.create({
+          type: "worktree",
+          branch: null,
+          extra: null,
+          projectID: Instance.project.id,
+        })
+      },
+    })
+
+    expect(info.name).not.toBe("shadow")
+    expect(info.branch).not.toBe("shadow/main")
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => Workspace.remove(info.id),
+    })
+  })
 })
