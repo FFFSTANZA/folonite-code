@@ -1,4 +1,7 @@
 import type { MiddlewareHandler } from "hono"
+import { mkdirSync } from "fs"
+import os from "os"
+import path from "path"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
 import type { WorkspaceID } from "@/control-plane/schema"
 import { Filesystem } from "@/util/filesystem"
@@ -7,7 +10,8 @@ import { Instance } from "@/project/instance"
 
 export function InstanceMiddleware(workspaceID?: WorkspaceID): MiddlewareHandler {
   return async (c, next) => {
-    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || process.cwd()
+    const pawworkDefault = path.join(os.homedir(), "PawWork")
+    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || pawworkDefault
     const directory = Filesystem.resolve(
       (() => {
         try {
@@ -17,6 +21,14 @@ export function InstanceMiddleware(workspaceID?: WorkspaceID): MiddlewareHandler
         }
       })(),
     )
+
+    if (!c.req.query("directory") && !c.req.header("x-opencode-directory")) {
+      try {
+        mkdirSync(pawworkDefault, { recursive: true })
+      } catch {
+        // Ignore: home may be unwritable or path may be a regular file
+      }
+    }
 
     const runInstance = () =>
       Instance.provide({

@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { Effect } from "effect"
 import { Instance } from "../../src/project/instance"
 import { Server } from "../../src/server/server"
 import { Session as SessionNs } from "../../src/session"
+import { SessionPrompt } from "../../src/session/prompt"
 import type { SessionID } from "../../src/session/schema"
 import { Log } from "../../src/util"
 import { tmpdir } from "../fixture/fixture"
@@ -35,12 +36,14 @@ describe("session action routes", () => {
       directory: tmp.path,
       fn: async () => {
         const session = await svc.create({})
+        const cancel = spyOn(SessionPrompt, "cancel").mockResolvedValue()
         const app = Server.Default().app
 
         const res = await app.request(`/session/${session.id}/abort`, { method: "POST" })
 
         expect(res.status).toBe(200)
         expect(await res.json()).toBe(true)
+        expect(cancel).toHaveBeenCalledWith(session.id)
 
         await svc.remove(session.id)
       },

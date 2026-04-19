@@ -11,7 +11,6 @@ import { InstanceRoutes } from "./routes/instance"
 import { ControlPlaneRoutes } from "./routes/control"
 import { UIRoutes } from "./routes/ui"
 import { GlobalRoutes } from "./routes/global"
-import { WorkspaceRouterMiddleware } from "./workspace"
 import { InstanceMiddleware } from "./routes/instance/middleware"
 import { WorkspaceRoutes } from "./routes/control/workspace"
 
@@ -45,14 +44,8 @@ function create(opts: { cors?: string[] }) {
   return {
     app: app
       .route("/", ControlPlaneRoutes())
-      .route(
-        "/",
-        new Hono()
-          .use(InstanceMiddleware())
-          .route("/experimental/workspace", WorkspaceRoutes())
-          .use(WorkspaceRouterMiddleware(runtime.upgradeWebSocket)),
-      )
-      .route("/", InstanceRoutes(runtime.upgradeWebSocket))
+      .route("/experimental/workspace", new Hono().use(InstanceMiddleware()).route("/", WorkspaceRoutes()))
+      .route("/", new Hono().use(FenceMiddleware).route("/", InstanceRoutes(runtime.upgradeWebSocket)))
       .route("/", UIRoutes()),
     runtime,
   }
