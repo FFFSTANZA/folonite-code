@@ -28,6 +28,10 @@ afterAll(() => {
   Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = experimental
 })
 
+function wait(ms = 50) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function pluginProject() {
   return tmpdir({
     git: true,
@@ -272,5 +276,81 @@ describe("plugin.workspace", () => {
         .quiet()
         .catch(() => {})
     }
+  })
+
+  test("cold-start Workspace.get retries sync after owner bootstrap for remote adaptors", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const type = `plug-${Math.random().toString(36).slice(2)}`
+        const file = path.join(dir, "plugin.ts")
+        const counter = path.join(dir, "target-count.txt")
+        await Bun.write(counter, "0")
+        await Bun.write(
+          file,
+          [
+            "export default async ({ experimental_workspace }) => {",
+            `  experimental_workspace.register(${JSON.stringify(type)}, {`,
+            '    name: "remote",',
+            '    description: "remote adaptor",',
+            '    configure(input) { return { ...input, name: "remote", branch: "remote/main", directory: null } },',
+            "    async create() {},",
+            "    async remove() {},",
+            "    async target() {",
+            `      const file = Bun.file(${JSON.stringify(counter)})`,
+            '      const count = Number((await file.text()) || "0") + 1',
+            `      await Bun.write(${JSON.stringify(counter)}, String(count))`,
+            '      throw new Error("target unavailable")',
+            "    },",
+            "  })",
+            "  return {}",
+            "}",
+            "",
+          ].join("\n"),
+        )
+
+        await Bun.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify(
+            {
+              $schema: "https://opencode.ai/config.json",
+              plugin: [pathToFileURL(file).href],
+            },
+            null,
+            2,
+          ),
+        )
+
+        return { counter, type }
+      },
+    })
+
+    const workspace = await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Plugin.init()
+        return Workspace.create({
+          type: tmp.extra.type,
+          branch: null,
+          extra: null,
+          projectID: Instance.project.id,
+        })
+      },
+    })
+
+    await Instance.disposeAll()
+
+    await Workspace.get(workspace.id)
+    await wait(100)
+    const first = Number(await Bun.file(tmp.extra.counter).text())
+    expect(first).toBeGreaterThan(0)
+
+    await Workspace.get(workspace.id)
+    await wait(100)
+    const second = Number(await Bun.file(tmp.extra.counter).text())
+    expect(second).toBeGreaterThan(first)
+
+    const status = Workspace.status().find((item) => item.workspaceID === workspace.id)
+    expect(status?.error).toContain("target unavailable")
   })
 })

@@ -10,6 +10,7 @@ import { Log } from "@/util/log"
 import { Filesystem } from "@/util/filesystem"
 import { ProjectID } from "@/project/schema"
 import { Instance } from "@/project/instance"
+import { InstanceBootstrap } from "@/project/bootstrap"
 import { WorkspaceTable } from "./workspace.sql"
 import { getAdaptor } from "./adaptors"
 import { WorkspaceInfo } from "./types"
@@ -21,6 +22,9 @@ export namespace Workspace {
     ref: "Workspace",
   })
   export type Info = z.infer<typeof Info>
+  type StoredInfo = Info & {
+    owner: string | null
+  }
 
   export const ConnectionStatus = z.object({
     workspaceID: WorkspaceID.zod,
@@ -45,7 +49,20 @@ export namespace Workspace {
     Status: BusEvent.define("workspace.status", ConnectionStatus),
   }
 
-  function fromRow(row: typeof WorkspaceTable.$inferSelect): Info {
+  function fromRow(row: typeof WorkspaceTable.$inferSelect): StoredInfo {
+    return {
+      id: row.id,
+      type: row.type,
+      branch: row.branch,
+      name: row.name,
+      directory: row.directory,
+      owner: row.owner_directory,
+      extra: row.extra,
+      projectID: row.project_id,
+    }
+  }
+
+  function toInfo(row: StoredInfo): Info {
     return {
       id: row.id,
       type: row.type,
@@ -53,7 +70,7 @@ export namespace Workspace {
       name: row.name,
       directory: row.directory,
       extra: row.extra,
-      projectID: row.project_id,
+      projectID: row.projectID,
     }
   }
 
@@ -65,18 +82,54 @@ export namespace Workspace {
     extra: Info.shape.extra,
   })
 
+  async function bootstrapAdaptor(input: Pick<StoredInfo, "projectID" | "type" | "owner">, error: unknown) {
+    const project = Project.get(input.projectID)
+    if (!project) throw error
+
+    const candidates = [
+      ...new Set(
+        [input.owner, project.worktree, ...project.sandboxes].filter((value): value is string => Boolean(value)),
+      ),
+    ]
+    let lastError = error
+
+    for (const directory of candidates) {
+      try {
+        return await Instance.provide({
+          directory,
+          init: InstanceBootstrap,
+          fn: () => getAdaptor(input.projectID, input.type, directory),
+        })
+      } catch (candidateError) {
+        lastError = candidateError
+      }
+    }
+
+    throw lastError
+  }
+
+  export async function resolveAdaptor(input: Pick<StoredInfo, "projectID" | "type" | "owner">) {
+    try {
+      return await getAdaptor(input.projectID, input.type, input.owner ?? undefined)
+    } catch (error) {
+      return bootstrapAdaptor(input, error)
+    }
+  }
+
   export const create = fn(CreateInput, async (input) => {
     const id = WorkspaceID.ascending(input.id)
-    const adaptor = await getAdaptor(input.projectID, input.type, Instance.directory)
+    const owner = Instance.directory
+    const adaptor = await getAdaptor(input.projectID, input.type, owner)
 
     const config = await adaptor.configure({ ...input, id, name: null, directory: null })
 
-    const info: Info = {
+    const info: StoredInfo = {
       id,
       type: config.type,
       branch: config.branch ?? null,
       name: config.name ?? null,
       directory: config.directory ?? null,
+      owner,
       extra: config.extra ?? null,
       projectID: input.projectID,
     }
@@ -89,6 +142,7 @@ export namespace Workspace {
           branch: info.branch,
           name: info.name,
           directory: info.directory,
+          owner_directory: info.owner,
           extra: info.extra,
           project_id: info.projectID,
         })
@@ -99,7 +153,7 @@ export namespace Workspace {
 
     startSync(info)
 
-    return info
+    return toInfo(info)
   })
 
   export function list(project: Project.Info) {
@@ -108,27 +162,31 @@ export namespace Workspace {
     )
     const spaces = rows.map(fromRow).sort((a, b) => a.id.localeCompare(b.id))
     for (const space of spaces) startSync(space)
-    return spaces
+    return spaces.map(toInfo)
   }
 
-  export const get = fn(WorkspaceID.zod, async (id) => {
+  export const record = fn(WorkspaceID.zod, async (id) => {
     const row = Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
     if (!row) return
-    const space = fromRow(row)
+    return fromRow(row)
+  })
+
+  export const get = fn(WorkspaceID.zod, async (id) => {
+    const space = await record(id)
+    if (!space) return
     startSync(space)
-    return space
+    return toInfo(space)
   })
 
   export const remove = fn(WorkspaceID.zod, async (id) => {
-    const row = Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
-    if (row) {
+    const info = await record(id)
+    if (info) {
       stopSync(id)
 
-      const info = fromRow(row)
-      const adaptor = await getAdaptor(info.projectID, row.type)
+      const adaptor = await resolveAdaptor(info)
       adaptor.remove(info)
       Database.use((db) => db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run())
-      return info
+      return toInfo(info)
     }
   })
 
@@ -156,14 +214,14 @@ export namespace Workspace {
 
   const log = Log.create({ service: "workspace-sync" })
 
-  async function workspaceEventLoop(space: Info, signal: AbortSignal) {
+  async function workspaceEventLoop(space: StoredInfo, signal: AbortSignal) {
     log.info("starting sync: " + space.id)
 
     while (!signal.aborted) {
       log.info("connecting to sync: " + space.id)
 
       setStatus(space.id, "connecting")
-      const adaptor = await getAdaptor(space.projectID, space.type)
+      const adaptor = await resolveAdaptor(space)
       const target = await adaptor.target(space)
 
       if (target.type === "local") return
@@ -200,7 +258,7 @@ export namespace Workspace {
     }
   }
 
-  function startSync(space: Info) {
+  function startSync(space: StoredInfo) {
     if (space.type === "worktree") {
       void Filesystem.exists(space.directory!).then((exists) => {
         setStatus(space.id, exists ? "connected" : "error", exists ? undefined : "directory does not exist")
@@ -214,6 +272,7 @@ export namespace Workspace {
     setStatus(space.id, "disconnected")
 
     void workspaceEventLoop(space, abort.signal).catch((error) => {
+      aborts.delete(space.id)
       setStatus(space.id, "error", String(error))
       log.warn("workspace sync listener failed", {
         workspaceID: space.id,

@@ -193,4 +193,119 @@ describe("workspace router", () => {
         .catch(() => {})
     }
   })
+
+  test("routes a persisted workspace through its original checkout when the same type is registered elsewhere", async () => {
+    await using root = await tmpdir({ git: true })
+
+    const type = "shared"
+    const rootPlugin = path.join(root.path, "plugin.ts")
+    const rootSpace = path.join(root.path, "root-space")
+    await Bun.write(
+      rootPlugin,
+      [
+        "export default async ({ experimental_workspace }) => {",
+        `  experimental_workspace.register(${JSON.stringify(type)}, {`,
+        '    name: "root",',
+        '    description: "root adaptor",',
+        "    configure(input) {",
+        `      return { ...input, name: "root", branch: "root/main", directory: ${JSON.stringify(rootSpace)} }`,
+        "    },",
+        "    async create() {},",
+        "    async remove() {},",
+        "    target() {",
+        `      return { type: "local", directory: ${JSON.stringify(rootSpace)} }`,
+        "    },",
+        "  })",
+        "  return {}",
+        "}",
+        "",
+      ].join("\n"),
+    )
+    await Bun.write(
+      path.join(root.path, "opencode.json"),
+      JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          plugin: [pathToFileURL(rootPlugin).href],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const worktreePath = path.join(root.path, "..", path.basename(root.path) + "-router-shared")
+    const worktreePlugin = path.join(worktreePath, "plugin.ts")
+    const worktreeSpace = path.join(worktreePath, "worktree-space")
+
+    try {
+      await $`git worktree add ${worktreePath} -b test-shared-${Date.now()}`.cwd(root.path).quiet()
+      await Bun.write(
+        worktreePlugin,
+        [
+          "export default async ({ experimental_workspace }) => {",
+          `  experimental_workspace.register(${JSON.stringify(type)}, {`,
+          '    name: "worktree",',
+          '    description: "worktree adaptor",',
+          "    configure(input) {",
+          `      return { ...input, name: "worktree", branch: "worktree/main", directory: ${JSON.stringify(worktreeSpace)} }`,
+          "    },",
+          "    async create() {},",
+          "    async remove() {},",
+          "    target() {",
+          `      return { type: "local", directory: ${JSON.stringify(worktreeSpace)} }`,
+          "    },",
+          "  })",
+          "  return {}",
+          "}",
+          "",
+        ].join("\n"),
+      )
+      await Bun.write(
+        path.join(worktreePath, "opencode.json"),
+        JSON.stringify(
+          {
+            $schema: "https://opencode.ai/config.json",
+            plugin: [pathToFileURL(worktreePlugin).href],
+          },
+          null,
+          2,
+        ),
+      )
+
+      const workspace = await Instance.provide({
+        directory: root.path,
+        fn: async () => {
+          await Plugin.init()
+          return Workspace.create({
+            type,
+            branch: null,
+            extra: null,
+            projectID: Instance.project.id,
+          })
+        },
+      })
+
+      await Instance.provide({
+        directory: worktreePath,
+        fn: async () => Plugin.init(),
+      })
+
+      const app = Server.Default().app
+      const response = await app.request(`/path?workspace=${workspace.id}`, {
+        headers: {
+          "x-opencode-directory": worktreePath,
+        },
+      })
+
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({
+        directory: rootSpace,
+      })
+    } finally {
+      await $`git worktree remove ${worktreePath}`
+        .cwd(root.path)
+        .quiet()
+        .catch(() => {})
+    }
+  })
 })

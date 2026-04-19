@@ -3,14 +3,12 @@ import type { UpgradeWebSocket } from "hono/ws"
 import { mkdirSync } from "fs"
 import os from "os"
 import path from "path"
-import { getAdaptor } from "@/control-plane/adaptors"
 import { WorkspaceID } from "@/control-plane/schema"
 import { Workspace } from "@/control-plane/workspace"
 import { ServerProxy } from "../proxy"
 import { Filesystem } from "@/util/filesystem"
 import { Instance } from "@/project/instance"
 import { InstanceBootstrap } from "@/project/bootstrap"
-import { Project } from "@/project/project"
 import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
@@ -46,32 +44,6 @@ async function getSessionWorkspace(url: URL) {
 
   const session = await Session.get(id).catch(() => undefined)
   return session?.workspaceID
-}
-
-async function getWorkspaceAdaptor(workspace: Workspace.Info) {
-  try {
-    return await getAdaptor(workspace.projectID, workspace.type)
-  } catch (error) {
-    const project = Project.get(workspace.projectID)
-    if (!project) throw error
-
-    const candidates = [...new Set([project.worktree, ...project.sandboxes])]
-    let lastError = error
-
-    for (const directory of candidates) {
-      try {
-        return await Instance.provide({
-          directory,
-          init: InstanceBootstrap,
-          fn: () => getAdaptor(workspace.projectID, workspace.type, directory),
-        })
-      } catch (candidateError) {
-        lastError = candidateError
-      }
-    }
-
-    throw lastError
-  }
 }
 
 export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): MiddlewareHandler {
@@ -112,7 +84,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
       })
     }
 
-    const workspace = await Workspace.get(WorkspaceID.make(workspaceID))
+    const workspace = await Workspace.record(WorkspaceID.make(workspaceID))
 
     if (!workspace) {
       // Special-case deleting a session in case user's data in a
@@ -133,7 +105,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
       })
     }
 
-    const adaptor = await getWorkspaceAdaptor(workspace)
+    const adaptor = await Workspace.resolveAdaptor(workspace)
     const target = await adaptor.target(workspace)
 
     if (target.type === "local") {
