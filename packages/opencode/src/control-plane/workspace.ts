@@ -66,7 +66,7 @@ export namespace Workspace {
 
   export const create = fn(CreateInput, async (input) => {
     const id = WorkspaceID.ascending(input.id)
-    const adaptor = await getAdaptor(input.type)
+    const adaptor = await getAdaptor(input.projectID, input.type)
 
     const config = await adaptor.configure({ ...input, id, name: null, directory: null })
 
@@ -124,7 +124,7 @@ export namespace Workspace {
       stopSync(id)
 
       const info = fromRow(row)
-      const adaptor = await getAdaptor(row.type)
+      const adaptor = await getAdaptor(info.projectID, row.type)
       adaptor.remove(info)
       Database.use((db) => db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run())
       return info
@@ -162,7 +162,7 @@ export namespace Workspace {
       log.info("connecting to sync: " + space.id)
 
       setStatus(space.id, "connecting")
-      const adaptor = await getAdaptor(space.type)
+      const adaptor = await getAdaptor(space.projectID, space.type)
       const target = await adaptor.target(space)
 
       if (target.type === "local") return

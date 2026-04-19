@@ -2,22 +2,27 @@ import { afterAll, afterEach, describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import path from "path"
 import { pathToFileURL } from "url"
+import { Instance } from "../../src/project/instance"
+import { Plugin } from "../../src/plugin"
+import { Server } from "../../src/server/server"
+import { Workspace } from "../../src/control-plane/workspace"
+import { Log } from "../../src/util/log"
+import { resetDatabase } from "../fixture/db"
 import { tmpdir } from "../fixture/fixture"
+
+Log.init({ print: false })
 
 const disableDefault = process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS
 process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = "1"
 
 const { Flag } = await import("../../src/flag/flag")
-const { Plugin } = await import("../../src/plugin/index")
-const { Workspace } = await import("../../src/control-plane/workspace")
-const { Instance } = await import("../../src/project/instance")
-
 const experimental = Flag.OPENCODE_EXPERIMENTAL_WORKSPACES
 // @ts-expect-error test-only flag override
 Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
 
 afterEach(async () => {
   await Instance.disposeAll()
+  await resetDatabase()
 })
 
 afterAll(() => {
@@ -33,7 +38,6 @@ async function pluginProject() {
     init: async (dir) => {
       const type = `plug-${Math.random().toString(36).slice(2)}`
       const file = path.join(dir, "plugin.ts")
-      const mark = path.join(dir, "created.json")
       const space = path.join(dir, "space")
       await Bun.write(
         file,
@@ -45,9 +49,7 @@ async function pluginProject() {
           "    configure(input) {",
           `      return { ...input, name: "plug", branch: "plug/main", directory: ${JSON.stringify(space)} }`,
           "    },",
-          "    async create(input) {",
-          `      await Bun.write(${JSON.stringify(mark)}, JSON.stringify(input))`,
-          "    },",
+          "    async create() {},",
           "    async remove() {},",
           "    target(input) {",
           '      return { type: "local", directory: input.directory }',
@@ -71,16 +73,16 @@ async function pluginProject() {
         ),
       )
 
-      return { mark, space, type }
+      return { space, type }
     },
   })
 }
 
-describe("plugin.workspace", () => {
-  test("plugin can install a workspace adaptor", async () => {
+describe("workspace router", () => {
+  test("bootstraps the owning project before routing a persisted plugin workspace", async () => {
     await using tmp = await pluginProject()
 
-    const info = await Instance.provide({
+    const workspace = await Instance.provide({
       directory: tmp.path,
       fn: async () =>
         Effect.gen(function* () {
@@ -88,38 +90,6 @@ describe("plugin.workspace", () => {
           yield* plugin.init()
           return Workspace.create({
             type: tmp.extra.type,
-            branch: null,
-            extra: { key: "value" },
-            projectID: Instance.project.id,
-          })
-        }).pipe(Effect.provide(Plugin.defaultLayer), Effect.runPromise),
-    })
-
-    expect(info.type).toBe(tmp.extra.type)
-    expect(info.name).toBe("plug")
-    expect(info.branch).toBe("plug/main")
-    expect(info.directory).toBe(tmp.extra.space)
-    expect(info.extra).toEqual({ key: "value" })
-    expect(JSON.parse(await Bun.file(tmp.extra.mark).text())).toMatchObject({
-      type: tmp.extra.type,
-      name: "plug",
-      branch: "plug/main",
-      directory: tmp.extra.space,
-      extra: { key: "value" },
-    })
-  })
-
-  test("plugin workspace adaptor registration does not survive instance disposal", async () => {
-    await using source = await pluginProject()
-
-    await Instance.provide({
-      directory: source.path,
-      fn: async () =>
-        Effect.gen(function* () {
-          const plugin = yield* Plugin.Service
-          yield* plugin.init()
-          return Workspace.create({
-            type: source.extra.type,
             branch: null,
             extra: null,
             projectID: Instance.project.id,
@@ -129,17 +99,16 @@ describe("plugin.workspace", () => {
 
     await Instance.disposeAll()
 
-    await expect(
-      Instance.provide({
-        directory: source.path,
-        fn: async () =>
-          Workspace.create({
-            type: source.extra.type,
-            branch: null,
-            extra: null,
-            projectID: Instance.project.id,
-          }),
-      }),
-    ).rejects.toThrow(/workspace adaptor/i)
+    const app = Server.Default().app
+    const response = await app.request(`/path?workspace=${workspace.id}`, {
+      headers: {
+        "x-opencode-directory": tmp.path,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      directory: tmp.extra.space,
+    })
   })
 })

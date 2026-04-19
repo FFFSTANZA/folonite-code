@@ -10,6 +10,7 @@ import { ServerProxy } from "../proxy"
 import { Filesystem } from "@/util/filesystem"
 import { Instance } from "@/project/instance"
 import { InstanceBootstrap } from "@/project/bootstrap"
+import { Project } from "@/project/project"
 import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
@@ -45,6 +46,21 @@ async function getSessionWorkspace(url: URL) {
 
   const session = await Session.get(id).catch(() => undefined)
   return session?.workspaceID
+}
+
+async function getWorkspaceAdaptor(workspace: Workspace.Info) {
+  try {
+    return await getAdaptor(workspace.projectID, workspace.type)
+  } catch (error) {
+    const project = Project.get(workspace.projectID)
+    if (!project) throw error
+
+    return Instance.provide({
+      directory: project.worktree,
+      init: InstanceBootstrap,
+      fn: () => getAdaptor(workspace.projectID, workspace.type),
+    })
+  }
 }
 
 export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): MiddlewareHandler {
@@ -106,7 +122,7 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
       })
     }
 
-    const adaptor = await getAdaptor(workspace.type)
+    const adaptor = await getWorkspaceAdaptor(workspace)
     const target = await adaptor.target(workspace)
 
     if (target.type === "local") {
