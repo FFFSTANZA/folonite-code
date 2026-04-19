@@ -401,11 +401,6 @@ export default function Page() {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const size = createSizing()
   const desktopReviewOpen = createMemo(() => isDesktop() && view().sidePanel.opened())
-  const desktopSidePanelOpen = createMemo(() => desktopReviewOpen())
-  const sessionPanelWidth = createMemo(() => {
-    if (!desktopSidePanelOpen()) return "100%"
-    return `${layout.session.width()}px`
-  })
   const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
 
   function normalizeTab(tab: string) {
@@ -1966,12 +1961,9 @@ export default function Page() {
         {/* Session panel */}
         <div
           classList={{
-            "@container relative shrink-0 flex flex-col min-h-0 h-full bg-background-stronger flex-1 md:flex-none": true,
+            "@container relative min-w-0 flex flex-col min-h-0 h-full bg-background-stronger flex-1": true,
             "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
               !size.active() && !ui.reviewSnap,
-          }}
-          style={{
-            width: sessionPanelWidth(),
           }}
         >
           <div class="flex-1 min-h-0 overflow-hidden">
@@ -2087,20 +2079,6 @@ export default function Page() {
             })()}
           </div>
 
-          <Show when={desktopReviewOpen()}>
-            <div onPointerDown={() => size.start()}>
-              <ResizeHandle
-                direction="horizontal"
-                size={layout.session.width()}
-                min={450}
-                max={typeof window === "undefined" ? 1000 : window.innerWidth * 0.45}
-                onResize={(width) => {
-                  size.touch()
-                  layout.session.resize(width)
-                }}
-              />
-            </div>
-          </Show>
         </div>
 
         <SessionSidePanel
