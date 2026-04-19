@@ -1,6 +1,7 @@
 import { $ } from "bun"
 import { afterAll, afterEach, describe, expect, test } from "bun:test"
 import { Effect } from "effect"
+import { mkdir } from "fs/promises"
 import path from "path"
 import { pathToFileURL } from "url"
 import { tmpdir } from "../fixture/fixture"
@@ -84,6 +85,7 @@ async function pluginProject() {
 describe("plugin.workspace", () => {
   test("plugin can install a workspace adaptor", async () => {
     await using tmp = await pluginProject()
+    await mkdir(tmp.extra.space, { recursive: true })
 
     const info = await Instance.provide({
       directory: tmp.path,
@@ -112,6 +114,8 @@ describe("plugin.workspace", () => {
       directory: tmp.extra.space,
       extra: { key: "value" },
     })
+    await wait(100)
+    expect(Workspace.status().find((item) => item.workspaceID === info.id)?.status).not.toBe("connecting")
   })
 
   test("plugin workspace adaptor registration does not survive instance disposal", async () => {

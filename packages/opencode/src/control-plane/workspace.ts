@@ -222,6 +222,7 @@ export namespace Workspace {
 
   const connections = new Map<WorkspaceID, ConnectionStatus>()
   const aborts = new Map<WorkspaceID, AbortController>()
+  const pending = new Map<WorkspaceID, StoredInfo>()
 
   function setStatus(id: WorkspaceID, status: ConnectionStatus["status"], error?: string) {
     const prev = connections.get(id)
@@ -254,7 +255,11 @@ export namespace Workspace {
       const adaptor = await resolveAdaptor(space)
       const target = await adaptor.target(space)
 
-      if (target.type === "local") return
+      if (target.type === "local") {
+        const exists = await Filesystem.exists(target.directory)
+        setStatus(space.id, exists ? "connected" : "error", exists ? undefined : "directory does not exist")
+        return
+      }
 
       const res = await fetch(target.url + "/sync/event", { method: "GET", signal }).catch((err: unknown) => {
         setStatus(space.id, "error", String(err))
@@ -296,24 +301,37 @@ export namespace Workspace {
       return
     }
 
-    if (aborts.has(space.id)) return
+    if (aborts.has(space.id)) {
+      pending.set(space.id, space)
+      return
+    }
     const abort = new AbortController()
     aborts.set(space.id, abort)
     setStatus(space.id, "disconnected")
 
-    void workspaceEventLoop(space, abort.signal).catch((error) => {
-      aborts.delete(space.id)
-      setStatus(space.id, "error", String(error))
-      log.warn("workspace sync listener failed", {
-        workspaceID: space.id,
-        error,
+    void workspaceEventLoop(space, abort.signal)
+      .catch((error) => {
+        setStatus(space.id, "error", String(error))
+        log.warn("workspace sync listener failed", {
+          workspaceID: space.id,
+          error,
+        })
       })
-    })
+      .finally(() => {
+        if (aborts.get(space.id) === abort) {
+          aborts.delete(space.id)
+        }
+        const next = pending.get(space.id)
+        if (!next) return
+        pending.delete(space.id)
+        startSync(next)
+      })
   }
 
   function stopSync(id: WorkspaceID) {
     aborts.get(id)?.abort()
     aborts.delete(id)
+    pending.delete(id)
     connections.delete(id)
   }
 }
