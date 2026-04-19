@@ -1,3 +1,4 @@
+import { $ } from "bun"
 import { afterAll, afterEach, describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import path from "path"
@@ -141,5 +142,135 @@ describe("plugin.workspace", () => {
           }),
       }),
     ).rejects.toThrow(/workspace adaptor/i)
+  })
+
+  test("disposing one checkout restores the previous adaptor for the same project and type", async () => {
+    await using root = await tmpdir({ git: true })
+
+    const type = "shared"
+    const rootPlugin = path.join(root.path, "plugin.ts")
+    const rootSpace = path.join(root.path, "root-space")
+    await Bun.write(
+      rootPlugin,
+      [
+        "export default async ({ experimental_workspace }) => {",
+        `  experimental_workspace.register(${JSON.stringify(type)}, {`,
+        '    name: "root",',
+        '    description: "root adaptor",',
+        "    configure(input) {",
+        `      return { ...input, name: "root", branch: "root/main", directory: ${JSON.stringify(rootSpace)} }`,
+        "    },",
+        "    async create() {},",
+        "    async remove() {},",
+        "    target(input) {",
+        '      return { type: "local", directory: input.directory }',
+        "    },",
+        "  })",
+        "  return {}",
+        "}",
+        "",
+      ].join("\n"),
+    )
+    await Bun.write(
+      path.join(root.path, "opencode.json"),
+      JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          plugin: [pathToFileURL(rootPlugin).href],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const worktreePath = path.join(root.path, "..", path.basename(root.path) + "-plugin-wt")
+    const worktreePlugin = path.join(worktreePath, "plugin.ts")
+    const worktreeSpace = path.join(worktreePath, "worktree-space")
+
+    try {
+      await $`git worktree add ${worktreePath} -b test-plugin-${Date.now()}`.cwd(root.path).quiet()
+      await Bun.write(
+        worktreePlugin,
+        [
+          "export default async ({ experimental_workspace }) => {",
+          `  experimental_workspace.register(${JSON.stringify(type)}, {`,
+          '    name: "worktree",',
+          '    description: "worktree adaptor",',
+          "    configure(input) {",
+          `      return { ...input, name: "worktree", branch: "worktree/main", directory: ${JSON.stringify(worktreeSpace)} }`,
+          "    },",
+          "    async create() {},",
+          "    async remove() {},",
+          "    target(input) {",
+          '      return { type: "local", directory: input.directory }',
+          "    },",
+          "  })",
+          "  return {}",
+          "}",
+          "",
+        ].join("\n"),
+      )
+      await Bun.write(
+        path.join(worktreePath, "opencode.json"),
+        JSON.stringify(
+          {
+            $schema: "https://opencode.ai/config.json",
+            plugin: [pathToFileURL(worktreePlugin).href],
+          },
+          null,
+          2,
+        ),
+      )
+
+      const fromRoot = await Instance.provide({
+        directory: root.path,
+        fn: async () => {
+          await Plugin.init()
+          return Workspace.create({
+            type,
+            branch: null,
+            extra: null,
+            projectID: Instance.project.id,
+          })
+        },
+      })
+      expect(fromRoot.directory).toBe(rootSpace)
+
+      const fromWorktree = await Instance.provide({
+        directory: worktreePath,
+        fn: async () => {
+          await Plugin.init()
+          return Workspace.create({
+            type,
+            branch: null,
+            extra: null,
+            projectID: Instance.project.id,
+          })
+        },
+      })
+      expect(fromWorktree.directory).toBe(worktreeSpace)
+
+      await Instance.provide({
+        directory: worktreePath,
+        fn: async () => Instance.dispose(),
+      })
+
+      const restored = await Instance.provide({
+        directory: root.path,
+        fn: async () =>
+          Workspace.create({
+            type,
+            branch: null,
+            extra: null,
+            projectID: Instance.project.id,
+          }),
+      })
+      expect(restored.directory).toBe(rootSpace)
+    } finally {
+      await $`git worktree remove ${worktreePath}`
+        .cwd(root.path)
+        .quiet()
+        .catch(() => {})
+    }
   })
 })

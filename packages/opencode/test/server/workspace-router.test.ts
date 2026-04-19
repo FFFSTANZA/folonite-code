@@ -1,3 +1,4 @@
+import { $ } from "bun"
 import { afterAll, afterEach, describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import path from "path"
@@ -110,5 +111,86 @@ describe("workspace router", () => {
     expect(await response.json()).toMatchObject({
       directory: tmp.extra.space,
     })
+  })
+
+  test("tries project sandboxes when the plugin only exists in a secondary worktree", async () => {
+    await using root = await tmpdir({ git: true })
+
+    const worktreePath = path.join(root.path, "..", path.basename(root.path) + "-router-wt")
+    const type = `plug-${Math.random().toString(36).slice(2)}`
+    const plugin = path.join(worktreePath, "plugin.ts")
+    const space = path.join(worktreePath, "space")
+
+    try {
+      await $`git worktree add ${worktreePath} -b test-router-${Date.now()}`.cwd(root.path).quiet()
+
+      await Bun.write(
+        plugin,
+        [
+          "export default async ({ experimental_workspace }) => {",
+          `  experimental_workspace.register(${JSON.stringify(type)}, {`,
+          '    name: "plug",',
+          '    description: "worktree-only adaptor",',
+          "    configure(input) {",
+          `      return { ...input, name: "plug", branch: "plug/main", directory: ${JSON.stringify(space)} }`,
+          "    },",
+          "    async create() {},",
+          "    async remove() {},",
+          "    target(input) {",
+          '      return { type: "local", directory: input.directory }',
+          "    },",
+          "  })",
+          "  return {}",
+          "}",
+          "",
+        ].join("\n"),
+      )
+
+      await Bun.write(
+        path.join(worktreePath, "opencode.json"),
+        JSON.stringify(
+          {
+            $schema: "https://opencode.ai/config.json",
+            plugin: [pathToFileURL(plugin).href],
+          },
+          null,
+          2,
+        ),
+      )
+
+      const workspace = await Instance.provide({
+        directory: worktreePath,
+        fn: async () =>
+          Effect.gen(function* () {
+            const plugin = yield* Plugin.Service
+            yield* plugin.init()
+            return Workspace.create({
+              type,
+              branch: null,
+              extra: null,
+              projectID: Instance.project.id,
+            })
+          }).pipe(Effect.provide(Plugin.defaultLayer), Effect.runPromise),
+      })
+
+      await Instance.disposeAll()
+
+      const app = Server.Default().app
+      const response = await app.request(`/path?workspace=${workspace.id}`, {
+        headers: {
+          "x-opencode-directory": root.path,
+        },
+      })
+
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({
+        directory: space,
+      })
+    } finally {
+      await $`git worktree remove ${worktreePath}`
+        .cwd(root.path)
+        .quiet()
+        .catch(() => {})
+    }
   })
 })

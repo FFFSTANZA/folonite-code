@@ -152,7 +152,7 @@ export namespace Plugin {
             directory: ctx.directory,
             experimental_workspace: {
               register(type: string, adaptor: PluginWorkspaceAdaptor) {
-                installAdaptor(ctx.project.id, type, adaptor as unknown as Adaptor)
+                installAdaptor(ctx.project.id, ctx.directory, type, adaptor as unknown as Adaptor)
                 registeredAdaptors.add(type)
               },
             },
@@ -285,7 +285,7 @@ export namespace Plugin {
           yield* Effect.addFinalizer(() =>
             Effect.sync(() => {
               for (const type of registeredAdaptors) {
-                uninstallAdaptor(ctx.project.id, type)
+                uninstallAdaptor(ctx.project.id, ctx.directory, type)
               }
             }),
           )

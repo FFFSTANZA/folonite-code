@@ -6,16 +6,20 @@ const BUILTIN: Record<string, () => Promise<Adaptor>> = {
   worktree: lazy(async () => (await import("./worktree")).WorktreeAdaptor),
 }
 
-type CustomAdaptor = {
-  adaptor: Adaptor
-  refs: number
-}
+const CUSTOM = new Map<ProjectID, Map<string, Map<string, Adaptor>>>()
 
-const CUSTOM = new Map<ProjectID, Map<string, CustomAdaptor>>()
+export async function getAdaptor(projectID: ProjectID, type: string, owner?: string): Promise<Adaptor> {
+  const project = CUSTOM.get(projectID)?.get(type)
+  if (project) {
+    if (owner) {
+      const exact = project.get(owner)
+      if (exact) return exact
+    }
 
-export async function getAdaptor(projectID: ProjectID, type: string): Promise<Adaptor> {
-  const custom = CUSTOM.get(projectID)?.get(type)
-  if (custom) return custom.adaptor
+    const adaptors = [...project.values()]
+    const latest = adaptors.at(-1)
+    if (latest) return latest
+  }
 
   const builtin = BUILTIN[type]
   if (builtin) return builtin()
@@ -23,35 +27,27 @@ export async function getAdaptor(projectID: ProjectID, type: string): Promise<Ad
   throw new Error(`Unknown workspace adaptor: ${type}`)
 }
 
-export function installAdaptor(projectID: ProjectID, type: string, adaptor: Adaptor) {
+export function installAdaptor(projectID: ProjectID, owner: string, type: string, adaptor: Adaptor) {
   // This is experimental: mostly used for testing right now, but we
   // will likely allow this in the future. Need to figure out the
   // TypeScript story
 
-  const project = CUSTOM.get(projectID) ?? new Map<string, CustomAdaptor>()
-  const current = project.get(type)
-  project.set(type, {
-    adaptor,
-    refs: (current?.refs ?? 0) + 1,
-  })
+  const project = CUSTOM.get(projectID) ?? new Map<string, Map<string, Adaptor>>()
+  const adaptors = project.get(type) ?? new Map<string, Adaptor>()
+  if (adaptors.has(owner)) adaptors.delete(owner)
+  adaptors.set(owner, adaptor)
+  project.set(type, adaptors)
   CUSTOM.set(projectID, project)
 }
 
-export function uninstallAdaptor(projectID: ProjectID, type: string) {
+export function uninstallAdaptor(projectID: ProjectID, owner: string, type: string) {
   const project = CUSTOM.get(projectID)
   if (!project) return
 
-  const current = project.get(type)
-  if (!current) return
+  const adaptors = project.get(type)
+  if (!adaptors) return
 
-  if (current.refs > 1) {
-    project.set(type, {
-      adaptor: current.adaptor,
-      refs: current.refs - 1,
-    })
-    return
-  }
-
-  project.delete(type)
+  adaptors.delete(owner)
+  if (adaptors.size === 0) project.delete(type)
   if (project.size === 0) CUSTOM.delete(projectID)
 }

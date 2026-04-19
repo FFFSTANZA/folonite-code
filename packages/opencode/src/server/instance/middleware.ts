@@ -55,11 +55,22 @@ async function getWorkspaceAdaptor(workspace: Workspace.Info) {
     const project = Project.get(workspace.projectID)
     if (!project) throw error
 
-    return Instance.provide({
-      directory: project.worktree,
-      init: InstanceBootstrap,
-      fn: () => getAdaptor(workspace.projectID, workspace.type),
-    })
+    const candidates = [...new Set([project.worktree, ...project.sandboxes])]
+    let lastError = error
+
+    for (const directory of candidates) {
+      try {
+        return await Instance.provide({
+          directory,
+          init: InstanceBootstrap,
+          fn: () => getAdaptor(workspace.projectID, workspace.type, directory),
+        })
+      } catch (candidateError) {
+        lastError = candidateError
+      }
+    }
+
+    throw lastError
   }
 }
 

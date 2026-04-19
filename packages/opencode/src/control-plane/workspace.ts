@@ -9,6 +9,7 @@ import { SyncEvent } from "@/sync"
 import { Log } from "@/util/log"
 import { Filesystem } from "@/util/filesystem"
 import { ProjectID } from "@/project/schema"
+import { Instance } from "@/project/instance"
 import { WorkspaceTable } from "./workspace.sql"
 import { getAdaptor } from "./adaptors"
 import { WorkspaceInfo } from "./types"
@@ -66,7 +67,7 @@ export namespace Workspace {
 
   export const create = fn(CreateInput, async (input) => {
     const id = WorkspaceID.ascending(input.id)
-    const adaptor = await getAdaptor(input.projectID, input.type)
+    const adaptor = await getAdaptor(input.projectID, input.type, Instance.directory)
 
     const config = await adaptor.configure({ ...input, id, name: null, directory: null })
 
