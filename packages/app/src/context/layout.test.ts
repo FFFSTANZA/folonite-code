@@ -113,4 +113,13 @@ describe("layout.rightPanel clamping", () => {
     expect(clampRightPanelWidth(600)).toBe(MAX_RIGHT_PANEL_WIDTH)
     expect(MAX_RIGHT_PANEL_WIDTH).toBe(520)
   })
+
+  test("clampRightPanelWidth(NaN) falls back to default", () => {
+    expect(clampRightPanelWidth(Number.NaN)).toBe(DEFAULT_RIGHT_PANEL_WIDTH)
+  })
+
+  test("clampRightPanelWidth(Infinity) falls back to default", () => {
+    expect(clampRightPanelWidth(Number.POSITIVE_INFINITY)).toBe(DEFAULT_RIGHT_PANEL_WIDTH)
+    expect(clampRightPanelWidth(Number.NEGATIVE_INFINITY)).toBe(DEFAULT_RIGHT_PANEL_WIDTH)
+  })
 })
