@@ -114,3 +114,27 @@ describe("formatRightPanelWidth", () => {
     expect(formatRightPanelWidth(true, 520)).toBe("520px")
   })
 })
+
+describe("makeRightPanelResizeHandler", () => {
+  test("calls size.touch() then layout.rightPanel.resize(width) in order", async () => {
+    const { makeRightPanelResizeHandler } = await import("./session-side-panel")
+    const calls: string[] = []
+    const handler = makeRightPanelResizeHandler(
+      { touch: () => calls.push("touch") },
+      { rightPanel: { resize: (w: number) => calls.push(`resize:${w}`) } },
+    )
+    handler(350)
+    expect(calls).toEqual(["touch", "resize:350"])
+  })
+
+  test("passes width through unchanged (clamping is the store's job)", async () => {
+    const { makeRightPanelResizeHandler } = await import("./session-side-panel")
+    let received = 0
+    const handler = makeRightPanelResizeHandler(
+      { touch: () => undefined },
+      { rightPanel: { resize: (w: number) => (received = w) } },
+    )
+    handler(280) // below MIN; handler doesn't clamp, store.resize clamps internally
+    expect(received).toBe(280)
+  })
+})

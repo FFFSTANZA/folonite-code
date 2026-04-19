@@ -20,7 +20,7 @@ import { StatusPanel } from "@/components/status-panel"
 import { useCommand } from "@/context/command"
 import { useFile, type SelectedLineRange } from "@/context/file"
 import { useLanguage } from "@/context/language"
-import { useLayout } from "@/context/layout"
+import { MAX_RIGHT_PANEL_WIDTH, MIN_RIGHT_PANEL_WIDTH, useLayout } from "@/context/layout"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
 import { FileTabContent } from "@/pages/session/file-tabs"
 import { FilesTab } from "@/pages/session/files-tab"
@@ -32,6 +32,16 @@ import { useSessionLayout } from "@/pages/session/session-layout"
 
 export function formatRightPanelWidth(open: boolean, width: number): string {
   return open ? `${width}px` : "0px"
+}
+
+export function makeRightPanelResizeHandler(
+  size: { touch: () => void },
+  layout: { rightPanel: { resize: (width: number) => void } },
+): (width: number) => void {
+  return (width) => {
+    size.touch()
+    layout.rightPanel.resize(width)
+  }
 }
 
 type RightPanelShellIconName = "summary" | "folder" | "review" | "terminal"
@@ -307,6 +317,20 @@ export function SessionSidePanel(props: {
         }}
         style={{ width: panelWidth() }}
       >
+        <div
+          data-testid="right-panel-resize-wrapper"
+          onPointerDown={() => props.size.start()}
+          class="absolute top-0 left-0 h-full z-10"
+        >
+          <ResizeHandle
+            direction="horizontal"
+            edge="start"
+            size={layout.rightPanel.width()}
+            min={MIN_RIGHT_PANEL_WIDTH}
+            max={MAX_RIGHT_PANEL_WIDTH}
+            onResize={makeRightPanelResizeHandler(props.size, layout)}
+          />
+        </div>
         <div class="size-full border-l border-border-weaker-base">
           <Tabs
             variant="sidepanel"
