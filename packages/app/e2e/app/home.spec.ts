@@ -1,15 +1,14 @@
 import { test, expect } from "../fixtures"
 import { promptSelector, sessionComposerDockSelector } from "../selectors"
+import { serverNamePattern } from "../utils"
 
 test("@smoke root route renders seeded home entrypoints", async ({ page }) => {
   await page.goto("/")
 
   await expect(page.getByRole("button", { name: "Open project" }).first()).toBeVisible()
-  await expect(page.getByRole("heading", { name: "Choose what to do" })).toBeVisible()
-  await expect(page.getByRole("button", { name: /Process documents/i })).toBeVisible()
-  await expect(page.getByRole("button", { name: /Analyze data/i })).toBeVisible()
-  await expect(page.getByRole("button", { name: /Write faster/i })).toBeVisible()
-  await expect(page.getByRole("button", { name: "Status" })).toBeVisible()
+  await expect(page.getByRole("button", { name: serverNamePattern })).toBeVisible()
+  await expect(page.getByText("No recent projects")).toBeVisible()
+  await expect(page.getByText("Get started by opening a local project")).toBeVisible()
 })
 
 test("@smoke home renders the hero composer and starter cards", async ({ page, project }) => {
@@ -28,7 +27,7 @@ test("@smoke home renders the hero composer and starter cards", async ({ page, p
   await expect(firstCard).toBeVisible()
   await expect(page.getByRole("button", { name: /Analyze data/i })).toBeVisible()
   await expect(page.getByRole("button", { name: /Write faster/i })).toBeVisible()
-  await expect(page.getByRole("button", { name: "Status" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Right utility panel" })).toBeVisible()
 
   const cardBox = await firstCard.boundingBox()
   const composerBox = await composer.boundingBox()
@@ -55,7 +54,7 @@ test("@smoke home hero prompt starts a session", async ({ page, project, assista
 
 test("@smoke project home status panel can open the server picker dialog", async ({ page, project }) => {
   await project.open()
-  const statusButton = page.getByRole("button", { name: "Status" }).first()
+  const statusButton = page.getByRole("button", { name: "Right utility panel" }).first()
   const rightPanel = page.locator("#right-panel")
 
   await statusButton.click()
