@@ -12,7 +12,7 @@ import { ProjectID } from "@/project/schema"
 import { Instance } from "@/project/instance"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { WorkspaceTable } from "./workspace.sql"
-import { getAdaptor } from "./adaptors"
+import { getAdaptor, getBuiltinAdaptor, ownerKey } from "./adaptors"
 import { WorkspaceInfo } from "./types"
 import { WorkspaceID } from "./schema"
 import { parseSSE } from "./sse"
@@ -92,16 +92,39 @@ export namespace Workspace {
       ),
     ]
     let lastError = error
+    const resolved: { owner: string; adaptor: Awaited<ReturnType<typeof getAdaptor>> }[] = []
 
     for (const directory of candidates) {
       try {
-        return await Instance.provide({
+        const match = await Instance.provide({
           directory,
           init: InstanceBootstrap,
-          fn: () => getAdaptor(input.projectID, input.type, directory),
+          fn: async () => {
+            const owner = ownerKey(Instance.directory, Instance.worktree)
+            return {
+              owner,
+              adaptor: await getAdaptor(input.projectID, input.type, owner),
+            }
+          },
         })
+
+        if (input.owner) {
+          if (match.owner === input.owner) return match.adaptor
+          continue
+        }
+
+        if (!resolved.some((item) => item.owner === match.owner)) {
+          resolved.push(match)
+        }
       } catch (candidateError) {
         lastError = candidateError
+      }
+    }
+
+    if (!input.owner) {
+      if (resolved.length === 1) return resolved[0]!.adaptor
+      if (resolved.length > 1) {
+        throw new Error(`Ambiguous workspace adaptor owner for ${input.type}`)
       }
     }
 
@@ -109,16 +132,23 @@ export namespace Workspace {
   }
 
   export async function resolveAdaptor(input: Pick<StoredInfo, "projectID" | "type" | "owner">) {
-    try {
-      return await getAdaptor(input.projectID, input.type, input.owner ?? undefined)
-    } catch (error) {
-      return bootstrapAdaptor(input, error)
+    if (input.owner) {
+      try {
+        return await getAdaptor(input.projectID, input.type, input.owner)
+      } catch (error) {
+        return bootstrapAdaptor(input, error)
+      }
     }
+
+    const builtin = getBuiltinAdaptor(input.type)
+    if (builtin) return builtin()
+
+    return bootstrapAdaptor(input, new Error(`Missing workspace owner for adaptor: ${input.type}`))
   }
 
   export const create = fn(CreateInput, async (input) => {
     const id = WorkspaceID.ascending(input.id)
-    const owner = Instance.worktree
+    const owner = ownerKey(Instance.directory, Instance.worktree)
     const adaptor = await getAdaptor(input.projectID, input.type, owner)
 
     const config = await adaptor.configure({ ...input, id, name: null, directory: null })

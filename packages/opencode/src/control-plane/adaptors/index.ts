@@ -8,6 +8,14 @@ const BUILTIN: Record<string, () => Promise<Adaptor>> = {
 
 const CUSTOM = new Map<ProjectID, Map<string, Map<string, Adaptor>>>()
 
+export function ownerKey(directory: string, worktree: string) {
+  return worktree === "/" ? directory : worktree
+}
+
+export function getBuiltinAdaptor(type: string) {
+  return BUILTIN[type]
+}
+
 export async function getAdaptor(projectID: ProjectID, type: string, owner?: string): Promise<Adaptor> {
   const project = CUSTOM.get(projectID)?.get(type)
   if (project) {

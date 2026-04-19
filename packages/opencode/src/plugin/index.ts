@@ -27,7 +27,7 @@ import { errorMessage } from "@/util/error"
 import { needsConfigDependencies } from "@/config/dependency"
 import { PluginLoader } from "./loader"
 import { parsePluginSpecifier, readPluginId, readV1Plugin, resolvePluginId } from "./shared"
-import { installAdaptor, uninstallAdaptor } from "@/control-plane/adaptors"
+import { installAdaptor, ownerKey, uninstallAdaptor } from "@/control-plane/adaptors"
 import type { Adaptor } from "@/control-plane/types"
 
 export namespace Plugin {
@@ -152,7 +152,7 @@ export namespace Plugin {
             directory: ctx.directory,
             experimental_workspace: {
               register(type: string, adaptor: PluginWorkspaceAdaptor) {
-                installAdaptor(ctx.project.id, ctx.worktree, type, adaptor as unknown as Adaptor)
+                installAdaptor(ctx.project.id, ownerKey(ctx.directory, ctx.worktree), type, adaptor as unknown as Adaptor)
                 registeredAdaptors.add(type)
               },
             },
@@ -285,7 +285,7 @@ export namespace Plugin {
           yield* Effect.addFinalizer(() =>
             Effect.sync(() => {
               for (const type of registeredAdaptors) {
-                uninstallAdaptor(ctx.project.id, ctx.worktree, type)
+                uninstallAdaptor(ctx.project.id, ownerKey(ctx.directory, ctx.worktree), type)
               }
             }),
           )
