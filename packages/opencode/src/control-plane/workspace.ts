@@ -10,7 +10,7 @@ import { Log } from "@/util/log"
 import { Filesystem } from "@/util/filesystem"
 import { ProjectID } from "@/project/schema"
 import { Instance } from "@/project/instance"
-import { InstanceBootstrap } from "@/project/bootstrap"
+import { Plugin } from "@/plugin"
 import { WorkspaceTable } from "./workspace.sql"
 import { getAdaptor, getBuiltinAdaptor, ownerKey } from "./adaptors"
 import { WorkspaceInfo } from "./types"
@@ -103,8 +103,8 @@ export namespace Workspace {
       try {
         const match = await Instance.provide({
           directory,
-          init: InstanceBootstrap,
           fn: async () => {
+            await Plugin.init()
             const owner = ownerKey(Instance.directory, Instance.worktree)
             return {
               owner,
@@ -137,18 +137,33 @@ export namespace Workspace {
   }
 
   export async function resolveAdaptor(input: Pick<StoredInfo, "projectID" | "type" | "owner"> & { hint?: string | null }) {
+    const hint =
+      input.hint ??
+      (() => {
+        try {
+          return ownerKey(Instance.directory, Instance.worktree)
+        } catch {
+          return undefined
+        }
+      })()
+
     if (input.owner) {
       try {
         return await getAdaptor(input.projectID, input.type, input.owner)
       } catch (error) {
-        return bootstrapAdaptor(input, error)
+        return bootstrapAdaptor({ ...input, hint }, error)
       }
     }
 
     const builtin = getBuiltinAdaptor(input.type)
     if (builtin) return builtin()
 
-    return bootstrapAdaptor(input, new Error(`Missing workspace owner for adaptor: ${input.type}`))
+    const project = Project.get(input.projectID)
+    if (project?.worktree === "/" && !hint) {
+      throw new Error(`Missing workspace owner for non-git adaptor: ${input.type}`)
+    }
+
+    return bootstrapAdaptor({ ...input, hint }, new Error(`Missing workspace owner for adaptor: ${input.type}`))
   }
 
   export const create = fn(CreateInput, async (input) => {

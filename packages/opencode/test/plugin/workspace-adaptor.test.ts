@@ -4,7 +4,10 @@ import { Effect } from "effect"
 import { mkdir } from "fs/promises"
 import path from "path"
 import { pathToFileURL } from "url"
+import { eq } from "../../src/storage/db"
 import { tmpdir } from "../fixture/fixture"
+import { WorkspaceTable } from "../../src/control-plane/workspace.sql"
+import { Database } from "../../src/storage/db"
 
 const disableDefault = process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS
 process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = "1"
@@ -415,5 +418,39 @@ describe("plugin.workspace", () => {
       directory: tmp.path,
       fn: async () => Workspace.remove(info.id),
     })
+  })
+
+  test("Workspace.get recovers a null-owner non-git workspace when called from its original directory", async () => {
+    await using tmp = await pluginProject()
+
+    const workspace = await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Plugin.init()
+        return Workspace.create({
+          type: tmp.extra.type,
+          branch: null,
+          extra: null,
+          projectID: Instance.project.id,
+        })
+      },
+    })
+
+    Database.use((db) =>
+      db.update(WorkspaceTable).set({ owner_directory: null }).where(eq(WorkspaceTable.id, workspace.id)).run(),
+    )
+    await Instance.disposeAll()
+
+    const reloaded = await Instance.provide({
+      directory: tmp.path,
+      fn: async () => Workspace.get(workspace.id),
+    })
+
+    expect(reloaded?.id).toBe(workspace.id)
+    expect(
+      Workspace.status()
+        .find((item) => item.workspaceID === workspace.id)
+        ?.error?.includes("Unknown workspace adaptor") ?? false,
+    ).toBe(false)
   })
 })
