@@ -118,7 +118,7 @@ export namespace Workspace {
 
   export const create = fn(CreateInput, async (input) => {
     const id = WorkspaceID.ascending(input.id)
-    const owner = Instance.directory
+    const owner = Instance.worktree
     const adaptor = await getAdaptor(input.projectID, input.type, owner)
 
     const config = await adaptor.configure({ ...input, id, name: null, directory: null })

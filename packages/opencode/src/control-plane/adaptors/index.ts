@@ -14,6 +14,7 @@ export async function getAdaptor(projectID: ProjectID, type: string, owner?: str
     if (owner) {
       const exact = project.get(owner)
       if (exact) return exact
+      throw new Error(`Unknown workspace adaptor owner: ${owner} (${type})`)
     }
 
     const adaptors = [...project.values()]

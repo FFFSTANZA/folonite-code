@@ -194,7 +194,7 @@ describe("workspace router", () => {
     }
   })
 
-  test("routes a persisted workspace through its original checkout when the same type is registered elsewhere", async () => {
+  test("routes a persisted workspace through its original checkout after the owner instance is disposed", async () => {
     await using root = await tmpdir({ git: true })
 
     const type = "shared"
@@ -288,6 +288,11 @@ describe("workspace router", () => {
       await Instance.provide({
         directory: worktreePath,
         fn: async () => Plugin.init(),
+      })
+
+      await Instance.provide({
+        directory: root.path,
+        fn: async () => Instance.dispose(),
       })
 
       const app = Server.Default().app
