@@ -1,6 +1,10 @@
 import type { Target } from "@/control-plane/types"
 import { Hono } from "hono"
 import type { UpgradeWebSocket } from "hono/ws"
+import { Log } from "@/util/log"
+import * as Fence from "./fence"
+import type { WorkspaceID } from "@/control-plane/schema"
+import { Workspace } from "@/control-plane/workspace"
 
 const hop = new Set([
   "connection",
@@ -20,6 +24,7 @@ type Msg = string | ArrayBuffer | Uint8Array
 function headers(req: Request, extra?: HeadersInit) {
   const out = new Headers(req.headers)
   for (const key of hop) out.delete(key)
+  out.delete("accept-encoding")
   out.delete("x-opencode-directory")
   out.delete("x-opencode-workspace")
   if (!extra) return out
@@ -72,7 +77,7 @@ const app = (upgrade: UpgradeWebSocket) =>
             queue.length = 0
           }
           remote.onmessage = (event) => {
-            send(ws, event.data)
+            void send(ws, event.data)
           }
           remote.onerror = () => {
             ws.close(1011, "proxy error")
@@ -97,37 +102,137 @@ const app = (upgrade: UpgradeWebSocket) =>
     }),
   )
 
-export namespace ServerProxy {
-  export function http(target: Extract<Target, { type: "remote" }>, req: Request) {
+const log = Log.Default.clone().tag("service", "server-proxy")
+
+function isLegacyTarget(value: unknown): value is Extract<Target, { type: "remote" }> {
+  return Boolean(value && typeof value === "object" && "type" in value && (value as { type?: unknown }).type === "remote")
+}
+
+function proxyReady(workspaceID: WorkspaceID) {
+  const status = Workspace.status().find((item) => item.workspaceID === workspaceID)
+  if (!status) return
+  if (status.status === "connected" || status.status === "connecting") return
+  return new Response(`broken sync connection for workspace: ${workspaceID}`, {
+    status: 503,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+    },
+  })
+}
+
+export async function http(
+  target: Extract<Target, { type: "remote" }>,
+  req: Request,
+): Promise<Response>
+export async function http(
+  url: string | URL,
+  extra: HeadersInit | undefined,
+  req: Request,
+  workspaceID: WorkspaceID,
+): Promise<Response>
+export async function http(
+  targetOrUrl: Extract<Target, { type: "remote" }> | string | URL,
+  extraOrReq: HeadersInit | Request | undefined,
+  reqOrWorkspace?: Request | WorkspaceID,
+  maybeWorkspace?: WorkspaceID,
+) {
+  if (isLegacyTarget(targetOrUrl) && extraOrReq instanceof Request) {
     return fetch(
-      new Request(target.url, {
-        method: req.method,
-        headers: headers(req, target.headers),
-        body: req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+      new Request(targetOrUrl.url, {
+        method: extraOrReq.method,
+        headers: headers(extraOrReq, targetOrUrl.headers),
+        body: extraOrReq.method === "GET" || extraOrReq.method === "HEAD" ? undefined : extraOrReq.body,
         redirect: "manual",
-        signal: req.signal,
+        signal: extraOrReq.signal,
       }),
     )
   }
 
-  export function websocket(
-    upgrade: UpgradeWebSocket,
-    target: Extract<Target, { type: "remote" }>,
-    req: Request,
-    env: unknown,
-  ) {
-    const url = new URL(req.url)
-    url.pathname = "/__workspace_ws"
-    url.search = ""
-    const next = new Headers(req.headers)
-    next.set("x-opencode-proxy-url", socket(target.url))
-    return app(upgrade).fetch(
-      new Request(url, {
-        method: req.method,
-        headers: next,
-        signal: req.signal,
-      }),
-      env as never,
-    )
+  const url = targetOrUrl as string | URL
+  const extra = extraOrReq as HeadersInit | undefined
+  const req = reqOrWorkspace as Request
+  const workspaceID = maybeWorkspace as WorkspaceID
+
+  const blocked = proxyReady(workspaceID)
+  if (blocked) {
+    return new Response(`broken sync connection for workspace: ${workspaceID}`, {
+      status: 503,
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+      },
+    })
   }
+
+  return fetch(
+    new Request(url, {
+      method: req.method,
+      headers: headers(req, extra),
+      body: req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+      redirect: "manual",
+      signal: req.signal,
+    }),
+  ).then((res) => {
+    const sync = Fence.parse(res.headers)
+    const next = new Headers(res.headers)
+    next.delete("content-encoding")
+    next.delete("content-length")
+
+    const done = sync ? Fence.wait(workspaceID, sync, req.signal) : Promise.resolve()
+
+    return done.then(async () => {
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: next,
+      })
+    })
+  })
 }
+
+export function websocket(
+  upgrade: UpgradeWebSocket,
+  target: Extract<Target, { type: "remote" }>,
+  req: Request,
+  env: unknown,
+): Response | Promise<Response>
+export function websocket(
+  upgrade: UpgradeWebSocket,
+  target: string | URL,
+  extra: HeadersInit | undefined,
+  req: Request,
+  env: unknown,
+) : Response | Promise<Response>
+export function websocket(
+  upgrade: UpgradeWebSocket,
+  targetOrUrl: Extract<Target, { type: "remote" }> | string | URL,
+  extraOrReq: HeadersInit | Request | undefined,
+  reqOrEnv: Request | unknown,
+  maybeEnv?: unknown,
+) {
+  const target = isLegacyTarget(targetOrUrl) ? targetOrUrl.url : targetOrUrl
+  const extra = isLegacyTarget(targetOrUrl) ? targetOrUrl.headers : (extraOrReq as HeadersInit | undefined)
+  const req = (isLegacyTarget(targetOrUrl) ? extraOrReq : reqOrEnv) as Request
+  const env = isLegacyTarget(targetOrUrl) ? reqOrEnv : maybeEnv
+  const proxy = new URL(req.url)
+  proxy.pathname = "/__workspace_ws"
+  proxy.search = ""
+  const next = new Headers(req.headers)
+  next.set("x-opencode-proxy-url", socket(target))
+  for (const [key, value] of new Headers(extra).entries()) {
+    next.set(key, value)
+  }
+  log.info("proxy websocket", {
+    request: req.url,
+    target: String(target),
+  })
+  return app(upgrade).fetch(
+    new Request(proxy, {
+      method: req.method,
+      headers: next,
+      signal: req.signal,
+    }),
+    env as never,
+  )
+}
+
+export * as ServerProxy from "./proxy"
