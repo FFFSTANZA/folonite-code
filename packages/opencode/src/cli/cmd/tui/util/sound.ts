@@ -1,4 +1,3 @@
-import { Player } from "cli-sound"
 import { mkdirSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
@@ -43,7 +42,11 @@ function args(kind: Kind, file: string, volume: number) {
   return [kind, "-c", `(New-Object Media.SoundPlayer '${file.replace(/'/g, "''")}').PlaySync()`]
 }
 
-let item: Player | null | undefined
+type PlayerLike = {
+  play: (file: string, options: { volume: number }) => Promise<unknown>
+}
+
+let item: PlayerLike | null | undefined
 let kind: Kind | null | undefined
 let proc: Process.Child | undefined
 let tail: ReturnType<typeof setTimeout> | undefined
@@ -53,11 +56,7 @@ let shot = 0
 
 function load() {
   if (item !== undefined) return item
-  try {
-    item = new Player({ volume: 0.35 })
-  } catch {
-    item = null
-  }
+  item = null
   return item
 }
 
