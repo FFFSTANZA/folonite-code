@@ -80,7 +80,13 @@ function fadeColor(color: RGBA, alpha: number) {
   return RGBA.fromValues(color.r, color.g, color.b, color.a * alpha)
 }
 
-let stashed: { prompt: PromptInfo; cursor: number } | undefined
+const stashed = new Map<string, { prompt: PromptInfo; cursor: number }>()
+
+function stashKey(props: Pick<PromptProps, "sessionID" | "workspaceID">) {
+  if (props.sessionID) return `session:${props.sessionID}`
+  if (props.workspaceID) return `workspace:${props.workspaceID}`
+  return "home"
+}
 
 export function Prompt(props: PromptProps) {
   let input: TextareaRenderable
@@ -444,8 +450,9 @@ export function Prompt(props: PromptProps) {
   }
 
   onMount(() => {
-    const saved = stashed
-    stashed = undefined
+    const key = stashKey(props)
+    const saved = stashed.get(key)
+    stashed.delete(key)
     if (store.prompt.input) return
     if (saved && saved.prompt.input) {
       input.setText(saved.prompt.input)
@@ -456,8 +463,9 @@ export function Prompt(props: PromptProps) {
   })
 
   onCleanup(() => {
+    const key = stashKey(props)
     if (store.prompt.input) {
-      stashed = { prompt: unwrap(store.prompt), cursor: input.cursorOffset }
+      stashed.set(key, { prompt: unwrap(store.prompt), cursor: input.cursorOffset })
     }
     props.ref?.(undefined)
   })

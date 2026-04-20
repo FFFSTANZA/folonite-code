@@ -44,7 +44,9 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
       },
       set(key: string, value: any) {
         setStore(key, value)
-        void Filesystem.writeJson(filePath, store)
+        void Filesystem.writeJson(filePath, store).catch((error) => {
+          console.error("Failed to persist KV store", error)
+        })
       },
     }
     return result

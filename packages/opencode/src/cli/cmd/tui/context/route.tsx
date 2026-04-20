@@ -24,13 +24,17 @@ export type Route = HomeRoute | SessionRoute | PluginRoute
 export const { use: useRoute, provider: RouteProvider } = createSimpleContext({
   name: "Route",
   init: (props: { initialRoute?: Route }) => {
+    let envRoute: Route | undefined
+    if (process.env["OPENCODE_ROUTE"]) {
+      try {
+        envRoute = JSON.parse(process.env["OPENCODE_ROUTE"])
+      } catch {}
+    }
     const [store, setStore] = createStore<Route>(
       props.initialRoute ??
-        (process.env["OPENCODE_ROUTE"]
-          ? JSON.parse(process.env["OPENCODE_ROUTE"])
-          : {
-              type: "home",
-            }),
+        envRoute ?? {
+          type: "home",
+        },
     )
 
     return {

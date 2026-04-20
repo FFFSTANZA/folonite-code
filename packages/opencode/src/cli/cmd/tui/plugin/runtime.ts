@@ -962,7 +962,14 @@ export async function dispose() {
   const task = loaded
   loaded = undefined
   dir = ""
-  if (task) await task
+  let loadError: unknown
+  if (task) {
+    try {
+      await task
+    } catch (error) {
+      loadError = error
+    }
+  }
   const state = runtime
   runtime = undefined
   if (!state) return
@@ -970,6 +977,7 @@ export async function dispose() {
   for (const plugin of queue) {
     await deactivatePluginEntry(state, plugin, false)
   }
+  if (loadError) throw loadError
 }
 
 async function load(input: { api: Api; config: TuiConfig.Info }) {

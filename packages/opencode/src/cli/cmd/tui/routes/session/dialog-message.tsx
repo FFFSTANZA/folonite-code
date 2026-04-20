@@ -32,7 +32,7 @@ export function DialogMessage(props: {
             void sdk.client.session.revert({
               sessionID: props.sessionID,
               messageID: msg.id,
-            })
+            }).catch(() => {})
 
             if (props.setPrompt) {
               const parts = sync.data.part[msg.id]

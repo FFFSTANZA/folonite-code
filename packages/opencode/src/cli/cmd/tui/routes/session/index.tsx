@@ -174,31 +174,40 @@ export function Session() {
   const toast = useToast()
   const sdk = useSDK()
 
-  createEffect(async () => {
-    const previousWorkspace = project.workspace.current()
-    const result = await sdk.client.session.get({ sessionID: route.sessionID }, { throwOnError: true })
-    if (!result.data) {
-      toast.show({
-        message: `Session not found: ${route.sessionID}`,
-        variant: "error",
-      })
-      navigate({ type: "home" })
-      return
-    }
+  createEffect(() => {
+    const sessionID = route.sessionID
+    void (async () => {
+      const previousWorkspace = project.workspace.current()
+      const result = await sdk.client.session.get({ sessionID }, { throwOnError: true })
+      if (sessionID !== route.sessionID) return
+      if (!result.data) {
+        toast.show({
+          message: `Session not found: ${sessionID}`,
+          variant: "error",
+        })
+        navigate({ type: "home" })
+        return
+      }
 
-    if (result.data.workspaceID !== previousWorkspace) {
-      project.workspace.set(result.data.workspaceID)
+      if (result.data.workspaceID !== previousWorkspace) {
+        project.workspace.set(result.data.workspaceID)
 
-      // Sync all the data for this workspace. Note that this
-      // workspace may not exist anymore which is why this is not
-      // fatal. If it doesn't we still want to show the session
-      // (which will be non-interactive)
-      try {
-        await sync.bootstrap({ fatal: false })
-      } catch (e) {}
-    }
-    await sync.session.sync(route.sessionID)
-    if (scroll) scroll.scrollBy(100_000)
+        // Sync all the data for this workspace. Note that this
+        // workspace may not exist anymore which is why this is not
+        // fatal. If it doesn't we still want to show the session
+        // (which will be non-interactive)
+        try {
+          await sync.bootstrap({ fatal: false })
+        } catch {}
+        if (sessionID !== route.sessionID) return
+      }
+      await sync.session.sync(sessionID)
+      if (sessionID !== route.sessionID) return
+      if (scroll) scroll.scrollBy(100_000)
+    })().catch((error) => {
+      if (sessionID !== route.sessionID) return
+      toast.error(error)
+    })
   })
 
   let lastSwitch: string | undefined = undefined
