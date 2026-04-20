@@ -672,12 +672,12 @@ export default function Layout(props: ParentProps) {
     return result
   })
 
-  const pawworkSessions = createMemo(() => {
+  const collectPawworkSessions = (projects: LocalProject[]) => {
     const now = Date.now()
     const seen = new Set<string>()
     const result: PawworkSidebarSession[] = []
 
-    for (const project of layout.projects.list()) {
+    for (const project of projects) {
       for (const directory of workspaceIds(project)) {
         const key = workspaceKey(directory)
         if (seen.has(key)) continue
@@ -689,12 +689,20 @@ export default function Layout(props: ParentProps) {
             session,
             slug: base64Encode(session.directory),
             projectLabel: displayName(project),
+            updated: session.time?.updated ?? session.time?.created ?? 0,
           })
         }
       }
     }
 
-    return result
+    return result.sort((a, b) => b.updated - a.updated || a.projectLabel.localeCompare(b.projectLabel) || a.session.id.localeCompare(b.session.id))
+  }
+
+  const pawworkSessions = createMemo(() => collectPawworkSessions(layout.projects.list()))
+  const pawworkPeekSessions = createMemo(() => {
+    const project = peekProject()
+    if (!project) return [] as PawworkSidebarSession[]
+    return collectPawworkSessions([project])
   })
 
   type PrefetchQueue = {
@@ -2373,16 +2381,22 @@ export default function Layout(props: ParentProps) {
 
   const projects = () => layout.projects.list()
   const projectOverlay = () => <ProjectDragOverlay projects={projects} activeProject={() => store.activeProject} />
-  const renderPawworkPanel = (mobile?: boolean, directory?: string) => (
+  const renderPawworkPanel = (
+    sessions: Accessor<PawworkSidebarSession[]>,
+    options?: { mobile?: boolean; directory?: string; scope?: "main" | "peek" },
+  ) => (
     <PawworkSidebar
-      mobile={mobile}
-      sessions={pawworkSessions}
+      scope={options?.scope}
+      mobile={options?.mobile}
+      sessions={sessions}
       showProjectEmptyState={projects().length === 0}
+      activeSessionID={() => params.id}
       sidebarExpanded={sidebarExpanded}
+      setScrollContainerRef={workspaceSidebarCtx.setScrollContainerRef}
       clearHoverProjectSoon={clearHoverProjectSoon}
       prefetchSession={prefetchSession}
       archiveSession={archiveSession}
-      onNew={() => openPawworkHome(directory)}
+      onNew={() => openPawworkHome(options?.directory)}
       onSearch={() => command.show()}
       onOpenProject={chooseProject}
     />
@@ -2408,7 +2422,9 @@ export default function Layout(props: ParentProps) {
       onOpenSettings={openSettings}
       helpLabel={() => language.t("sidebar.help")}
       onOpenHelp={() => platform.openLink("https://github.com/Astro-Han/pawwork/issues")}
-      renderPanel={() => renderPawworkPanel(mobile, currentProject()?.worktree)}
+      renderPanel={() =>
+        renderPawworkPanel(pawworkSessions, { mobile, directory: currentProject()?.worktree, scope: "main" })
+      }
     />
   )
 
@@ -2559,7 +2575,13 @@ export default function Layout(props: ParentProps) {
                 }}
               >
                 <Show when={peekProject()}>
-                  {(project) => renderPawworkPanel(false, project().worktree)}
+                  {(project) =>
+                    renderPawworkPanel(pawworkPeekSessions, {
+                      mobile: false,
+                      directory: project().worktree,
+                      scope: "peek",
+                    })
+                  }
                 </Show>
               </div>
 
