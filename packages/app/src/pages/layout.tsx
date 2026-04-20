@@ -1318,6 +1318,7 @@ export default function Layout(props: ParentProps) {
   function openSettings() {
     setSettingsTab("general")
     setSettingsOpen(true)
+    layout.mobileSidebar.hide()
   }
 
   function closeSettings() {
