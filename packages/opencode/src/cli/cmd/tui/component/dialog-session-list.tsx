@@ -170,11 +170,16 @@ export function DialogSessionList() {
                 setToDelete(undefined)
                 return
               }
-              if (status && status !== "connected") {
-                await sync.session.refresh()
+              try {
+                if (status && status !== "connected") {
+                  await sync.session.refresh()
+                }
+                if (search()) await refetch()
+              } catch (err) {
+                deleteError(err)
+              } finally {
+                setToDelete(undefined)
               }
-              if (search()) await refetch()
-              setToDelete(undefined)
               return
             }
             setToDelete(option.value)

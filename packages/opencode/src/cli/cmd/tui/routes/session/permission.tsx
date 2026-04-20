@@ -14,7 +14,9 @@ import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { Keybind } from "@/util/keybind"
 import { Locale } from "@/util/locale"
 import { Global } from "@/global"
+import { errorMessage } from "@/util/error"
 import { useDialog } from "../../ui/dialog"
+import { useToast } from "../../ui/toast"
 import { getScrollAcceleration } from "../../util/scroll"
 import { useTuiConfig } from "../../context/tui-config"
 
@@ -132,6 +134,7 @@ function TextBody(props: { title: string; description?: string; icon?: string })
 export function PermissionPrompt(props: { request: PermissionRequest }) {
   const sdk = useSDK()
   const sync = useSync()
+  const toast = useToast()
   const [store, setStore] = createStore({
     stage: "permission" as PermissionStage,
   })
@@ -151,6 +154,15 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   })
 
   const { theme } = useTheme()
+
+  function handleReplyError(title: string, error: unknown) {
+    setStore("stage", "permission")
+    toast.show({
+      variant: "error",
+      title,
+      message: errorMessage(error),
+    })
+  }
 
   return (
     <Switch>
@@ -187,6 +199,8 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
             void sdk.client.permission.reply({
               reply: "always",
               requestID: props.request.id,
+            }).catch((error) => {
+              handleReplyError("Failed to update permission", error)
             })
           }}
         />
@@ -198,6 +212,8 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
               reply: "reject",
               requestID: props.request.id,
               message: message || undefined,
+            }).catch((error) => {
+              handleReplyError("Failed to reject permission", error)
             })
           }}
           onCancel={() => {
@@ -450,12 +466,16 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
                   void sdk.client.permission.reply({
                     reply: "reject",
                     requestID: props.request.id,
+                  }).catch((error) => {
+                    handleReplyError("Failed to reject permission", error)
                   })
                   return
                 }
                 void sdk.client.permission.reply({
                   reply: "once",
                   requestID: props.request.id,
+                }).catch((error) => {
+                  handleReplyError("Failed to update permission", error)
                 })
               }}
             />

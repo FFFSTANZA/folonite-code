@@ -58,6 +58,8 @@ export function ErrorComponent(props: {
   const copyIssueURL = () => {
     void Clipboard.copy(issueURL.toString()).then(() => {
       setCopied(true)
+    }).catch(() => {
+      setCopied(false)
     })
   }
 

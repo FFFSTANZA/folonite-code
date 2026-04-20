@@ -18,6 +18,22 @@ type Adaptor = {
 
 const log = Log.Default.clone().tag("service", "tui-workspace")
 
+export function isAdaptorList(value: unknown): value is Adaptor[] {
+  return Array.isArray(value) && value.every((item) => {
+    if (!item || typeof item !== "object") return false
+    const adaptor = item as Record<string, unknown>
+    return typeof adaptor.type === "string" && typeof adaptor.name === "string" && typeof adaptor.description === "string"
+  })
+}
+
+export async function loadWorkspaceAdaptors(fetchImpl: typeof fetch, url: URL) {
+  const response = await fetchImpl(url).catch(() => undefined)
+  if (!response?.ok) return
+  const data = await response.json().catch(() => undefined)
+  if (!isAdaptorList(data)) return
+  return data
+}
+
 function scoped(sdk: ReturnType<typeof useSDK>, sync: ReturnType<typeof useSync>, workspaceID: string) {
   return createOpencodeClient({
     baseUrl: sdk.url,
@@ -122,10 +138,7 @@ export function DialogWorkspaceCreate(props: { onSelect: (workspaceID: string) =
       const dir = sync.path.directory || sdk.directory
       const url = new URL("/experimental/workspace/adaptor", sdk.url)
       if (dir) url.searchParams.set("directory", dir)
-      const res = await sdk
-        .fetch(url)
-        .then((x) => x.json() as Promise<Adaptor[]>)
-        .catch(() => undefined)
+      const res = await loadWorkspaceAdaptors(sdk.fetch, url)
       if (!res) {
         toast.show({
           message: "Failed to load workspace adaptors",
@@ -173,10 +186,6 @@ export function DialogWorkspaceCreate(props: { onSelect: (workspaceID: string) =
     })
 
     const result = await sdk.client.experimental.workspace.create({ type, branch: null }).catch((err) => {
-      toast.show({
-        message: "Creating workspace failed",
-        variant: "error",
-      })
       log.error("workspace create request failed", {
         type,
         error: errorData(err),

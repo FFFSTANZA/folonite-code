@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 
-const { openWorkspaceSession } = await import("../../../src/cli/cmd/tui/component/dialog-workspace-create")
+const { loadWorkspaceAdaptors, openWorkspaceSession } = await import("../../../src/cli/cmd/tui/component/dialog-workspace-create")
 
 type SessionCreateResponse = {
   status: number
@@ -133,5 +133,42 @@ describe("openWorkspaceSession", () => {
         variant: "error",
       },
     ])
+  })
+})
+
+describe("loadWorkspaceAdaptors", () => {
+  test("rejects non-ok and non-array adaptor responses", async () => {
+    const url = new URL("http://test/experimental/workspace/adaptor")
+
+    await expect(
+      loadWorkspaceAdaptors(
+        Object.assign(async () => json({ message: "boom" }, { status: 500 }), {
+          preconnect: globalThis.fetch.preconnect.bind(globalThis.fetch),
+        }) satisfies typeof fetch,
+        url,
+      ),
+    ).resolves.toBeUndefined()
+
+    await expect(
+      loadWorkspaceAdaptors(
+        Object.assign(async () => json({ type: "git" }), {
+          preconnect: globalThis.fetch.preconnect.bind(globalThis.fetch),
+        }) satisfies typeof fetch,
+        url,
+      ),
+    ).resolves.toBeUndefined()
+  })
+
+  test("accepts valid adaptor arrays", async () => {
+    const url = new URL("http://test/experimental/workspace/adaptor")
+
+    await expect(
+      loadWorkspaceAdaptors(
+        Object.assign(async () => json([{ type: "git", name: "Git", description: "Workspace" }]), {
+          preconnect: globalThis.fetch.preconnect.bind(globalThis.fetch),
+        }) satisfies typeof fetch,
+        url,
+      ),
+    ).resolves.toEqual([{ type: "git", name: "Git", description: "Workspace" }])
   })
 })
