@@ -2,7 +2,6 @@
 import { CliRenderEvents } from "@opentui/core"
 import { testRender, useRenderer } from "@opentui/solid"
 import { describe, expect, spyOn, test } from "bun:test"
-import { onMount } from "solid-js"
 import { KVProvider } from "../../../src/cli/cmd/tui/context/kv"
 import { ThemeProvider, useTheme } from "../../../src/cli/cmd/tui/context/theme"
 import { TuiConfigProvider } from "../../../src/cli/cmd/tui/context/tui-config"
@@ -32,9 +31,7 @@ describe("ThemeProvider renderer sync", () => {
 
       const Probe = () => {
         const theme = useTheme()
-        onMount(() => {
-          mode = theme.mode
-        })
+        mode = theme.mode
         return <box />
       }
 
