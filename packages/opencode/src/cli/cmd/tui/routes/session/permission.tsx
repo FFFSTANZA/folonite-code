@@ -11,8 +11,8 @@ import { useSync } from "../../context/sync"
 import { useTextareaKeybindings } from "../../component/textarea-keybindings"
 import path from "path"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
-import { Keybind } from "@/util/keybind"
-import { Locale } from "@/util/locale"
+import { Keybind } from "@/util"
+import { Locale } from "@/util"
 import { Global } from "@/global"
 import { useDialog } from "../../ui/dialog"
 import { getScrollAcceleration } from "../../util/scroll"
@@ -160,11 +160,11 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
           body={
             <Switch>
               <Match when={props.request.always.length === 1 && props.request.always[0] === "*"}>
-                <TextBody title={"This will allow " + props.request.permission + " until PawWork is restarted."} />
+                <TextBody title={"This will allow " + props.request.permission + " until OpenCode is restarted."} />
               </Match>
               <Match when={true}>
                 <box paddingLeft={1} gap={1}>
-                  <text fg={theme.textMuted}>This will allow the following patterns until PawWork is restarted</text>
+                  <text fg={theme.textMuted}>This will allow the following patterns until OpenCode is restarted</text>
                   <box>
                     <For each={props.request.always}>
                       {(pattern) => (
@@ -184,7 +184,7 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
           onSelect={(option) => {
             setStore("stage", "permission")
             if (option === "cancel") return
-            sdk.client.permission.reply({
+            void sdk.client.permission.reply({
               reply: "always",
               requestID: props.request.id,
             })
@@ -194,7 +194,7 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
       <Match when={store.stage === "reject"}>
         <RejectPrompt
           onConfirm={(message) => {
-            sdk.client.permission.reply({
+            void sdk.client.permission.reply({
               reply: "reject",
               requestID: props.request.id,
               message: message || undefined,
@@ -261,6 +261,22 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
                   <Show when={pattern}>
                     <box paddingLeft={1}>
                       <text fg={theme.textMuted}>{"Pattern: " + pattern}</text>
+                    </box>
+                  </Show>
+                ),
+              }
+            }
+
+            if (permission === "list") {
+              const raw = data.path
+              const dir = typeof raw === "string" ? raw : ""
+              return {
+                icon: "→",
+                title: `List ${normalizePath(dir)}`,
+                body: (
+                  <Show when={dir}>
+                    <box paddingLeft={1}>
+                      <text fg={theme.textMuted}>{"Path: " + normalizePath(dir)}</text>
                     </box>
                   </Show>
                 ),
@@ -431,13 +447,13 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
                     setStore("stage", "reject")
                     return
                   }
-                  sdk.client.permission.reply({
+                  void sdk.client.permission.reply({
                     reply: "reject",
                     requestID: props.request.id,
                   })
                   return
                 }
-                sdk.client.permission.reply({
+                void sdk.client.permission.reply({
                   reply: "once",
                   requestID: props.request.id,
                 })
@@ -488,7 +504,7 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
           <text fg={theme.text}>Reject permission</text>
         </box>
         <box paddingLeft={1}>
-          <text fg={theme.textMuted}>Tell PawWork what to do differently</text>
+          <text fg={theme.textMuted}>Tell OpenCode what to do differently</text>
         </box>
       </box>
       <box
@@ -583,7 +599,7 @@ function Prompt<const T extends Record<string, string>>(props: {
   })
 
   const hint = createMemo(() => (store.expanded ? "minimize" : "fullscreen"))
-  const renderer = useRenderer()
+  useRenderer()
 
   const content = () => (
     <box
