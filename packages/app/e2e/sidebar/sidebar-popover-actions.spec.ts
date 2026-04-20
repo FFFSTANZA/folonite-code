@@ -36,10 +36,8 @@ test("collapsed sidebar popover stays open when archiving a session", async ({ p
     await expect(twoItem).toBeVisible()
 
     const item = await hoverSessionItem(page, one.id)
-    await item
-      .getByRole("button", { name: /archive/i })
-      .first()
-      .click()
+    await item.getByRole("button", { name: /more options/i }).first().click()
+    await page.getByRole("menuitem", { name: /archive/i }).click()
 
     await expect(twoItem).toBeVisible()
   } finally {

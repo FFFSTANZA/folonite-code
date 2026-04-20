@@ -617,6 +617,11 @@ export const dict = {
   "sidebar.pawwork.search": "搜尋工作階段",
   "sidebar.pawwork.empty.description": "開啟一個專案後，即可使用以工作階段為中心的側邊欄。",
   "sidebar.pawwork.empty.sessions": "尚未有工作階段，先新增一個開始。",
+  "sidebar.pawwork.pinned": "已釘選",
+  "sidebar.pawwork.pinSession": "釘選工作階段",
+  "sidebar.pawwork.unpinSession": "取消釘選",
+  "sidebar.pawwork.sort.byProject": "依專案分組",
+  "sidebar.pawwork.sort.byTime": "依時間排序",
 
   "app.name.desktop": "PawWork Desktop",
   "settings.section.desktop": "桌面",

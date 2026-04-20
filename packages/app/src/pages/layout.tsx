@@ -104,7 +104,7 @@ export default function Layout(props: ParentProps) {
       workspaceExpanded: {} as Record<string, boolean>,
       gettingStartedDismissed: false,
       pawworkPinnedSessions: [] as string[],
-      pawworkSortMode: "time" as const,
+      pawworkSortMode: "time" as "time" | "project",
     }),
   )
 
@@ -1047,6 +1047,44 @@ export default function Layout(props: ParentProps) {
         navigate(`/${params.dir}/session`)
       }
     }
+  }
+
+  async function renamePawworkSession(session: Session, next: string) {
+    const title = next.trim()
+    if (!title || title === (session.title ?? "")) return
+
+    try {
+      await globalSDK.client.session.update({
+        directory: session.directory,
+        sessionID: session.id,
+        title,
+      })
+
+      const [, setStore] = globalSync.child(session.directory)
+      setStore(
+        produce((draft) => {
+          const match = Binary.search(draft.session, session.id, (item) => item.id)
+          if (match.found) draft.session[match.index].title = title
+        }),
+      )
+    } catch (error) {
+      showToast({
+        title: language.t("common.requestFailed"),
+        description: errorMessage(error, language.t("common.requestFailed")),
+      })
+    }
+  }
+
+  function togglePinnedSession(sessionID: string) {
+    setStore("pawworkPinnedSessions", (current) => {
+      const next = current.filter((id) => id !== sessionID)
+      if (next.length !== current.length) return next
+      return [sessionID, ...current]
+    })
+  }
+
+  function setPawworkSortMode(mode: "time" | "project") {
+    setStore("pawworkSortMode", mode)
   }
 
   command.register("layout", () => {
@@ -2393,11 +2431,16 @@ export default function Layout(props: ParentProps) {
       sessions={sessions}
       showProjectEmptyState={projects().length === 0}
       activeSessionID={() => params.id}
+      pinnedIDs={() => store.pawworkPinnedSessions}
+      sortMode={() => store.pawworkSortMode}
       sidebarExpanded={sidebarExpanded}
       setScrollContainerRef={workspaceSidebarCtx.setScrollContainerRef}
       clearHoverProjectSoon={clearHoverProjectSoon}
       prefetchSession={prefetchSession}
       archiveSession={archiveSession}
+      onRenameSession={renamePawworkSession}
+      onTogglePinnedSession={togglePinnedSession}
+      onSetSortMode={setPawworkSortMode}
       onNew={() => openPawworkHome(options?.directory)}
       onSearch={() => command.show()}
       onOpenProject={chooseProject}

@@ -67,4 +67,16 @@ describe("movePawworkSession", () => {
 
     expect(result).toEqual(["gamma", "beta"])
   })
+
+  test("removes duplicates when reordering inside pinned", () => {
+    const result = movePawworkSession({
+      pinnedIDs: ["alpha", "beta", "gamma"],
+      visibleUnpinnedIDs: [],
+      sourceID: "gamma",
+      targetSection: "pinned",
+      targetIndex: 1,
+    })
+
+    expect(result).toEqual(["alpha", "gamma", "beta"])
+  })
 })
