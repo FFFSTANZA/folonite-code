@@ -375,7 +375,6 @@ render(() => {
         if (await reportCiSmokeReady(readySidecar)) return
         await new Promise((resolve) => setTimeout(resolve, 250))
       }
-      ciSmokeTaskStarted = false
     })()
   })
 

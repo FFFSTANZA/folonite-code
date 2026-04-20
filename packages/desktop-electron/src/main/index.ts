@@ -76,6 +76,8 @@ function setupApp() {
   ensureLoopbackNoProxy()
   app.commandLine.appendSwitch("proxy-bypass-list", "<-loopback>")
 
+  // CI smoke should not fail just because a local desktop instance already holds
+  // the singleton lock on the runner or developer machine.
   if (!CI_SMOKE_ENABLED && !app.requestSingleInstanceLock()) {
     app.quit()
     return
@@ -138,6 +140,8 @@ function setInitStep(step: InitStep) {
 }
 
 async function initialize() {
+  // CI smoke only verifies that the desktop shell boots and the embedded
+  // sidecar is healthy; sqlite migration coverage stays outside this gate.
   const needsMigration = !CI_SMOKE_ENABLED && !sqliteFileExists()
   const sqliteDone = needsMigration ? defer<void>() : undefined
   let overlay: BrowserWindow | null = null
