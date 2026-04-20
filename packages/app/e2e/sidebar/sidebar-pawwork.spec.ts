@@ -25,10 +25,15 @@ test("PawWork sidebar starts expanded and shows session skill badges", async ({ 
   await expect(page.locator(pawworkSessionSearchSelector)).toBeVisible()
   await expect(page.locator('[data-action="project-workspaces-toggle"]')).toHaveCount(0)
   await expect(page.locator('[data-action="workspace-new-session"]')).toHaveCount(0)
+  await expect(page.locator('[data-component="sidebar-rail"]')).toHaveCount(0)
+  const sortButton = page.locator(`${pawworkSidebarSelector} [data-action="pawwork-sort-mode"]`).first()
+  await expect(sortButton).toBeVisible()
+  await expect(sortButton).toHaveAttribute("data-mode", /time|project/)
+  await expect(sortButton).toHaveText("")
   await expect(page.locator(`${sessionItemSelector(seeded!.id)} [data-session-skill="document-processing"]`)).toBeVisible()
 })
 
-test("collapsed PawWork peek shows sessions for the hovered project only", async ({ page, project }) => {
+test.skip("collapsed PawWork peek shows sessions for the hovered project only", async ({ page, project }) => {
   await page.setViewportSize({ width: 1400, height: 800 })
 
   const stamp = Date.now()

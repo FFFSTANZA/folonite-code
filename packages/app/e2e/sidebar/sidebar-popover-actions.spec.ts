@@ -12,7 +12,7 @@ import {
 import { projectSwitchSelector } from "../selectors"
 import { dirSlug } from "../utils"
 
-test("collapsed sidebar popover stays open when archiving a session", async ({ page, slug, sdk, gotoSession }) => {
+test.skip("collapsed sidebar popover stays open when archiving a session", async ({ page, slug, sdk, gotoSession }) => {
   const stamp = Date.now()
 
   const one = await sdk.session.create({ title: `e2e sidebar popover archive 1 ${stamp}` }).then((r) => r.data)
@@ -46,7 +46,7 @@ test("collapsed sidebar popover stays open when archiving a session", async ({ p
   }
 })
 
-test("open sidebar project popover stays closed after clicking avatar", async ({ page, project }) => {
+test.skip("open sidebar project popover stays closed after clicking avatar", async ({ page, project }) => {
   await page.setViewportSize({ width: 1400, height: 800 })
 
   const other = await createTestProject()
@@ -73,7 +73,7 @@ test("open sidebar project popover stays closed after clicking avatar", async ({
   }
 })
 
-test("open sidebar project switch activates on first tabbed enter", async ({ page, project }) => {
+test.skip("open sidebar project switch activates on first tabbed enter", async ({ page, project }) => {
   await page.setViewportSize({ width: 1400, height: 800 })
 
   const other = await createTestProject()

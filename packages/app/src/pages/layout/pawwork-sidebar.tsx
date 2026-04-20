@@ -2,6 +2,7 @@ import type { Session } from "@opencode-ai/sdk/v2/client"
 import { Button } from "@opencode-ai/ui/button"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { createEffect, createMemo, createSignal, For, Show, type Accessor, type JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { createInlineEditorController } from "./inline-editor"
@@ -13,6 +14,15 @@ export type PawworkSidebarSession = {
   slug: string
   projectLabel: string
   updated: number
+}
+
+const FilterIcon = (props: { size?: number }) => {
+  const size = props.size ?? 14
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M1.5 3h9M3 6h6M4.5 9h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+    </svg>
+  )
 }
 
 export const PawworkSidebar = (props: {
@@ -34,12 +44,18 @@ export const PawworkSidebar = (props: {
   onNew: () => void
   onSearch: () => void
   onOpenProject: () => void
+  onOpenSettings: () => void
+  onOpenHelp: () => void
+  openProjectLabel: Accessor<string>
+  openProjectKeybind: Accessor<string | undefined>
+  settingsLabel: Accessor<string>
+  settingsKeybind: Accessor<string | undefined>
+  helpLabel: Accessor<string>
 }): JSX.Element => {
   const language = useLanguage()
   const editor = createInlineEditorController()
   const [pendingRenameID, setPendingRenameID] = createSignal<string>()
   const navList = createMemo(() => props.sessions().map((item) => item.session))
-  const showProjectLabels = createMemo(() => new Set(props.sessions().map((item) => item.projectLabel)).size > 1)
   let scrollEl: HTMLDivElement | undefined
   const byID = createMemo(() => new Map(props.sessions().map((item) => [item.session.id, item] as const)))
   const sections = createMemo(() =>
@@ -57,15 +73,13 @@ export const PawworkSidebar = (props: {
     }),
   )
   const rows = createMemo(() =>
-    sections().recent.map((item, index, list) => ({
+    sections().recent.map((item) => ({
       item: byID().get(item.id)!,
-      showProjectLabel: showProjectLabels() && list[index - 1]?.projectLabel !== item.projectLabel,
     })),
   )
   const pinnedRows = createMemo(() =>
     sections().pinned.map((item) => ({
       item: byID().get(item.id)!,
-      showProjectLabel: false,
     })),
   )
   const groupedRows = createMemo(() =>
@@ -75,13 +89,8 @@ export const PawworkSidebar = (props: {
     })),
   )
 
-  const renderSessionItem = (entry: { item: PawworkSidebarSession; showProjectLabel: boolean }) => (
+  const renderSessionItem = (entry: { item: PawworkSidebarSession }) => (
     <div class="flex flex-col gap-1">
-      <Show when={entry.showProjectLabel}>
-        <div data-component="pawwork-group-header" class="px-2 pt-3 pb-1 text-11-medium text-text-weak">
-          {entry.item.projectLabel}
-        </div>
-      </Show>
       <SessionItem
         session={entry.item.session}
         list={navList()}
@@ -171,30 +180,23 @@ export const PawworkSidebar = (props: {
     })
   })
 
+  const tooltipPlacement = () => (props.mobile ? "bottom" : "right")
+  const sortAriaLabel = () =>
+    props.sortMode() === "time" ? language.t("sidebar.pawwork.sort.byProject") : language.t("sidebar.pawwork.sort.byTime")
+
   return (
     <section
       data-component="pawwork-sidebar"
       data-sidebar-scope={props.scope ?? "main"}
-      class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-t border-border-weaker-base bg-background-base px-3"
+      class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background-base"
     >
-      <div class="shrink-0 border-b border-border-weaker-base py-3">
-        <div class="px-2 text-14-medium text-text-strong">PawWork</div>
-        <div class="mt-3 flex flex-col gap-2">
+      <div class="shrink-0 px-3 pt-3">
+        <div class="flex flex-col gap-2">
           <Button data-action="pawwork-session-new" size="large" icon="new-session" class="w-full" onClick={props.onNew}>
             {language.t("command.session.new")}
           </Button>
           <Button data-action="pawwork-session-search" size="large" variant="ghost" class="w-full" onClick={props.onSearch}>
             {language.t("sidebar.pawwork.search")}
-          </Button>
-        </div>
-        <div class="mt-3 flex justify-end">
-          <Button
-            data-action="pawwork-sort-mode"
-            size="small"
-            variant="ghost"
-            onClick={() => props.onSetSortMode(props.sortMode() === "time" ? "project" : "time")}
-          >
-            {props.sortMode() === "time" ? language.t("sidebar.pawwork.sort.byProject") : language.t("sidebar.pawwork.sort.byTime")}
           </Button>
         </div>
       </div>
@@ -219,7 +221,7 @@ export const PawworkSidebar = (props: {
             props.setScrollContainerRef(el, props.mobile)
           }}
           data-component="pawwork-session-scroll"
-          class="flex-1 min-h-0 overflow-y-auto py-3"
+          class="flex-1 min-h-0 overflow-y-auto px-3 pt-3 pb-3"
         >
           <Show
             when={props.sessions().length > 0}
@@ -232,6 +234,25 @@ export const PawworkSidebar = (props: {
                   <For each={pinnedRows()}>{(entry) => renderSessionItem(entry)}</For>
                 </section>
               </Show>
+              <div class="mt-3 flex items-center justify-between pr-2 pl-2">
+                <span class="text-11-medium text-text-weak">{language.t("sidebar.pawwork.all")}</span>
+                <button
+                  type="button"
+                  data-action="pawwork-sort-mode"
+                  data-mode={props.sortMode()}
+                  aria-label={sortAriaLabel()}
+                  title={sortAriaLabel()}
+                  onClick={() => props.onSetSortMode(props.sortMode() === "time" ? "project" : "time")}
+                  classList={{
+                    "inline-flex items-center justify-center rounded-md p-1 transition-colors": true,
+                    "hover:bg-surface-hovered-base": true,
+                    "text-text-accent-base": props.sortMode() === "project",
+                    "text-text-weak": props.sortMode() !== "project",
+                  }}
+                >
+                  <FilterIcon size={14} />
+                </button>
+              </div>
               <Show when={props.sortMode() === "time"}>
                 <For each={rows()}>{(entry) => renderSessionItem(entry)}</For>
               </Show>
@@ -242,7 +263,7 @@ export const PawworkSidebar = (props: {
                       <div data-component="pawwork-group-header" class="px-2 pt-3 pb-1 text-11-medium text-text-weak">
                         {group.label}
                       </div>
-                      <For each={group.items}>{(item) => renderSessionItem({ item, showProjectLabel: false })}</For>
+                      <For each={group.items}>{(item) => renderSessionItem({ item })}</For>
                     </section>
                   )}
                 </For>
@@ -251,6 +272,52 @@ export const PawworkSidebar = (props: {
           </Show>
         </div>
       </Show>
+
+      <div
+        data-component="pawwork-sidebar-footer"
+        class="shrink-0 border-t border-border-weaker-base px-3 py-2 flex items-center justify-between"
+      >
+        <TooltipKeybind
+          placement={tooltipPlacement()}
+          title={props.openProjectLabel()}
+          keybind={props.openProjectKeybind() ?? ""}
+        >
+          <IconButton
+            icon="folder-add-left"
+            variant="ghost"
+            size="large"
+            data-action="pawwork-open-project"
+            onClick={props.onOpenProject}
+            aria-label={props.openProjectLabel()}
+          />
+        </TooltipKeybind>
+        <div class="flex items-center gap-1">
+          <Tooltip placement={tooltipPlacement()} value={props.helpLabel()}>
+            <IconButton
+              icon="help"
+              variant="ghost"
+              size="large"
+              data-action="pawwork-open-help"
+              onClick={props.onOpenHelp}
+              aria-label={props.helpLabel()}
+            />
+          </Tooltip>
+          <TooltipKeybind
+            placement={tooltipPlacement()}
+            title={props.settingsLabel()}
+            keybind={props.settingsKeybind() ?? ""}
+          >
+            <IconButton
+              icon="settings-gear"
+              variant="ghost"
+              size="large"
+              data-action="pawwork-open-settings"
+              onClick={props.onOpenSettings}
+              aria-label={props.settingsLabel()}
+            />
+          </TooltipKeybind>
+        </div>
+      </div>
     </section>
   )
 }

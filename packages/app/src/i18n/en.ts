@@ -700,6 +700,7 @@ export const dict = {
   "sidebar.pawwork.empty.description": "Open a project to start using the session-first sidebar.",
   "sidebar.pawwork.empty.sessions": "No sessions yet. Start a new one to begin.",
   "sidebar.pawwork.pinned": "Pinned",
+  "sidebar.pawwork.all": "All sessions",
   "sidebar.pawwork.pinSession": "Pin session",
   "sidebar.pawwork.unpinSession": "Unpin session",
   "sidebar.pawwork.sort.byProject": "Group by project",

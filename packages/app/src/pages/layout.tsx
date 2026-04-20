@@ -96,7 +96,6 @@ import {
 } from "./layout/sidebar-workspace"
 import { PawworkSidebar, type PawworkSidebarSession } from "./layout/pawwork-sidebar"
 import { ProjectDragOverlay, SortableProject, type ProjectSidebarContext } from "./layout/sidebar-project"
-import { SidebarContent } from "./layout/sidebar-shell"
 import { PawworkTitlebar } from "./layout/pawwork-titlebar"
 import { SettingsPage, type SettingsPageTab } from "@/components/settings-page"
 
@@ -2451,34 +2450,17 @@ export default function Layout(props: ParentProps) {
       onNew={() => openPawworkHome(options?.directory)}
       onSearch={() => command.show()}
       onOpenProject={chooseProject}
-    />
-  )
-  const sidebarContent = (mobile?: boolean) => (
-    <SidebarContent
-      mobile={mobile}
-      opened={() => layout.sidebar.opened()}
-      aimMove={aim.move}
-      projects={projects}
-      renderProject={(project) => (
-        <SortableProject ctx={projectSidebarCtx} project={project} sortNow={sortNow} mobile={mobile} />
-      )}
-      handleDragStart={handleDragStart}
-      handleDragEnd={handleDragEnd}
-      handleDragOver={handleDragOver}
-      openProjectLabel={language.t("command.project.open")}
+      onOpenSettings={openSettings}
+      onOpenHelp={() => platform.openLink("https://github.com/Astro-Han/pawwork/issues")}
+      openProjectLabel={() => language.t("command.project.open")}
       openProjectKeybind={() => command.keybind("project.open")}
-      onOpenProject={chooseProject}
-      renderProjectOverlay={projectOverlay}
       settingsLabel={() => language.t("sidebar.settings")}
       settingsKeybind={() => command.keybind("settings.open")}
-      onOpenSettings={openSettings}
       helpLabel={() => language.t("sidebar.help")}
-      onOpenHelp={() => platform.openLink("https://github.com/Astro-Han/pawwork/issues")}
-      renderPanel={() =>
-        renderPawworkPanel(pawworkSessions, { mobile, directory: currentProject()?.worktree, scope: "main" })
-      }
     />
   )
+  const sidebarContent = (mobile?: boolean) =>
+    renderPawworkPanel(pawworkSessions, { mobile, directory: currentProject()?.worktree, scope: "main" })
 
   return (
     <LayoutPageContext.Provider
