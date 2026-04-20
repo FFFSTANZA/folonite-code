@@ -269,7 +269,7 @@ export function SessionSidePanel(props: {
             </Tabs.List>
 
             <Tabs.Content value="status" class="min-h-0 flex-1 overflow-hidden">
-              <SessionStatusPanel shown={open} />
+              <SessionStatusPanel shown={() => open() && sidePanelTab() === "status"} />
             </Tabs.Content>
 
             <Tabs.Content value="files" class="min-h-0 flex-1 overflow-hidden">
