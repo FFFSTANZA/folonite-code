@@ -25,6 +25,7 @@ describe("ThemeProvider renderer sync", () => {
         onCalls.push(args)
         return renderer
       })
+      renderer.on("unrelated", () => {})
       spyOn(renderer, "getPalette").mockResolvedValue({ palette: [] })
       spyOn(renderer, "setBackgroundColor").mockImplementation(() => {})
       spyOn(renderer, "clearPaletteCache").mockImplementation(() => {})
@@ -49,11 +50,12 @@ describe("ThemeProvider renderer sync", () => {
     const app = await testRender(() => <App />)
 
     try {
-      await wait(() => onCalls.length > 0)
+      await wait(() => onCalls.some((call) => call[0] === CliRenderEvents.THEME_MODE) && typeof mode === "function")
       const hit = onCalls.find((call) => call[0] === CliRenderEvents.THEME_MODE)
       expect(hit).toBeDefined()
       expect(typeof hit?.[1]).toBe("function")
       ;(hit?.[1] as (next: "dark" | "light") => void)("light")
+      await wait(() => mode() === "light")
       expect(mode()).toBe("light")
     } finally {
       app.renderer.destroy()

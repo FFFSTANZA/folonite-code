@@ -55,6 +55,14 @@ const listDirs = () =>
 const ready = () =>
   Effect.runPromise(Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(layer)))
 
+async function waitFor(fn: () => Promise<boolean>, timeout = 2000) {
+  const start = Date.now()
+  while (!(await fn())) {
+    if (Date.now() - start > timeout) throw new Error("timed out waiting for condition")
+    await Bun.sleep(50)
+  }
+}
+
 // Get managed config directory from environment (set in preload.ts)
 const managedConfigDir = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR!
 
@@ -835,8 +843,9 @@ test("does not try to install dependencies in read-only OPENCODE_CONFIG_DIR", as
   }
 })
 
-test("installs dependencies in writable OPENCODE_CONFIG_DIR", async () => {
-  await withConfigDepsLock(async () => {
+it.live(
+  "installs dependencies in writable OPENCODE_CONFIG_DIR",
+  Effect.promise(async () => {
     await using tmp = await tmpdir<string>({
       init: async (dir) => {
         const cfg = path.join(dir, "configdir")
@@ -846,7 +855,7 @@ test("installs dependencies in writable OPENCODE_CONFIG_DIR", async () => {
     })
 
     const prev = process.env.OPENCODE_CONFIG_DIR
-    process.env.OPENCODE_CONFIG_DIR = tmp.extra
+    const gitignorePath = path.join(tmp.extra, ".gitignore")
 
     const testLayer = Config.layer.pipe(
       Layer.provide(AppFileSystem.defaultLayer),
@@ -855,28 +864,35 @@ test("installs dependencies in writable OPENCODE_CONFIG_DIR", async () => {
       Layer.provideMerge(infra),
     )
 
-    try {
-      await Instance.provide({
-        directory: tmp.path,
-        fn: async () => {
-          await Effect.runPromise(Config.Service.use((svc) => svc.get()).pipe(Effect.scoped, Effect.provide(testLayer)))
-          await Effect.runPromise(
-            Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(testLayer)),
-          )
-        },
-      })
+    await withConfigDepsLock(async () => {
+      process.env.OPENCODE_CONFIG_DIR = tmp.extra
+      try {
+        await Instance.provide({
+          directory: tmp.path,
+          fn: async () => {
+            await Effect.runPromise(
+              Config.Service.use((svc) => svc.get()).pipe(Effect.scoped, Effect.provide(testLayer)),
+            )
+            await Effect.runPromise(
+              Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(testLayer)),
+            )
+          },
+        })
+      } finally {
+        if (prev === undefined) delete process.env.OPENCODE_CONFIG_DIR
+        else process.env.OPENCODE_CONFIG_DIR = prev
+      }
+    })
 
-      // TODO: this is a hack to wait for backgruounded gitignore
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+    await waitFor(async () => {
+      if (!(await Filesystem.exists(gitignorePath))) return false
+      return (await Filesystem.readText(gitignorePath)).includes("package-lock.json")
+    })
 
-      expect(await Filesystem.exists(path.join(tmp.extra, ".gitignore"))).toBe(true)
-      expect(await Filesystem.readText(path.join(tmp.extra, ".gitignore"))).toContain("package-lock.json")
-    } finally {
-      if (prev === undefined) delete process.env.OPENCODE_CONFIG_DIR
-      else process.env.OPENCODE_CONFIG_DIR = prev
-    }
-  })
-})
+    expect(await Filesystem.exists(gitignorePath)).toBe(true)
+    expect(await Filesystem.readText(gitignorePath)).toContain("package-lock.json")
+  }),
+)
 
 // Note: npm install deduplication is covered in the current Npm implementation,
 // not in this config suite.
