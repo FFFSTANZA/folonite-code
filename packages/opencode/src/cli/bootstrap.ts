@@ -1,3 +1,4 @@
+import { AppRuntime } from "@/effect/app-runtime"
 import { InstanceBootstrap } from "../project/bootstrap"
 import { Instance } from "../project/instance"
 

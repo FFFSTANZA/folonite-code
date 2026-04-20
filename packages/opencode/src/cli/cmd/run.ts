@@ -26,6 +26,7 @@ import { SkillTool } from "../../tool/skill"
 import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util/locale"
+import { AppRuntime } from "@/effect/app-runtime"
 
 type ToolProps<T> = {
   input: Tool.InferParameters<T>
@@ -48,8 +49,6 @@ type Inline = {
   description?: string
 }
 
-type RenderedTool = (Inline & { kind: "inline" }) | (Inline & { kind: "block"; output?: string })
-
 function inline(info: Inline) {
   const suffix = info.description ? UI.Style.TEXT_DIM + ` ${info.description}` + UI.Style.TEXT_NORMAL : ""
   UI.println(UI.Style.TEXT_NORMAL + info.icon, UI.Style.TEXT_NORMAL + info.title + suffix)
@@ -64,20 +63,15 @@ function block(info: Inline, output?: string) {
 }
 
 function fallback(part: ToolPart) {
-  inline(fallbackInfo(part))
-}
-
-function fallbackInfo(part: ToolPart): RenderedTool {
   const state = part.state
   const input = "input" in state ? state.input : undefined
   const title =
     ("title" in state && state.title ? state.title : undefined) ||
     (input && typeof input === "object" && Object.keys(input).length > 0 ? JSON.stringify(input) : "Unknown")
-  return {
-    kind: "inline",
+  inline({
     icon: "⚙",
     title: `${part.tool} ${title}`,
-  }
+  })
 }
 
 function glob(info: ToolProps<typeof GlobTool>) {
@@ -106,30 +100,6 @@ function grep(info: ToolProps<typeof GrepTool>) {
     title,
     ...(description && { description }),
   })
-}
-
-function renderTool(info: RenderedTool) {
-  if (info.kind === "block") {
-    return block(info, info.output)
-  }
-  return inline(info)
-}
-
-export function describeToolPartForRun(part: ToolPart): RenderedTool {
-  try {
-    if (part.tool === "bash") {
-      const info = props<typeof BashTool>(part)
-      return {
-        kind: "block",
-        icon: "$",
-        title: `${info.input.command}`,
-        output: info.part.state.status === "completed" ? info.part.state.output?.trim() : undefined,
-      }
-    }
-    return fallbackInfo(part)
-  } catch {
-    return fallbackInfo(part)
-  }
 }
 
 function read(info: ToolProps<typeof ReadTool>) {
@@ -211,6 +181,17 @@ function skill(info: ToolProps<typeof SkillTool>) {
     icon: "→",
     title: `Skill "${info.input.name}"`,
   })
+}
+
+function bash(info: ToolProps<typeof BashTool>) {
+  const output = info.part.state.status === "completed" ? info.part.state.output?.trim() : undefined
+  block(
+    {
+      icon: "$",
+      title: `${info.input.command}`,
+    },
+    output,
+  )
 }
 
 function todo(info: ToolProps<typeof TodoWriteTool>) {
@@ -427,7 +408,7 @@ export const RunCommand = cmd({
     async function execute(sdk: OpencodeClient) {
       function tool(part: ToolPart) {
         try {
-          if (part.tool === "bash") return renderTool(describeToolPartForRun(part))
+          if (part.tool === "bash") return bash(props<typeof BashTool>(part))
           if (part.tool === "glob") return glob(props<typeof GlobTool>(part))
           if (part.tool === "grep") return grep(props<typeof GrepTool>(part))
           if (part.tool === "read") return read(props<typeof ReadTool>(part))
@@ -583,6 +564,7 @@ export const RunCommand = cmd({
       // Validate agent if specified
       const agent = await (async () => {
         if (!args.agent) return undefined
+        const name = args.agent
 
         // When attaching, validate against the running server instead of local Instance state.
         if (args.attach) {
@@ -600,12 +582,12 @@ export const RunCommand = cmd({
             return undefined
           }
 
-          const agent = modes.find((a) => a.name === args.agent)
+          const agent = modes.find((a) => a.name === name)
           if (!agent) {
             UI.println(
               UI.Style.TEXT_WARNING_BOLD + "!",
               UI.Style.TEXT_NORMAL,
-              `agent "${args.agent}" not found. Falling back to default agent`,
+              `agent "${name}" not found. Falling back to default agent`,
             )
             return undefined
           }
@@ -614,20 +596,20 @@ export const RunCommand = cmd({
             UI.println(
               UI.Style.TEXT_WARNING_BOLD + "!",
               UI.Style.TEXT_NORMAL,
-              `agent "${args.agent}" is a subagent, not a primary agent. Falling back to default agent`,
+              `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
             )
             return undefined
           }
 
-          return args.agent
+          return name
         }
 
-        const entry = await Agent.get(args.agent)
+        const entry = await AppRuntime.runPromise(Agent.Service.use((svc) => svc.get(name)))
         if (!entry) {
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${args.agent}" not found. Falling back to default agent`,
+            `agent "${name}" not found. Falling back to default agent`,
           )
           return undefined
         }
@@ -635,11 +617,11 @@ export const RunCommand = cmd({
           UI.println(
             UI.Style.TEXT_WARNING_BOLD + "!",
             UI.Style.TEXT_NORMAL,
-            `agent "${args.agent}" is a subagent, not a primary agent. Falling back to default agent`,
+            `agent "${name}" is a subagent, not a primary agent. Falling back to default agent`,
           )
           return undefined
         }
-        return args.agent
+        return name
       })()
 
       const sessionID = await session(sdk)

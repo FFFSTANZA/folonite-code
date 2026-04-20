@@ -401,9 +401,7 @@
 
   &[data-variant="sidepanel"] {
     [data-slot="tabs-list"] {
-      /* Override the base 48px so the consumer's h-11 (44px) is honored.
-         Tailwind class (0,1,0) would lose to the base nested selector (0,2,0)
-         without this explicit override. */
+      /* Let the consumer-owned h-11 shell row define the final height. */
       height: 44px;
 
       &::after {
@@ -411,7 +409,6 @@
       }
     }
 
-    /* Neutralize the base tabs-trigger-wrapper chrome (borders, bg, selected-state tint). */
     [data-slot="tabs-trigger-wrapper"] {
       border-bottom: none;
       border-right: none;
@@ -430,8 +427,6 @@
       }
     }
 
-    /* Sidepanel trigger visuals — geometry (height/padding/gap/border-radius) is set by the
-       consumer via Tailwind classes; this block only owns the color/bg/state contract. */
     [data-slot="tabs-trigger"] {
       border: 1px solid transparent;
       color: var(--text-weak);

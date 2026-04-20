@@ -361,7 +361,7 @@ export const GithubInstallCommand = cmd({
 
               retries++
               await sleep(1000)
-            } while (true)
+            } while (true) // oxlint-disable-line no-constant-condition
 
             s.stop("Installed GitHub app")
 
@@ -926,7 +926,7 @@ export const GithubRunCommand = cmd({
       async function summarize(response: string) {
         try {
           return await chat(`Summarize the following in less than 40 characters:\n\n${response}`)
-        } catch (e) {
+        } catch {
           const title = issueEvent
             ? issueEvent.issue.title
             : (payload as PullRequestReviewCommentEvent).pull_request.title
@@ -973,23 +973,16 @@ export const GithubRunCommand = cmd({
           ],
         })
 
-        // result should always be assistant just satisfying type checker
         if (result.info.role === "assistant" && result.info.error) {
           const err = result.info.error
           console.error("Agent error:", err)
-
-          if (err.name === "ContextOverflowError") {
-            throw new Error(formatPromptTooLargeError(files))
-          }
-
-          const errorMsg = err.data?.message || ""
-          throw new Error(`${err.name}: ${errorMsg}`)
+          if (err.name === "ContextOverflowError") throw new Error(formatPromptTooLargeError(files))
+          throw new Error(`${err.name}: ${err.data?.message || ""}`)
         }
 
         const text = extractResponseText(result.parts)
         if (text) return text
 
-        // No text part (tool-only or reasoning-only) - ask agent to summarize
         console.log("Requesting summary from agent...")
         const summary = await SessionPrompt.prompt({
           sessionID: session.id,
@@ -999,7 +992,7 @@ export const GithubRunCommand = cmd({
             providerID,
             modelID,
           },
-          tools: { "*": false }, // Disable all tools to force text response
+          tools: { "*": false },
           parts: [
             {
               id: PartID.ascending(),
@@ -1012,20 +1005,12 @@ export const GithubRunCommand = cmd({
         if (summary.info.role === "assistant" && summary.info.error) {
           const err = summary.info.error
           console.error("Summary agent error:", err)
-
-          if (err.name === "ContextOverflowError") {
-            throw new Error(formatPromptTooLargeError(files))
-          }
-
-          const errorMsg = err.data?.message || ""
-          throw new Error(`${err.name}: ${errorMsg}`)
+          if (err.name === "ContextOverflowError") throw new Error(formatPromptTooLargeError(files))
+          throw new Error(`${err.name}: ${err.data?.message || ""}`)
         }
 
         const summaryText = extractResponseText(summary.parts)
-        if (!summaryText) {
-          throw new Error("Failed to get summary from agent")
-        }
-
+        if (!summaryText) throw new Error("Failed to get summary from agent")
         return summaryText
       }
 
@@ -1036,6 +1021,7 @@ export const GithubRunCommand = cmd({
           console.error("Failed to get OIDC token:", error instanceof Error ? error.message : error)
           throw new Error(
             "Could not fetch an OIDC token. Make sure to add `id-token: write` to your workflow permissions.",
+            { cause: error },
           )
         }
       }
@@ -1226,7 +1212,7 @@ export const GithubRunCommand = cmd({
           console.log(`  permission: ${permission}`)
         } catch (error) {
           console.error(`Failed to check permissions: ${error}`)
-          throw new Error(`Failed to check permissions for user ${actor}: ${error}`)
+          throw new Error(`Failed to check permissions for user ${actor}: ${error}`, { cause: error })
         }
 
         if (!["admin", "write"].includes(permission)) throw new Error(`User ${actor} does not have write permissions`)
