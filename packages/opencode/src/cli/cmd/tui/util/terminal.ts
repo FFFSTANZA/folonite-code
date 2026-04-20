@@ -23,6 +23,12 @@ function mode(bg: RGBA | null): "dark" | "light" {
   return luminance > 0.5 ? "light" : "dark"
 }
 
+export function backgroundModeFromResponse(buffer: string): "dark" | "light" | undefined {
+  const match = buffer.match(/\x1b]11;([^\x07\x1b]+)(?:\x07|\x1b\\)/)
+  if (!match) return
+  return mode(parse(match[1]))
+}
+
 /**
  * Query terminal colors including background, foreground, and palette (0-15).
  * Uses OSC escape sequences to retrieve actual terminal color values.
@@ -109,6 +115,7 @@ export async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
 
   return new Promise((resolve) => {
     let timeout: NodeJS.Timeout
+    let buffer = ""
 
     const cleanup = () => {
       process.stdin.setRawMode(false)
@@ -117,10 +124,11 @@ export async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
     }
 
     const handler = (data: Buffer) => {
-      const match = data.toString().match(/\x1b]11;([^\x07\x1b]+)/)
-      if (!match) return
+      buffer += data.toString()
+      const next = backgroundModeFromResponse(buffer)
+      if (!next) return
       cleanup()
-      resolve(mode(parse(match[1])))
+      resolve(next)
     }
 
     process.stdin.setRawMode(true)

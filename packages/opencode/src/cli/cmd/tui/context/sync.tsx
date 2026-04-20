@@ -30,6 +30,7 @@ import { useArgs } from "./args"
 import { batch, createEffect, on } from "solid-js"
 import { Log } from "@/util/log"
 import { emptyConsoleState, type ConsoleState } from "@/config/console-state"
+import { errorData } from "@/util/error"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -440,6 +441,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             project.workspace.sync(),
           ]).then(() => {
             setStore("status", "complete")
+          }).catch((error) => {
+            Log.Default.error("tui bootstrap non-blocking sync failed", {
+              workspace,
+              error: errorData(error),
+            })
           })
         })
         .catch(async (e) => {

@@ -36,11 +36,12 @@ export async function openWorkspaceSession(input: {
   workspaceID: string
 }) {
   const client = scoped(input.sdk, input.sync, input.workspaceID)
+  const maxAttempts = 3
   log.info("workspace session create requested", {
     workspaceID: input.workspaceID,
   })
 
-  while (true) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await client.session.create({ workspace: input.workspaceID }).catch((err) => {
       log.error("workspace session create request failed", {
         workspaceID: input.workspaceID,
@@ -61,9 +62,23 @@ export async function openWorkspaceSession(input: {
       sessionID: result.data?.id,
     })
     if (result.response?.status && result.response.status >= 500 && result.response.status < 600) {
+      if (attempt === maxAttempts) {
+        log.error("workspace session create exhausted retries", {
+          workspaceID: input.workspaceID,
+          status: result.response.status,
+          attempts: attempt,
+        })
+        input.toast.show({
+          message: "Failed to create workspace session",
+          variant: "error",
+        })
+        return
+      }
       log.warn("workspace session create retrying after server error", {
         workspaceID: input.workspaceID,
         status: result.response.status,
+        attempt,
+        maxAttempts,
       })
       await sleep(1000)
       continue
