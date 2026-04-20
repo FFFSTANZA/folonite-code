@@ -1,3 +1,9 @@
+# This workflow is intentionally non-blocking: it uploads Playwright
+# artifacts on PRs for manual inspection but never fails the PR. Do NOT
+# add `e2e-artifacts / e2e-artifacts` to the `dev` ruleset as a required
+# check -- `continue-on-error: true` on the job means the check reports
+# success even when tests fail, which would make the gate lie about
+# every PR forever. Decision recorded in issue #54.
 name: e2e-artifacts
 
 on:

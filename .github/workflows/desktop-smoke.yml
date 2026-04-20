@@ -185,6 +185,9 @@ jobs:
           grep -q "Signature=adhoc" /tmp/pawwork-codesign.txt
         working-directory: packages/desktop-electron
 
+  # Aggregator for the `dev` branch ruleset. The required check on GitHub
+  # is `desktop-smoke / check`; every new job added above MUST be listed
+  # in `needs:` below, otherwise its failure will not block merge.
   check:
     if: always()
     needs:

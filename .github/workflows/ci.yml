@@ -190,6 +190,11 @@ jobs:
           retention-days: 7
           path: packages/*/.artifacts/unit/junit.xml
 
+  # Aggregator for the `dev` branch ruleset. The required check on GitHub
+  # is `ci / check`; every new job added above MUST be listed in `needs:`
+  # below, otherwise its failure will not block merge. If this list grows
+  # past ~5 entries, consider switching to `re-actors/alls-green` for
+  # dynamic aggregation (tracked in issue #54).
   check:
     if: always()
     needs:
