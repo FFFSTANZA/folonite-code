@@ -87,7 +87,13 @@ type Hit = {
   workspace?: string
 }
 
-function createFetch(log: Hit[]) {
+function createFetch(
+  log: Hit[],
+  options: {
+    rejectPaths?: string[]
+    delays?: { path: string; workspace?: string; ms: number }[]
+  } = {},
+) {
   return Object.assign(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const req = new Request(input, init)
@@ -97,6 +103,15 @@ function createFetch(log: Hit[]) {
         path: url.pathname,
         workspace,
       })
+
+      if (options.rejectPaths?.includes(url.pathname)) {
+        throw new Error(`forced fetch failure: ${url.pathname}`)
+      }
+
+      const delay = options.delays?.find((item) => item.path === url.pathname && item.workspace === workspace)
+      if (delay) {
+        await Bun.sleep(delay.ms)
+      }
 
       if (url.pathname === "/config/providers") {
         return json({ providers: [], default: {} })
@@ -111,7 +126,7 @@ function createFetch(log: Hit[]) {
         return json([])
       }
       if (url.pathname === "/config") {
-        return json({})
+        return json({ workspaceTag: workspace ?? "root" })
       }
       if (url.pathname === "/project/current") {
         return json({ id: `proj-${workspace ?? "root"}` })
@@ -173,7 +188,13 @@ function createFetch(log: Hit[]) {
   ) satisfies typeof fetch
 }
 
-async function mount(log: Hit[]) {
+async function mount(
+  log: Hit[],
+  options: {
+    rejectPaths?: string[]
+    delays?: { path: string; workspace?: string; ms: number }[]
+  } = {},
+) {
   let project!: ReturnType<typeof useProject>
   let sync!: ReturnType<typeof useSync>
   let done!: () => void
@@ -185,7 +206,7 @@ async function mount(log: Hit[]) {
     <SDKProvider
       url="http://test"
       directory="/tmp/root"
-      fetch={createFetch(log)}
+      fetch={createFetch(log, options)}
       events={{ subscribe: async () => () => {} }}
     >
       <ArgsProvider continue={false}>
@@ -285,6 +306,56 @@ describe("SyncProvider", () => {
       expect(sync.data.message.ses_1[0]?.id).toBe("msg_1")
       expect(sync.data.part.msg_1[0]).toMatchObject({ type: "text", text: "part-ws_b" })
       expect(sync.data.session_diff.ses_1[0]?.file).toBe("ws_b.ts")
+    } finally {
+      app.renderer.destroy()
+    }
+  })
+
+  test("keeps non-blocking bootstrap fetch failures from surfacing as unhandled rejections", async () => {
+    const log: Hit[] = []
+    const unhandled: unknown[] = []
+    const onUnhandled = (error: unknown) => {
+      unhandled.push(error)
+    }
+    process.on("unhandledRejection", onUnhandled)
+
+    const { app, project } = await mount(log, {
+      rejectPaths: ["/command"],
+    })
+
+    try {
+      await waitBoot(log)
+      log.length = 0
+      project.workspace.set("ws_a")
+      await wait(() => log.some((item) => item.path === "/project/current" && item.workspace === "ws_a"))
+      await Bun.sleep(50)
+
+      expect(unhandled).toHaveLength(0)
+    } finally {
+      process.off("unhandledRejection", onUnhandled)
+      app.renderer.destroy()
+    }
+  })
+
+  test("ignores stale bootstrap responses after switching workspaces", async () => {
+    const log: Hit[] = []
+    const { app, project, sync } = await mount(log, {
+      delays: [{ path: "/config", workspace: "ws_a", ms: 150 }],
+    })
+
+    try {
+      await waitBoot(log)
+      log.length = 0
+
+      project.workspace.set("ws_a")
+      await wait(() => log.some((item) => item.path === "/project/current" && item.workspace === "ws_a"))
+      await Bun.sleep(20)
+
+      project.workspace.set("ws_b")
+      await wait(() => log.some((item) => item.path === "/project/current" && item.workspace === "ws_b"))
+      await Bun.sleep(220)
+
+      expect((sync.data.config as Record<string, unknown>).workspaceTag).toBe("ws_b")
     } finally {
       app.renderer.destroy()
     }

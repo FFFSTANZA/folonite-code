@@ -1,11 +1,28 @@
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
-import type { GlobalEvent, Event } from "@opencode-ai/sdk/v2"
+import type { GlobalEvent } from "@opencode-ai/sdk/v2"
 import { createSimpleContext } from "./helper"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { batch, onCleanup, onMount } from "solid-js"
 
 export type EventSource = {
   subscribe: (handler: (event: GlobalEvent) => void) => Promise<() => void>
+}
+
+export function sleepWithAbort(ms: number, signals: AbortSignal[]) {
+  return new Promise<void>((resolve) => {
+    let timer: ReturnType<typeof setTimeout>
+    const stop = () => {
+      clearTimeout(timer)
+      for (const signal of signals) {
+        signal.removeEventListener("abort", stop)
+      }
+      resolve()
+    }
+    timer = setTimeout(stop, ms)
+    for (const signal of signals) {
+      signal.addEventListener("abort", stop, { once: true })
+    }
+  })
 }
 
 export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
@@ -39,6 +56,8 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     let queue: GlobalEvent[] = []
     let timer: Timer | undefined
     let last = 0
+    const retryDelay = 1000
+    const maxRetryDelay = 30000
 
     const flush = () => {
       if (queue.length === 0) return
@@ -73,9 +92,24 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
       const ctrl = new AbortController()
       sse = ctrl
       ;(async () => {
+        let attempt = 0
         while (true) {
           if (abort.signal.aborted || ctrl.signal.aborted) break
-          const events = await sdk.global.event({ signal: ctrl.signal })
+
+          let events: Awaited<ReturnType<typeof sdk.global.event>> | undefined
+          try {
+            events = await sdk.global.event({
+              signal: ctrl.signal,
+              sseMaxRetryAttempts: 0,
+            })
+            attempt = 0
+          } catch {
+            attempt += 1
+            if (abort.signal.aborted || ctrl.signal.aborted) break
+            const backoff = Math.min(retryDelay * 2 ** (attempt - 1), maxRetryDelay)
+            await sleepWithAbort(backoff, [abort.signal, ctrl.signal])
+            continue
+          }
 
           for await (const event of events.stream) {
             if (ctrl.signal.aborted) break
@@ -84,6 +118,12 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
 
           if (timer) clearTimeout(timer)
           if (queue.length > 0) flush()
+          attempt += 1
+          if (abort.signal.aborted || ctrl.signal.aborted) break
+
+          // Exponential backoff
+          const backoff = Math.min(retryDelay * 2 ** (attempt - 1), maxRetryDelay)
+          await sleepWithAbort(backoff, [abort.signal, ctrl.signal])
         }
       })().catch(() => {})
     }

@@ -2,6 +2,7 @@ import { createStore } from "solid-js/store"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import type { TextareaRenderable } from "@opentui/core"
+import { errorMessage } from "@/util/error"
 import { useKeybind } from "../../context/keybind"
 import { selectedForeground, tint, useTheme } from "../../context/theme"
 import type { QuestionAnswer, QuestionRequest } from "@opencode-ai/sdk/v2"
@@ -9,12 +10,14 @@ import { useSDK } from "../../context/sdk"
 import { SplitBorder } from "../../component/border"
 import { useTextareaKeybindings } from "../../component/textarea-keybindings"
 import { useDialog } from "../../ui/dialog"
+import { useToast } from "../../ui/toast"
 
 export function QuestionPrompt(props: { request: QuestionRequest }) {
   const sdk = useSDK()
   const { theme } = useTheme()
   const keybind = useKeybind()
   const bindings = useTextareaKeybindings()
+  const toast = useToast()
 
   const questions = createMemo(() => props.request.questions)
   const single = createMemo(() => questions().length === 1 && questions()[0]?.multiple !== true)
@@ -43,17 +46,29 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
     return store.answers[store.tab]?.includes(value) ?? false
   })
 
+  function showQuestionError(title: string, error: unknown) {
+    toast.show({
+      variant: "error",
+      title,
+      message: errorMessage(error),
+    })
+  }
+
   function submit() {
     const answers = questions().map((_, i) => store.answers[i] ?? [])
-    sdk.client.question.reply({
+    void sdk.client.question.reply({
       requestID: props.request.id,
       answers,
+    }).catch((error) => {
+      showQuestionError("Failed to submit answer", error)
     })
   }
 
   function reject() {
-    sdk.client.question.reject({
+    void sdk.client.question.reject({
       requestID: props.request.id,
+    }).catch((error) => {
+      showQuestionError("Failed to reject question", error)
     })
   }
 
@@ -67,9 +82,11 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
       setStore("custom", inputs)
     }
     if (single()) {
-      sdk.client.question.reply({
+      void sdk.client.question.reply({
         requestID: props.request.id,
         answers: [[answer]],
+      }).catch((error) => {
+        showQuestionError("Failed to submit answer", error)
       })
       return
     }

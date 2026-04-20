@@ -13,9 +13,9 @@ import { Filesystem } from "@/util/filesystem"
 import type { GlobalEvent } from "@opencode-ai/sdk/v2"
 import type { EventSource } from "./context/sdk"
 import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
+import { writeHeapSnapshot } from "v8"
 import { TuiConfig } from "@/config/tui"
 import { Instance } from "@/project/instance"
-import { writeHeapSnapshot } from "v8"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -130,7 +130,6 @@ export const TuiThreadCommand = cmd({
         return
       }
       const cwd = Filesystem.resolve(process.cwd())
-
       const worker = new Worker(file, {
         env: Object.fromEntries(
           Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),

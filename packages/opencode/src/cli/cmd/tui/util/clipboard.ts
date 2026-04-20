@@ -190,3 +190,7 @@ export namespace Clipboard {
     await getCopyMethod()(text)
   }
 }
+
+export type Content = Clipboard.Content
+export const read = Clipboard.read
+export const copy = Clipboard.copy

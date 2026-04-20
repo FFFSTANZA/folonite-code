@@ -5,9 +5,17 @@ import { useTerminalDimensions } from "@opentui/solid"
 import { SplitBorder } from "../component/border"
 import { TextAttributes } from "@opentui/core"
 import z from "zod"
-import { TuiEvent } from "../event"
+import { type TuiEvent } from "../event"
 
 export type ToastOptions = z.infer<typeof TuiEvent.ToastShow.properties>
+export const DEFAULT_TOAST_DURATION_MS = 3000
+
+export function normalizeToastDuration(duration?: number) {
+  if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
+    return DEFAULT_TOAST_DURATION_MS
+  }
+  return duration
+}
 
 export function Toast() {
   const toast = useToast()
@@ -56,13 +64,14 @@ function init() {
 
   const toast = {
     show(options: ToastOptions) {
-      const parsedOptions = TuiEvent.ToastShow.properties.parse(options)
-      const { duration, ...currentToast } = parsedOptions
+      const { duration, ...currentToast } = options
+      const timeoutMs = normalizeToastDuration(duration)
       setStore("currentToast", currentToast)
       if (timeoutHandle) clearTimeout(timeoutHandle)
       timeoutHandle = setTimeout(() => {
         setStore("currentToast", null)
-      }, duration).unref()
+      }, timeoutMs)
+      timeoutHandle.unref?.()
     },
     error: (err: any) => {
       if (err instanceof Error)

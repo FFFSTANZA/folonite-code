@@ -15,8 +15,13 @@ import { createDebouncedSignal } from "../util/signal"
 import { useToast } from "../ui/toast"
 import { DialogWorkspaceCreate, openWorkspaceSession } from "./dialog-workspace-create"
 import { Spinner } from "./spinner"
+import { errorMessage } from "@/util/error"
 
 type WorkspaceStatus = "connected" | "connecting" | "disconnected" | "error"
+
+export function shouldRecoverWorkspaceSessionDelete(status?: WorkspaceStatus) {
+  return false
+}
 
 export function DialogSessionList() {
   const dialog = useDialog()
@@ -30,7 +35,7 @@ export function DialogSessionList() {
   const [toDelete, setToDelete] = createSignal<string>()
   const [search, setSearch] = createDebouncedSignal("", 150)
 
-  const [searchResults] = createResource(search, async (query) => {
+  const [searchResults, { refetch }] = createResource(search, async (query) => {
     if (!query) return undefined
     const result = await sdk.client.session.list({ search: query, limit: 30 })
     return result.data ?? []
@@ -54,6 +59,14 @@ export function DialogSessionList() {
         }
       />
     ))
+  }
+
+  function deleteError(error: unknown) {
+    toast.show({
+      variant: "error",
+      title: "Failed to delete session",
+      message: errorMessage(error),
+    })
   }
 
   const options = createMemo(() => {
@@ -82,15 +95,10 @@ export function DialogSessionList() {
                 {desc}{" "}
                 <span
                   style={{
-                    fg:
-                      workspaceStatus === "error"
-                        ? theme.error
-                        : workspaceStatus === "disconnected"
-                          ? theme.textMuted
-                          : theme.success,
+                    fg: workspaceStatus === "connected" ? theme.success : theme.error,
                   }}
                 >
-                  ■
+                  ●
                 </span>
               </>
             )
@@ -145,10 +153,33 @@ export function DialogSessionList() {
           title: "delete",
           onTrigger: async (option) => {
             if (toDelete() === option.value) {
-              sdk.client.session.delete({
-                sessionID: option.value,
-              })
-              setToDelete(undefined)
+              const session = sessions().find((item) => item.id === option.value)
+              const status = session?.workspaceID ? project.workspace.status(session.workspaceID) : undefined
+
+              try {
+                const result = await sdk.client.session.delete({
+                  sessionID: option.value,
+                })
+                if (result.error) {
+                  deleteError(result.error)
+                  setToDelete(undefined)
+                  return
+                }
+              } catch (err) {
+                deleteError(err)
+                setToDelete(undefined)
+                return
+              }
+              try {
+                if (status && status !== "connected") {
+                  await sync.session.refresh()
+                }
+                if (search()) await refetch()
+              } catch (err) {
+                deleteError(err)
+              } finally {
+                setToDelete(undefined)
+              }
               return
             }
             setToDelete(option.value)

@@ -12,7 +12,7 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
     const [store, setStore] = createStore<Record<string, any>>()
     const filePath = path.join(Global.Path.state, "kv.json")
 
-    Filesystem.readJson(filePath)
+    Filesystem.readJson<Record<string, any>>(filePath)
       .then((x) => {
         setStore(x)
       })
@@ -44,7 +44,9 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
       },
       set(key: string, value: any) {
         setStore(key, value)
-        Filesystem.writeJson(filePath, store)
+        void Filesystem.writeJson(filePath, store).catch((error) => {
+          console.error("Failed to persist KV store", error)
+        })
       },
     }
     return result

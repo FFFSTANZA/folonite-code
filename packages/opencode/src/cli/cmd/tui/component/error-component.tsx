@@ -1,10 +1,31 @@
 import { TextAttributes } from "@opentui/core"
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
-import { Clipboard } from "@tui/util/clipboard"
+import * as Clipboard from "@tui/util/clipboard"
 import { createSignal } from "solid-js"
 import { Installation } from "@/installation"
 import { win32FlushInputBuffer } from "../win32"
 import { getScrollAcceleration } from "../util/scroll"
+
+export async function performFatalExit(input: {
+  renderer: {
+    setTerminalTitle: (title: string) => void
+    destroy: () => void
+  }
+  onBeforeExit?: () => Promise<void>
+  onExit: () => Promise<void>
+  flushInput?: () => void
+}) {
+  try {
+    await input.onBeforeExit?.()
+  } catch {}
+
+  try {
+    input.renderer.setTerminalTitle("")
+    input.renderer.destroy()
+    input.flushInput?.()
+    await input.onExit()
+  } catch {}
+}
 
 export function ErrorComponent(props: {
   error: Error
@@ -16,12 +37,13 @@ export function ErrorComponent(props: {
   const term = useTerminalDimensions()
   const renderer = useRenderer()
 
-  const handleExit = async () => {
-    await props.onBeforeExit?.()
-    renderer.setTerminalTitle("")
-    renderer.destroy()
-    win32FlushInputBuffer()
-    await props.onExit()
+  const handleExit = () => {
+    void performFatalExit({
+      renderer,
+      onBeforeExit: props.onBeforeExit,
+      onExit: props.onExit,
+      flushInput: win32FlushInputBuffer,
+    })
   }
 
   useKeyboard((evt) => {
@@ -31,7 +53,7 @@ export function ErrorComponent(props: {
   })
   const [copied, setCopied] = createSignal(false)
 
-  const issueURL = new URL("https://github.com/Astro-Han/pawwork/issues/new")
+  const issueURL = new URL("https://github.com/anomalyco/opencode/issues/new?template=bug-report.yml")
 
   // Choose safe fallback colors per mode since theme context may not be available
   const isLight = props.mode === "light"
@@ -43,7 +65,7 @@ export function ErrorComponent(props: {
   }
 
   if (props.error.message) {
-    issueURL.searchParams.set("title", `pawwork: fatal: ${props.error.message}`)
+    issueURL.searchParams.set("title", `opentui: fatal: ${props.error.message}`)
   }
 
   if (props.error.stack) {
@@ -56,8 +78,10 @@ export function ErrorComponent(props: {
   issueURL.searchParams.set("pawwork-version", Installation.VERSION)
 
   const copyIssueURL = () => {
-    Clipboard.copy(issueURL.toString()).then(() => {
+    void Clipboard.copy(issueURL.toString()).then(() => {
       setCopied(true)
+    }).catch(() => {
+      setCopied(false)
     })
   }
 
