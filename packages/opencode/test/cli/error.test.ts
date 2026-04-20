@@ -15,4 +15,20 @@ describe("cli.error", () => {
     expect(formatted).toContain("This failed before the server returned an HTTP response.")
     expect(formatted).toContain("Check your network, proxy, or VPN configuration and try again.")
   })
+
+  test("formats ProviderModelNotFoundError from named-error payloads", () => {
+    const formatted = FormatError({
+      name: "ProviderModelNotFoundError",
+      data: {
+        providerID: "openai",
+        modelID: "gpt-bad",
+        suggestions: ["gpt-5"],
+      },
+    })
+
+    expect(formatted).toContain("Model not found: openai/gpt-bad")
+    expect(formatted).toContain("Did you mean: gpt-5")
+    expect(formatted).toContain("opencode models")
+    expect(formatted).toContain("pawwork.json")
+  })
 })
