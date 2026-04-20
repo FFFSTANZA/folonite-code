@@ -16,7 +16,6 @@ import { useShellSurface } from "@/context/shell-surface"
 import { useSync } from "@/context/sync"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { decode64 } from "@/utils/base64"
-import { PaneR } from "@/components/design-icons"
 import { StatusPopover } from "../status-popover"
 
 export function SessionHeader() {
@@ -132,7 +131,11 @@ export function SessionHeader() {
                   aria-expanded={rightPanelOpen()}
                   aria-controls="right-panel"
                 >
-                  <PaneR />
+                  <Icon
+                    size="small"
+                    name={rightPanelOpen() ? "sidebar-active" : "sidebar"}
+                    class="-scale-x-100"
+                  />
                 </Button>
               </Tooltip>
             </Show>

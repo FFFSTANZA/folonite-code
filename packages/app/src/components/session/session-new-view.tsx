@@ -3,6 +3,7 @@ import { useSDK } from "@/context/sdk"
 import { useLocal } from "@/context/local"
 import { useLanguage } from "@/context/language"
 import { useNavigate } from "@solidjs/router"
+import { Icon } from "@opencode-ai/ui/icon"
 import { showToast } from "@opencode-ai/ui/toast"
 import { Mark } from "@opencode-ai/ui/logo"
 import { pawworkSkillCards, type PawworkSkillName } from "./pawwork-skill-meta"
@@ -75,7 +76,7 @@ export function NewSessionView(props: { composer?: JSX.Element }) {
                 disabled={pending() === card.name}
                 onClick={() => void start(card.name)}
               >
-                <card.Icon class="text-text-weak" />
+                <Icon name={card.iconName} size="medium" class="text-text-weak" />
                 <div class="mt-3 text-16-medium text-text-strong">{language.t(card.titleKey)}</div>
                 <div class="mt-1 text-14-regular text-text-weak">{language.t(card.descriptionKey)}</div>
               </button>
