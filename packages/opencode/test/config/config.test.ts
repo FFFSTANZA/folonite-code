@@ -870,6 +870,44 @@ Nested agent prompt`,
   })
 })
 
+test("continues loading agents when one agent file is invalid", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      const agentsDir = path.join(dir, ".opencode", "agents")
+      await fs.mkdir(agentsDir, { recursive: true })
+
+      await Filesystem.write(
+        path.join(agentsDir, "valid.md"),
+        `---
+mode: subagent
+steps: 1
+---
+Valid agent prompt`,
+      )
+      await Filesystem.write(
+        path.join(agentsDir, "invalid.md"),
+        `---
+mode: subagent
+steps: 0
+---
+Invalid agent prompt`,
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await load()
+      expect(config.agent?.["valid"]).toMatchObject({
+        mode: "subagent",
+        prompt: "Valid agent prompt",
+        steps: 1,
+      })
+      expect(config.agent?.["invalid"]).toBeUndefined()
+    },
+  })
+})
+
 test("loads commands from .opencode/command (singular)", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
@@ -1454,6 +1492,7 @@ test("migrates legacy tools config to permissions - allow", async () => {
         bash: "allow",
         read: "allow",
       })
+      expect(config.agent?.["test"]).not.toHaveProperty("tools")
     },
   })
 })
@@ -1498,6 +1537,7 @@ test("migrates legacy write tool to edit permission", async () => {
           $schema: "https://opencode.ai/config.json",
           agent: {
             test: {
+              maxSteps: 3,
               tools: {
                 write: true,
               },
@@ -1514,6 +1554,8 @@ test("migrates legacy write tool to edit permission", async () => {
       expect(config.agent?.["test"]?.permission).toEqual({
         edit: "allow",
       })
+      expect(config.agent?.["test"]?.steps).toBe(3)
+      expect(config.agent?.["test"]).not.toHaveProperty("maxSteps")
     },
   })
 })
@@ -1902,6 +1944,61 @@ test("MCP config deep merges preserving base config properties", async () => {
           "X-Custom-Header": "value",
         },
       })
+    },
+  })
+})
+
+test("rejects invalid MCP timeout values", async () => {
+  for (const timeout of [0, -1, 1.5]) {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Filesystem.write(
+          path.join(dir, "opencode.json"),
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            mcp: {
+              local: {
+                type: "local",
+                command: ["node", "server.js"],
+                timeout,
+              },
+              remote: {
+                type: "remote",
+                url: "https://example.com/mcp",
+                timeout,
+              },
+            },
+          }),
+        )
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await expect(load()).rejects.toThrow()
+      },
+    })
+  }
+})
+
+test("rejects unknown nested server keys", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Filesystem.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          server: {
+            hostnmae: "127.0.0.1",
+          },
+        }),
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      await expect(load()).rejects.toThrow()
     },
   })
 })

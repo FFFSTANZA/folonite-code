@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { zod } from "@/util/effect-zod"
+import z from "zod"
 
 export class Server extends Schema.Class<Server>("ServerConfig")({
   port: Schema.optional(Schema.Number.check(Schema.isInt()).check(Schema.isGreaterThan(0))).annotate({
@@ -14,7 +15,7 @@ export class Server extends Schema.Class<Server>("ServerConfig")({
     description: "Additional domains to allow for CORS",
   }),
 }) {
-  static readonly zod = zod(this)
+  static readonly zod = (zod(this) as unknown as z.ZodObject<any>).strict()
 }
 
 export * as ConfigServer from "./server"

@@ -108,6 +108,7 @@ export type Layout = ConfigLayout.Layout
 const AgentRef = Schema.Any.annotate({ [ZodOverride]: ConfigAgent.Info })
 const PermissionRef = Schema.Any.annotate({ [ZodOverride]: ConfigPermission.Info })
 const LogLevelRef = Schema.Any.annotate({ [ZodOverride]: Log.Level })
+const ServerRef = Schema.Any.annotate({ [ZodOverride]: ConfigServer.Server.zod }) as unknown as typeof ConfigServer.Server
 
 const PositiveInt = Schema.Number.check(Schema.isInt()).check(Schema.isGreaterThan(0))
 const NonNegativeInt = Schema.Number.check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))
@@ -117,7 +118,7 @@ const InfoSchema = Schema.Struct({
     description: "JSON schema reference for configuration validation",
   }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
-  server: Schema.optional(ConfigServer.Server).annotate({
+  server: Schema.optional(ServerRef).annotate({
     description: "Server configuration for opencode serve and web commands",
   }),
   command: Schema.optional(Schema.Record(Schema.String, ConfigCommand.Info)).annotate({

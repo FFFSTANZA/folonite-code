@@ -78,20 +78,35 @@ const KNOWN_KEYS = new Set([
   "tools",
 ])
 
+type AgentInput = Schema.Schema.Type<typeof AgentSchema>
+type AgentInfo = Omit<AgentInput, "maxSteps" | "options" | "permission" | "steps" | "tools"> & {
+  options?: Record<string, unknown>
+  permission?: ConfigPermission.Info
+  steps?: number
+}
+
 // Post-parse normalisation:
 //  - Promote any unknown-but-present keys into `options` so they survive the
 //    round-trip in a well-known field.
 //  - Translate the deprecated `tools: { name: boolean }` map into the new
 //    `permission` shape (write-adjacent tools collapse into `permission.edit`).
 //  - Coalesce `steps ?? maxSteps` so downstream can ignore the deprecated alias.
-const normalize = (agent: z.infer<typeof Info>) => {
-  const options: Record<string, unknown> = { ...agent.options }
+const normalize = (agent: AgentInput): AgentInfo => {
+  const {
+    maxSteps,
+    options: agentOptions,
+    permission: configuredPermission,
+    steps,
+    tools,
+    ...rest
+  } = agent
+  const options: Record<string, unknown> = { ...agentOptions }
   for (const [key, value] of Object.entries(agent)) {
     if (!KNOWN_KEYS.has(key)) options[key] = value
   }
 
   const permission: ConfigPermission.Info = {}
-  for (const [tool, enabled] of Object.entries(agent.tools ?? {})) {
+  for (const [tool, enabled] of Object.entries(tools ?? {})) {
     const action = enabled ? "allow" : "deny"
     if (tool === "write" || tool === "edit" || tool === "patch" || tool === "multiedit") {
       permission.edit = action
@@ -99,19 +114,19 @@ const normalize = (agent: z.infer<typeof Info>) => {
     }
     permission[tool] = action
   }
-  globalThis.Object.assign(permission, agent.permission)
+  Object.assign(permission, configuredPermission)
 
-  return { ...agent, options, permission, steps: agent.steps ?? agent.maxSteps }
+  return { ...rest, options, permission, steps: steps ?? maxSteps }
 }
 
-export const Info = zod(AgentSchema).transform(normalize).meta({ ref: "AgentConfig" }) as unknown as z.ZodType<
-  Omit<z.infer<ReturnType<typeof zod<typeof AgentSchema>>>, "options" | "permission" | "steps"> & {
-    options?: Record<string, unknown>
-    permission?: ConfigPermission.Info
-    steps?: number
-  }
->
+export const Info = zod(AgentSchema).transform(normalize).meta({ ref: "AgentConfig" }) as unknown as z.ZodType<AgentInfo>
 export type Info = z.infer<typeof Info>
+
+async function reportLoadError(error: { toObject(): any }, context: Record<string, unknown>) {
+  const { Session } = await import("@/session")
+  void Bus.publish(Session.Event.Error, { error: error.toObject() })
+  log.error("failed to load agent", context)
+}
 
 export async function load(dir: string) {
   const result: Record<string, Info> = {}
@@ -145,7 +160,8 @@ export async function load(dir: string) {
       result[config.name] = parsed.data
       continue
     }
-    throw new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error })
+    const error = new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error })
+    await reportLoadError(error, { agent: item, err: parsed.error })
   }
   return result
 }
@@ -180,7 +196,10 @@ export async function loadMode(dir: string) {
         ...parsed.data,
         mode: "primary" as const,
       }
+      continue
     }
+    const error = new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error })
+    await reportLoadError(error, { mode: item, err: parsed.error })
   }
   return result
 }

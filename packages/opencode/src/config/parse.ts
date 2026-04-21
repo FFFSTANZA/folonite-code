@@ -4,7 +4,11 @@ import { type ParseError as JsoncParseError, parse as parseJsoncImpl, printParse
 import z from "zod"
 import { InvalidError, JsonError } from "./error"
 
-type Schema<T> = z.ZodType<T>
+type Schema<T> = {
+  safeParse(data: unknown):
+    | { success: true; data: T }
+    | { success: false; error: { issues: z.core.$ZodIssue[] } }
+}
 
 export function jsonc(text: string, filepath: string): unknown {
   const errors: JsoncParseError[] = []
