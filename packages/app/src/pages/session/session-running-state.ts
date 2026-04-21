@@ -6,5 +6,5 @@ export function isSessionRunning(status: SessionStatus | undefined, messages: re
   if ((status ?? idle).type !== "idle") return true
 
   const latest = messages?.at(-1)
-  return latest?.role === "assistant" && typeof latest.time.completed !== "number"
+  return latest?.role === "assistant" && typeof latest.time?.completed !== "number"
 }
