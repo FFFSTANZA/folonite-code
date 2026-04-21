@@ -5,7 +5,14 @@ import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } f
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 import { IMAGE_EXTS } from "@opencode-ai/util/file-extensions"
 
-import type { InitStep, ServerReadyData, SqliteMigrationProgress, TitlebarTheme, WslConfig } from "../preload/types"
+import type {
+  DesktopContext,
+  InitStep,
+  ServerReadyData,
+  SqliteMigrationProgress,
+  TitlebarTheme,
+  WslConfig,
+} from "../preload/types"
 import { getStore } from "./store"
 import { setTitlebar } from "./windows"
 
@@ -52,6 +59,7 @@ type Deps = {
   setBackgroundColor: (color: string) => void
   reportDeepLinkReady: (win: BrowserWindow | null) => void
   reportCiSmokeReady: () => Promise<void> | void
+  setDesktopContext: (context: DesktopContext, win: BrowserWindow) => Promise<void> | void
 }
 
 export function registerIpcHandlers(deps: Deps) {
@@ -130,6 +138,11 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("report-deep-link-ready", (event: IpcMainInvokeEvent) =>
     deps.reportDeepLinkReady(BrowserWindow.fromWebContents(event.sender)),
   )
+  ipcMain.handle("set-desktop-context", (event: IpcMainInvokeEvent, context: DesktopContext) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    return deps.setDesktopContext(context, win)
+  })
   ipcMain.handle("store-get", (_event: IpcMainInvokeEvent, name: string, key: string) => {
     const store = getStore(name)
     const value = store.get(key)

@@ -8,11 +8,12 @@ import { Font } from "@opencode-ai/ui/font"
 import { Splash } from "@opencode-ai/ui/logo"
 import { ThemeProvider } from "@opencode-ai/ui/theme/context"
 import { MetaProvider } from "@solidjs/meta"
-import { type BaseRouterProps, Navigate, Route, Router } from "@solidjs/router"
+import { type BaseRouterProps, Navigate, Route, Router, useLocation } from "@solidjs/router"
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
 import { type Duration, Effect } from "effect"
 import {
   type Component,
+  createEffect,
   createMemo,
   createResource,
   createSignal,
@@ -44,6 +45,7 @@ import { TerminalProvider } from "@/context/terminal"
 import DirectoryLayout from "@/pages/directory-layout"
 import Layout from "@/pages/layout"
 import { ErrorPage } from "./pages/error"
+import { buildDesktopContext, type DesktopContext } from "./utils/desktop-context"
 import { useCheckServerHealth } from "./utils/server-health"
 
 const HomeRoute = lazy(() => import("@/pages/home"))
@@ -77,6 +79,7 @@ declare global {
     }
     api?: {
       setTitlebar?: (theme: { mode: "light" | "dark" }) => Promise<void>
+      setDesktopContext?: (context: DesktopContext) => Promise<void>
     }
   }
 }
@@ -122,11 +125,88 @@ function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   return (
     <AppShellProviders>
       <Suspense fallback={<Loading />}>
+        <DesktopContextRouteBridge />
         {props.appChildren}
         {props.children}
       </Suspense>
     </AppShellProviders>
   )
+}
+
+function DesktopContextRouteBridge() {
+  const language = useLanguage()
+  const location = useLocation()
+  const desktopContextMaxRetries = 5
+  let lastDesktopContext = ""
+  let pendingDesktopContext = ""
+  let desktopContextRetryTimer: number | undefined
+  let desktopContextRetryCount = 0
+  let disposed = false
+
+  const clearDesktopContextRetry = () => {
+    if (desktopContextRetryTimer !== undefined) window.clearTimeout(desktopContextRetryTimer)
+    desktopContextRetryTimer = undefined
+  }
+
+  const syncDesktopContext = (context: DesktopContext, serialized: string) => {
+    if (disposed || isSessionRoute(location.pathname)) return
+    const setDesktopContext = window.api?.setDesktopContext
+    if (!setDesktopContext) return
+    void setDesktopContext(context)
+      .then(() => {
+        if (disposed || pendingDesktopContext !== serialized) return
+        lastDesktopContext = serialized
+        pendingDesktopContext = ""
+        desktopContextRetryCount = 0
+        clearDesktopContextRetry()
+      })
+      .catch(() => {
+        if (disposed || pendingDesktopContext !== serialized || lastDesktopContext === serialized) return
+        if (desktopContextRetryCount >= desktopContextMaxRetries) {
+          pendingDesktopContext = ""
+          desktopContextRetryCount = 0
+          return
+        }
+        clearDesktopContextRetry()
+        desktopContextRetryCount += 1
+        const retryDelay = Math.min(4000, 250 * 2 ** (desktopContextRetryCount - 1))
+        desktopContextRetryTimer = window.setTimeout(() => {
+          desktopContextRetryTimer = undefined
+          if (disposed || pendingDesktopContext !== serialized || lastDesktopContext === serialized) return
+          syncDesktopContext(context, serialized)
+        }, retryDelay)
+      })
+  }
+
+  createEffect(() => {
+    if (!window.api?.setDesktopContext) return
+    if (isSessionRoute(location.pathname)) {
+      pendingDesktopContext = ""
+      desktopContextRetryCount = 0
+      clearDesktopContextRetry()
+      return
+    }
+    const context = buildDesktopContext({
+      route: `${location.pathname}${location.search}${location.hash}`,
+      locale: language.locale(),
+    })
+    const serialized = JSON.stringify(context)
+    if (serialized === lastDesktopContext || serialized === pendingDesktopContext) return
+    pendingDesktopContext = serialized
+    desktopContextRetryCount = 0
+    syncDesktopContext(context, serialized)
+  })
+
+  onCleanup(() => {
+    disposed = true
+    clearDesktopContextRetry()
+  })
+
+  return null
+}
+
+function isSessionRoute(pathname: string) {
+  return /^\/[^/]+\/session(?:\/[^/]+)?\/?$/.test(pathname)
 }
 
 export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
