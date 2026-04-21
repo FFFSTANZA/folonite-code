@@ -824,6 +824,42 @@ Run the derived command`,
   })
 })
 
+test("duplicate derived command names keep the first command", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      const singularDir = path.join(dir, ".opencode", "command")
+      const pluralDir = path.join(dir, ".opencode", "commands")
+      await fs.mkdir(singularDir, { recursive: true })
+      await fs.mkdir(pluralDir, { recursive: true })
+
+      await Filesystem.write(
+        path.join(singularDir, "dup.md"),
+        `---
+description: Singular command
+---
+Run the singular command`,
+      )
+      await Filesystem.write(
+        path.join(pluralDir, "dup.md"),
+        `---
+description: Plural command
+---
+Run the plural command`,
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await load()
+      expect(config.command?.["dup"]).toEqual({
+        description: "Singular command",
+        template: "Run the singular command",
+      })
+    },
+  })
+})
+
 test("migrates autoshare to share field", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

@@ -32,6 +32,7 @@ export type Info = Schema.Schema.Type<typeof Info>
 
 export async function load(dir: string) {
   const result: Record<string, Info> = {}
+  const sources: Record<string, string> = {}
   for (const item of await Glob.scan("{command,commands}/**/*.md", {
     cwd: dir,
     absolute: true,
@@ -57,7 +58,18 @@ export async function load(dir: string) {
     }
     const parsed = Info.zod.safeParse(config)
     if (parsed.success) {
+      if (config.name in result) {
+        await reportLoadError(
+          new NamedError.Unknown({
+            message: `Duplicate command name "${config.name}" in ${item}; already loaded from ${sources[config.name]}`,
+          }),
+          item,
+          undefined,
+        )
+        continue
+      }
       result[config.name] = parsed.data
+      sources[config.name] = item
       continue
     }
     await reportLoadError(new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error }), item, parsed.error)
