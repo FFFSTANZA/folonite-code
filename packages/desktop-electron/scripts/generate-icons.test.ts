@@ -1,15 +1,26 @@
 import { describe, expect, test } from "bun:test"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+import * as generateIcons from "./generate-icons"
 
 import {
   ANDROID_ICON_OUTPUTS,
+  ANDROID_ICON_BACKGROUND,
   ANDROID_XML_OUTPUTS,
-  ICNS_ICONSET_OUTPUTS,
+  ICNS_OUTPUTS,
   ICON_PNG_OUTPUTS,
   IOS_ICON_OUTPUTS,
   WINDOWS_TILE_OUTPUTS,
+  createAndroidXmlFiles,
+  createIcns,
   createIco,
+  createPngCache,
   getIconSource,
+  resolveIconChannel,
 } from "./generate-icons"
+
+const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 describe("icon generation manifest", () => {
   test("covers every icon file used by electron-builder resources", () => {
@@ -74,29 +85,83 @@ describe("icon generation manifest", () => {
       { path: "ios/AppIcon-512@2x.png", size: 1024 },
     ])
 
-    expect(ICNS_ICONSET_OUTPUTS).toEqual([
-      { path: "icon_16x16.png", size: 16 },
-      { path: "icon_16x16@2x.png", size: 32 },
-      { path: "icon_32x32.png", size: 32 },
-      { path: "icon_32x32@2x.png", size: 64 },
-      { path: "icon_128x128.png", size: 128 },
-      { path: "icon_128x128@2x.png", size: 256 },
-      { path: "icon_256x256.png", size: 256 },
-      { path: "icon_256x256@2x.png", size: 512 },
-      { path: "icon_512x512.png", size: 512 },
-      { path: "icon_512x512@2x.png", size: 1024 },
+    expect(ICNS_OUTPUTS).toEqual([
+      { type: "ic04", size: 16 },
+      { type: "ic11", size: 32 },
+      { type: "ic05", size: 32 },
+      { type: "ic12", size: 64 },
+      { type: "ic07", size: 128 },
+      { type: "ic13", size: 256 },
+      { type: "ic08", size: 256 },
+      { type: "ic14", size: 512 },
+      { type: "ic09", size: 512 },
+      { type: "ic10", size: 1024 },
     ])
 
     expect(ANDROID_XML_OUTPUTS).toEqual([
       "android/mipmap-anydpi-v26/ic_launcher.xml",
       "android/values/ic_launcher_background.xml",
     ])
+    expect(ANDROID_ICON_BACKGROUND).toBe("#FF7C3A")
   })
 
-  test("resolves every channel to the shared SVG source for now", () => {
-    expect(getIconSource("dev")).toBe("icons/source/icon.svg")
-    expect(getIconSource("beta")).toBe("icons/source/icon.svg")
-    expect(getIconSource("prod")).toBe("icons/source/icon.svg")
+  test("anchors source and output paths to the desktop package", () => {
+    const iconDest = (generateIcons as Record<string, unknown>).ICON_DEST
+
+    expect(getIconSource("dev")).toBe(path.join(PACKAGE_ROOT, "icons/source/icon.svg"))
+    expect(getIconSource("beta")).toBe(path.join(PACKAGE_ROOT, "icons/source/icon.svg"))
+    expect(getIconSource("prod")).toBe(path.join(PACKAGE_ROOT, "icons/source/icon.svg"))
+    expect(iconDest).toBe(path.join(PACKAGE_ROOT, "resources/icons"))
+  })
+
+  test("rejects invalid explicit channel arguments", () => {
+    expect(resolveIconChannel("dev")).toBe("dev")
+    expect(resolveIconChannel("beta")).toBe("beta")
+    expect(resolveIconChannel("prod")).toBe("prod")
+    expect(() => resolveIconChannel("staging")).toThrow("Invalid icon channel: staging")
+  })
+
+  test("uses the Android XML manifest as the writer source of truth", () => {
+    expect(createAndroidXmlFiles().map((file) => file.path)).toEqual(ANDROID_XML_OUTPUTS)
+  })
+})
+
+describe("createPngCache", () => {
+  test("renders each source and size only once", async () => {
+    const calls: string[] = []
+    const render = createPngCache(async (source, size) => {
+      calls.push(`${source}:${size}`)
+      return Buffer.from(`${source}:${size}`)
+    })
+
+    await expect(render("one.svg", 16)).resolves.toEqual(Buffer.from("one.svg:16"))
+    await expect(render("one.svg", 16)).resolves.toEqual(Buffer.from("one.svg:16"))
+    await expect(render("one.svg", 32)).resolves.toEqual(Buffer.from("one.svg:32"))
+    await expect(render("two.svg", 16)).resolves.toEqual(Buffer.from("two.svg:16"))
+
+    expect(calls).toEqual(["one.svg:16", "one.svg:32", "two.svg:16"])
+  })
+})
+
+describe("createIcns", () => {
+  test("creates a valid ICNS buffer from PNG payloads", () => {
+    const smallPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1])
+    const largePng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 2, 3])
+
+    const icns = createIcns([
+      { type: "ic04", png: smallPng },
+      { type: "ic10", png: largePng },
+    ])
+
+    expect(icns.toString("ascii", 0, 4)).toBe("icns")
+    expect(icns.readUInt32BE(4)).toBe(8 + 8 + smallPng.length + 8 + largePng.length)
+    expect(icns.toString("ascii", 8, 12)).toBe("ic04")
+    expect(icns.readUInt32BE(12)).toBe(8 + smallPng.length)
+    expect(icns.subarray(16, 16 + smallPng.length)).toEqual(smallPng)
+    const secondOffset = 16 + smallPng.length
+    expect(icns.toString("ascii", secondOffset, secondOffset + 4)).toBe("ic10")
+    expect(icns.readUInt32BE(secondOffset + 4)).toBe(8 + largePng.length)
+    expect(icns.subarray(secondOffset + 8)).toEqual(largePng)
   })
 })
 
