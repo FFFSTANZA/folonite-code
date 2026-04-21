@@ -48,7 +48,7 @@ import { AppFileSystem } from "../filesystem"
 import { Bus } from "../bus"
 import { Agent } from "../agent/agent"
 import { Skill } from "../skill"
-import { needsConfigDependencies } from "../config/dependency"
+import { needsConfigDependencies, usesConfigDependencies } from "../config/dependency"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
@@ -177,9 +177,15 @@ export namespace ToolRegistry {
             ])
             if (ids.length && ids.every((id) => disabled.has(id))) continue
             const spec = process.platform === "win32" ? match : pathToFileURL(match).href
-            if (!depsReady && (yield* Effect.promise(() => needsConfigDependencies(match, path.dirname(path.dirname(match)))))) {
+            const configDir = path.dirname(path.dirname(match))
+            const usesDeps = yield* Effect.promise(() => usesConfigDependencies(match))
+            if (!depsReady && usesDeps) {
               depsReady = true
+              const needsDeps = yield* Effect.promise(() => needsConfigDependencies(match, configDir))
               yield* config.waitForDependencies()
+              if (needsDeps) {
+                yield* Effect.tryPromise(() => Config.installDependencies(configDir)).pipe(Effect.orDie)
+              }
             }
             const mod = yield* Effect.promise(() => import(spec))
             for (const [id, def] of Object.entries<ToolDefinition>(mod)) {
