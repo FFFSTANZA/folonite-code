@@ -51,6 +51,14 @@ import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
 import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, spawnLocalServer } from "./server"
 import { createLoadingWindow, createMainWindow, setBackgroundColor, setDockIcon } from "./windows"
+import {
+  registerWindowLifecycle,
+  selectCommandWindow,
+  selectNextMainWindow,
+  shouldOpenWindowForExternalEvent,
+  shouldQueueDeepLinks,
+  takeQueuedDeepLinksForReadyWindow,
+} from "./window-lifecycle"
 import type { Server } from "virtual:opencode-server"
 
 const initEmitter = new EventEmitter()
@@ -59,6 +67,7 @@ let initStep: InitStep = { phase: "server_waiting" }
 let mainWindow: BrowserWindow | null = null
 let server: Server.Listener | null = null
 const loadingComplete = defer<void>()
+const deepLinkReadyWindows = new WeakSet<BrowserWindow>()
 
 const pendingDeepLinks: string[] = []
 
@@ -89,13 +98,25 @@ function setupApp() {
       logger.log("deep link received via second-instance", { urls })
       emitDeepLinks(urls)
     }
-    focusMainWindow()
+    focusMainWindow({ openIfMissing: true })
   })
 
   app.on("open-url", (event: Event, url: string) => {
     event.preventDefault()
     logger.log("deep link received via open-url", { url })
     emitDeepLinks([url])
+    focusMainWindow({ openIfMissing: true })
+  })
+
+  registerWindowLifecycle({
+    onWindowAllClosed: (listener) => app.on("window-all-closed", listener),
+    onActivate: (listener) => app.on("activate", listener),
+    quit: () => app.quit(),
+    getWindowCount: () => BrowserWindow.getAllWindows().length,
+    openWindow: () => {
+      if (isInitialized()) openMainWindow()
+    },
+    platform: process.platform,
   })
 
   app.on("before-quit", () => {
@@ -123,14 +144,52 @@ function setupApp() {
 
 function emitDeepLinks(urls: string[]) {
   if (urls.length === 0) return
-  pendingDeepLinks.push(...urls)
-  if (mainWindow) sendDeepLinks(mainWindow, urls)
+  const windowReady = mainWindow ? deepLinkReadyWindows.has(mainWindow) : false
+  if (shouldQueueDeepLinks(Boolean(mainWindow), windowReady)) pendingDeepLinks.push(...urls)
+  if (mainWindow && windowReady) sendDeepLinks(mainWindow, urls)
 }
 
-function focusMainWindow() {
+function flushPendingDeepLinksForReadyWindow(win: BrowserWindow | null) {
+  if (!win || !deepLinkReadyWindows.has(win)) return
+  const urls = takeQueuedDeepLinksForReadyWindow(pendingDeepLinks, true)
+  if (urls.length) sendDeepLinks(win, urls)
+}
+
+function reportDeepLinkReady(win: BrowserWindow | null) {
+  if (!win) return
+  deepLinkReadyWindows.add(win)
+  if (win !== mainWindow) return
+  flushPendingDeepLinksForReadyWindow(win)
+}
+
+function isInitialized() {
+  return initStep.phase === "done"
+}
+
+function focusMainWindow(options: { openIfMissing?: boolean } = {}) {
+  if (!mainWindow && options.openIfMissing && shouldOpenWindowForExternalEvent(false, isInitialized())) openMainWindow()
   if (!mainWindow) return
   mainWindow.show()
   mainWindow.focus()
+}
+
+function mainWindowGlobals() {
+  return {
+    updaterEnabled: UPDATER_ENABLED,
+    deepLinks: pendingDeepLinks,
+  }
+}
+
+function openMainWindow() {
+  const win = createMainWindow(mainWindowGlobals())
+  mainWindow = win
+  win.on("closed", () => {
+    if (mainWindow !== win) return
+    mainWindow = selectNextMainWindow(win, BrowserWindow.getAllWindows())
+    flushPendingDeepLinksForReadyWindow(mainWindow)
+  })
+  wireMenu()
+  return win
 }
 
 function setInitStep(step: InitStep) {
@@ -186,10 +245,7 @@ async function initialize() {
     logger.log("loading task finished")
   })()
 
-  const globals = {
-    updaterEnabled: UPDATER_ENABLED,
-    deepLinks: pendingDeepLinks,
-  }
+  const globals = mainWindowGlobals()
 
   if (needsMigration) {
     const show = await Promise.race([loadingTask.then(() => false), delay(1_000).then(() => true)])
@@ -206,25 +262,29 @@ async function initialize() {
     await loadingComplete.promise
   }
 
-  mainWindow = createMainWindow(globals)
-  wireMenu()
+  openMainWindow()
 
   overlay?.close()
 }
 
 function wireMenu() {
   if (!mainWindow) return
+  const commandWindow = () => selectCommandWindow(BrowserWindow.getFocusedWindow(), mainWindow)
   createMenu({
-    trigger: (id) => mainWindow && sendMenuCommand(mainWindow, id),
+    trigger: (id) => {
+      const win = commandWindow()
+      if (win) sendMenuCommand(win, id)
+    },
     checkForUpdates: () => {
       void checkForUpdates(true)
     },
-    reload: () => mainWindow?.reload(),
+    reload: () => commandWindow()?.reload(),
     relaunch: () => {
       killSidecar()
       app.relaunch()
       app.exit(0)
     },
+    newWindow: () => openMainWindow(),
   })
 }
 
@@ -258,6 +318,7 @@ registerIpcHandlers({
   checkUpdate: async () => checkUpdate(),
   installUpdate: async () => installUpdate(),
   setBackgroundColor: (color) => setBackgroundColor(color),
+  reportDeepLinkReady: (win) => reportDeepLinkReady(win),
   reportCiSmokeReady: () => reportCiSmokeReady(),
 })
 
