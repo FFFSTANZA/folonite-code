@@ -659,7 +659,7 @@ jobs:
   cleanup-snapshot-tag:
     needs:
       - build-electron
-    if: ${{ inputs.phase == 'finalize' && needs.build-electron.result == 'success' }}
+    if: ${{ always() && inputs.phase == 'finalize' && needs.build-electron.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
