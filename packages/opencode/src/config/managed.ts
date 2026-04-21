@@ -4,7 +4,6 @@ import { existsSync } from "fs"
 import os from "os"
 import path from "path"
 import { Log, Process } from "../util"
-import { warn } from "console"
 
 const log = Log.create({ service: "config" })
 
@@ -36,7 +35,13 @@ export function managedConfigDir() {
 }
 
 export function parseManagedPlist(json: string): string {
-  const raw = JSON.parse(json)
+  let raw: Record<string, unknown>
+  try {
+    raw = JSON.parse(json)
+  } catch (error) {
+    log.warn("failed to parse managed preferences JSON", { error })
+    return "{}"
+  }
   for (const key of Object.keys(raw)) {
     if (PLIST_META.has(key)) delete raw[key]
   }

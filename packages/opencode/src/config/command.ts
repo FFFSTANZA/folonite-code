@@ -2,7 +2,7 @@ export * as ConfigCommand from "./command"
 
 import { Log } from "../util"
 import { Schema } from "effect"
-import { NamedError } from "@opencode-ai/shared/util/error"
+import { NamedError } from "@opencode-ai/util/error"
 import { Glob } from "@opencode-ai/shared/util/glob"
 import { Bus } from "@/bus"
 import { zod } from "@/util/effect-zod"
@@ -13,6 +13,12 @@ import * as ConfigMarkdown from "./markdown"
 import { ConfigModelID } from "./model-id"
 
 const log = Log.create({ service: "config" })
+
+async function reportLoadError(error: { toObject(): any }, item: string, cause: unknown) {
+  const { Session } = await import("@/session")
+  void Bus.publish(Session.Event.Error, { error: error.toObject() })
+  log.error("failed to load command", { command: item, err: cause })
+}
 
 export const Info = Schema.Struct({
   template: Schema.String,
@@ -36,9 +42,7 @@ export async function load(dir: string) {
       const message = ConfigMarkdown.FrontmatterError.isInstance(err)
         ? err.data.message
         : `Failed to parse command ${item}`
-      const { Session } = await import("@/session")
-      void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message }).toObject() })
-      log.error("failed to load command", { command: item, err })
+      await reportLoadError(new NamedError.Unknown({ message }), item, err)
       return undefined
     })
     if (!md) continue
@@ -56,7 +60,7 @@ export async function load(dir: string) {
       result[config.name] = parsed.data
       continue
     }
-    throw new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error })
+    await reportLoadError(new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error }), item, parsed.error)
   }
   return result
 }

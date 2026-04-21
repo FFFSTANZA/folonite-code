@@ -4,6 +4,8 @@ import { NodeFileSystem, NodePath } from "@effect/platform-node"
 import { Config, ConfigManaged } from "../../src/config"
 import { ConfigParse } from "../../src/config/parse"
 import { ConsoleState } from "../../src/config/console-state"
+import { configEntryNameFromPath } from "../../src/config/entry-name"
+import { ConfigModelID } from "../../src/config/model-id"
 
 import { Instance } from "../../src/project/instance"
 import { Auth } from "../../src/auth"
@@ -136,6 +138,12 @@ test("console state keeps switchableOrgCount as a nonnegative integer", () => {
   expect(
     ConsoleState.zod.safeParse({
       consoleManagedProviders: [],
+      switchableOrgCount: 0,
+    }).success,
+  ).toBe(true)
+  expect(
+    ConsoleState.zod.safeParse({
+      consoleManagedProviders: [],
       switchableOrgCount: 1.5,
     }).success,
   ).toBe(false)
@@ -165,6 +173,25 @@ test("loads JSON config file", async () => {
       expect(config.username).toBe("testuser")
     },
   })
+})
+
+test("config model IDs require provider and model parts", () => {
+  expect(ConfigModelID.zod.safeParse("test/model").success).toBe(true)
+  expect(ConfigModelID.zod.safeParse("test/model/with/slash").success).toBe(true)
+  expect(ConfigModelID.zod.safeParse("").success).toBe(false)
+  expect(ConfigModelID.zod.safeParse("model-only").success).toBe(false)
+  expect(ConfigModelID.zod.safeParse("/model").success).toBe(false)
+  expect(ConfigModelID.zod.safeParse("provider/").success).toBe(false)
+  expect(ConfigModelID.zod.safeParse("provider//model").success).toBe(false)
+})
+
+test("config entry names tolerate unnormalized roots", () => {
+  expect(configEntryNameFromPath("C:\\repo\\.opencode\\commands\\nested\\run.md", ["C:\\repo\\.opencode\\commands"])).toBe(
+    "nested/run",
+  )
+  expect(configEntryNameFromPath("/repo/.opencode/commands/nested/run.md", ["/repo/.opencode/commands"])).toBe(
+    "nested/run",
+  )
 })
 
 test("loads PawWork project config aliases", async () => {
@@ -422,14 +449,14 @@ test("jsonc overrides json in the same directory", async () => {
         dir,
         {
           $schema: "https://opencode.ai/config.json",
-          model: "base",
+          model: "base/model",
           username: "base",
         },
         "opencode.jsonc",
       )
       await writeConfig(dir, {
         $schema: "https://opencode.ai/config.json",
-        model: "override",
+        model: "override/model",
       })
     },
   })
@@ -437,7 +464,7 @@ test("jsonc overrides json in the same directory", async () => {
     directory: tmp.path,
     fn: async () => {
       const config = await load()
-      expect(config.model).toBe("base")
+      expect(config.model).toBe("base/model")
       expect(config.username).toBe("base")
     },
   })
@@ -729,6 +756,41 @@ test("handles command configuration", async () => {
         description: "test command",
         agent: "test_agent",
       })
+    },
+  })
+})
+
+test("continues loading commands when one command file is invalid", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      const commandsDir = path.join(dir, ".opencode", "commands")
+      await fs.mkdir(commandsDir, { recursive: true })
+
+      await Filesystem.write(
+        path.join(commandsDir, "valid.md"),
+        `---
+description: Valid command
+---
+Run the valid command`,
+      )
+      await Filesystem.write(
+        path.join(commandsDir, "invalid.md"),
+        `---
+subtask: nope
+---
+Run the invalid command`,
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await load()
+      expect(config.command?.["valid"]).toMatchObject({
+        description: "Valid command",
+        template: "Run the valid command",
+      })
+      expect(config.command?.["invalid"]).toBeUndefined()
     },
   })
 })
@@ -1619,6 +1681,33 @@ test("managed settings override project settings", async () => {
   })
 })
 
+test("managed settings honor PawWork config aliases", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await writeConfig(dir, {
+        $schema: "https://opencode.ai/config.json",
+        model: "user/model",
+      })
+    },
+  })
+
+  await writeManagedSettings(
+    {
+      $schema: "https://opencode.ai/config.json",
+      model: "managed/pawwork",
+    },
+    "pawwork.json",
+  )
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await load()
+      expect(config.model).toBe("managed/pawwork")
+    },
+  })
+})
+
 test("missing managed settings file is not an error", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
@@ -2221,6 +2310,19 @@ describe("resolvePluginSpec", () => {
     const hit = await ConfigPlugin.resolvePluginSpec("./plugin", file)
     expect(ConfigPlugin.pluginSpecifier(hit)).toBe(pathToFileURL(path.join(tmp.path, "plugin", "index.ts")).href)
   })
+
+  test("rejects plugin directories without package.json or index file", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await fs.mkdir(path.join(dir, "plugin"), { recursive: true })
+      },
+    })
+
+    const file = path.join(tmp.path, "opencode.json")
+    await expect(ConfigPlugin.resolvePluginSpec("./plugin", file)).rejects.toThrow(
+      "is missing package.json or index file",
+    )
+  })
 })
 
 describe("deduplicatePluginOrigins", () => {
@@ -2592,6 +2694,10 @@ test("parseManagedPlist strips MDM metadata keys", async () => {
   expect((config as any).PayloadUUID).toBeUndefined()
   expect((config as any).PayloadType).toBeUndefined()
   expect((config as any)._manualProfile).toBeUndefined()
+})
+
+test("parseManagedPlist falls back to empty config for malformed JSON", () => {
+  expect(ConfigManaged.parseManagedPlist("{")).toBe("{}")
 })
 
 test("parseManagedPlist parses server settings", async () => {

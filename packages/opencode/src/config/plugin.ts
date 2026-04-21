@@ -62,7 +62,7 @@ export async function resolvePluginSpec(plugin: Spec, configFilepath: string): P
     return pathToFileURL(path.resolve(base, spec)).href
   })()
 
-  const resolved = await resolvePathPluginTarget(file).catch(() => file)
+  const resolved = await resolvePathPluginTarget(file)
 
   if (Array.isArray(plugin)) return [resolved, plugin[1]]
   return resolved

@@ -1,4 +1,4 @@
-import { NamedError } from "@opencode-ai/shared/util/error"
+import { NamedError } from "@opencode-ai/util/error"
 import matter from "gray-matter"
 import { z } from "zod"
 export * as ConfigMarkdown from "./markdown"

@@ -2,10 +2,16 @@ import path from "path"
 
 function sliceAfterMatch(filePath: string, searchRoots: string[]) {
   const normalizedPath = filePath.replaceAll("\\", "/")
-  for (const searchRoot of searchRoots) {
-    const index = normalizedPath.indexOf(searchRoot)
+  const normalizedRoots = searchRoots
+    .map((root) => root.replaceAll("\\", "/").replace(/\/+$/, ""))
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+
+  for (const searchRoot of normalizedRoots) {
+    const needle = `${searchRoot}/`
+    const index = normalizedPath.indexOf(needle)
     if (index === -1) continue
-    return normalizedPath.slice(index + searchRoot.length)
+    return normalizedPath.slice(index + needle.length).replace(/^\/+/, "")
   }
 }
 

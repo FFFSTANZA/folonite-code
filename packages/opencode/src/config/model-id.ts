@@ -7,7 +7,7 @@ import { withStatics } from "@/util/schema"
 // External model schema references make the OpenAPI client generator resolve
 // these fields to the full Model object, which is not the config file shape.
 export const ConfigModelID = Schema.String.annotate({
-  [ZodOverride]: z.string(),
+  [ZodOverride]: z.string().regex(/^[^/]+\/[^/].*$/, "Expected provider/model"),
 }).pipe(withStatics((s) => ({ zod: zod(s) })))
 
 export type ConfigModelID = Schema.Schema.Type<typeof ConfigModelID>
