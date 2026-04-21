@@ -6,7 +6,7 @@ const repoRoot = path.join(import.meta.dir, "../../../..")
 const workflowPath = path.join(repoRoot, ".github", "workflows", "build.yml")
 
 describe("release workflow", () => {
-  test("pins upgraded checkout and upload-artifact refs in the release workflow", () => {
+  test("validates the release workflow configuration", () => {
     const workflow = readWorkflow(workflowPath)
     const parsed = parseWorkflow(workflowPath)
     const buildElectron = parsed.jobs?.["build-electron"]
@@ -30,6 +30,7 @@ describe("release workflow", () => {
     })
     expect(parsed.on?.workflow_dispatch).toBeDefined()
     expect(buildElectron?.["runs-on"]).toBe("${{ matrix.host }}")
+    expect(cleanupSnapshotTag?.needs).toContain("build-electron")
     expect(cleanupSnapshotTag?.if).toBe(
       "${{ always() && inputs.phase == 'finalize' && needs.build-electron.result == 'success' }}",
     )
