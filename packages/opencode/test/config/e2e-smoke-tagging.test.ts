@@ -20,13 +20,13 @@ const expectedSmokeTests = [
   "packages/app/e2e/terminal/terminal-init.spec.ts:@smoke terminal mounts and can create a second tab",
 ]
 
-function normalizeSmokeInventoryPath(relative: string) {
-  return relative.replaceAll(path.win32.sep, path.posix.sep)
+function normalizeSmokeInventoryPath(relative: string, separator = path.sep) {
+  return relative.replaceAll(separator, path.posix.sep)
 }
 
 describe("e2e smoke tagging", () => {
   test("normalizes Windows smoke inventory paths", () => {
-    expect(normalizeSmokeInventoryPath("packages\\app\\e2e\\settings\\settings.spec.ts")).toBe(
+    expect(normalizeSmokeInventoryPath("packages\\app\\e2e\\settings\\settings.spec.ts", path.win32.sep)).toBe(
       "packages/app/e2e/settings/settings.spec.ts",
     )
   })
