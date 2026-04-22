@@ -19,7 +19,7 @@ const windowsUnitJobName = "unit-windows"
 
 // Suffixes drive readable job and artifact names; commands use package.json names verbatim.
 // `opencode` is intentionally unscoped because that is its actual package name.
-const unitPackages = [
+const linuxUnitPackages = [
   {
     suffix: "app",
     command: "bun turbo test:ci --filter=@opencode-ai/app",
@@ -37,14 +37,57 @@ const unitPackages = [
   },
 ] as const
 
-const linuxUnitJobs = unitPackages.map((pkg) => ({
+const windowsOpencodeShards = [
+  // Intentional dual source with ci.yml: this pins the exact shard command
+  // contract while the coverage test expands these paths to catch workflow
+  // drift and missing opencode tests. Update ci.yml and this list together.
+  {
+    suffix: "opencode-session",
+    usesTurbo: false,
+    command:
+      "cd packages/opencode && bun test --timeout 30000 --reporter=junit --reporter-outfile=.artifacts/unit/junit-windows-session.xml test/session test/plugin test/permission test/util test/skill test/index-runtime-namespace.test.ts test/npm.test.ts test/permission-task.test.ts",
+    reportPath: "packages/opencode/.artifacts/unit/junit-windows-session.xml",
+  },
+  {
+    suffix: "opencode-config-project",
+    usesTurbo: false,
+    command:
+      "cd packages/opencode && bun test --timeout 30000 --reporter=junit --reporter-outfile=.artifacts/unit/junit-windows-config-project.xml test/config test/project test/file test/github",
+    reportPath: "packages/opencode/.artifacts/unit/junit-windows-config-project.xml",
+  },
+  {
+    suffix: "opencode-server-tools",
+    usesTurbo: false,
+    command:
+      "cd packages/opencode && bun test --timeout 30000 --reporter=junit --reporter-outfile=.artifacts/unit/junit-windows-server-tools.xml test/server test/snapshot test/tool test/mcp test/question test/effect test/agent test/git test/storage test/provider test/pty test/share test/script test/memory test/lsp test/fixture test/acp test/bus test/cli test/global test/format test/account test/sync test/filesystem test/patch test/shell test/control-plane test/ide test/installation test/auth",
+    reportPath: "packages/opencode/.artifacts/unit/junit-windows-server-tools.xml",
+  },
+] as const
+
+const windowsUnitPackages = [
+  {
+    suffix: "app",
+    usesTurbo: true,
+    command: "bun turbo test:ci --filter=@opencode-ai/app",
+    reportPath: "packages/app/.artifacts/unit/junit.xml",
+  },
+  ...windowsOpencodeShards,
+  {
+    suffix: "desktop",
+    usesTurbo: true,
+    command: "bun turbo test:ci --filter=@opencode-ai/desktop-electron",
+    reportPath: "packages/desktop-electron/.artifacts/unit/junit.xml",
+  },
+] as const
+
+const linuxUnitJobs = linuxUnitPackages.map((pkg) => ({
   ...pkg,
   jobName: `unit-${pkg.suffix}`,
   checkName: `unit results (${pkg.suffix})`,
   artifactName: `unit-${pkg.suffix}-${runAttempt}`,
 }))
 
-const windowsUnitJobs = unitPackages.map((pkg) => ({
+const windowsUnitJobs = windowsUnitPackages.map((pkg) => ({
   ...pkg,
   jobName: `unit-windows-${pkg.suffix}`,
   artifactName: `unit-windows-${pkg.suffix}-${runAttempt}`,
@@ -148,10 +191,9 @@ describe("ci workflow", () => {
     }
   })
 
-  test("splits Windows unit signals by package without publishing advisory check runs", () => {
+  test("keeps Windows unit package and shard signals advisory", () => {
     const parsed = parseWorkflow(workflowPath)
     const job = parsed.jobs?.[windowsUnitJobName]
-    const matrixIncludes = job?.strategy?.matrix?.include ?? []
 
     expect(job?.name).toBe("unit-windows-${{ matrix.package }}")
     expect(job?.needs).toBe("changes")
@@ -162,6 +204,10 @@ describe("ci workflow", () => {
     expect(job?.strategy?.["fail-fast"]).toBe(false)
     expect(job?.permissions).toEqual({ contents: "read" })
     expect(job?.defaults?.run?.shell).toBe("bash")
+    expect(stepByName(windowsUnitJobName, "Prepare unit artifact directory")?.run).toBe(
+      'mkdir -p "$(dirname "${{ matrix.report_path }}")"',
+    )
+    expect(stepByName(windowsUnitJobName, "Prepare unit artifact directory")?.if).toBe("matrix.uses_turbo == false")
     expect(stepByName(windowsUnitJobName, "unit")?.id).toBe("unit")
     expect(stepByName(windowsUnitJobName, "unit")?.["continue-on-error"]).toBe(true)
     expect(stepByName(windowsUnitJobName, "unit")?.run).toContain("${{ matrix.command }}")
@@ -175,7 +221,8 @@ describe("ci workflow", () => {
     )
     expect(stepByName(windowsUnitJobName, "Upload unit artifacts")?.with?.path).toBe("${{ matrix.report_path }}")
 
-    const turboCacheStep = steps(windowsUnitJobName).filter((step) => step.uses?.startsWith("actions/cache@"))[1]
+    const turboCacheStep = steps(windowsUnitJobName).find((step) => step.with?.path === ".turbo/cache")
+    expect(turboCacheStep?.if).toBe("matrix.uses_turbo")
     expect(turboCacheStep?.with?.key).toBe(
       "turbo-${{ runner.os }}-unit-windows-${{ matrix.package }}-${{ hashFiles('turbo.json', '**/package.json', 'bun.lock') }}-${{ github.sha }}",
     )
@@ -183,16 +230,23 @@ describe("ci workflow", () => {
       "turbo-${{ runner.os }}-unit-windows-${{ matrix.package }}-${{ hashFiles('turbo.json', '**/package.json', 'bun.lock') }}-\n" +
         "turbo-${{ runner.os }}-unit-windows-${{ matrix.package }}-\n",
     )
+  })
+
+  test("defines Windows unit packages and opencode shards", () => {
+    const parsed = parseWorkflow(workflowPath)
+    const job = parsed.jobs?.[windowsUnitJobName]
+    const matrixIncludes = job?.strategy?.matrix?.include ?? []
 
     expect(matrixIncludes).toEqual(
-      windowsUnitJobs.map(({ jobName, command, reportPath }) => ({
+      windowsUnitJobs.map(({ jobName, usesTurbo, command, reportPath }) => ({
         package: jobName.replace("unit-windows-", ""),
+        uses_turbo: usesTurbo,
         command,
         report_path: reportPath,
       })),
     )
 
-    for (const { jobName, command, reportPath, artifactName } of windowsUnitJobs) {
+    for (const { jobName, artifactName } of windowsUnitJobs) {
       expect(parsed.jobs?.[jobName]).toBeUndefined()
       expect(artifactName).toBe(`unit-windows-${jobName.replace("unit-windows-", "")}-${runAttempt}`)
     }
@@ -210,6 +264,9 @@ describe("ci workflow", () => {
     expect(needs).not.toContain("unit-windows-app")
     expect(needs).not.toContain("unit-windows-desktop")
     expect(needs).not.toContain("unit-windows-opencode")
+    expect(needs).not.toContain("unit-windows-opencode-session")
+    expect(needs).not.toContain("unit-windows-opencode-config-project")
+    expect(needs).not.toContain("unit-windows-opencode-server-tools")
     expect(validate?.env?.DOCS_ONLY).toBe("${{ needs.changes.outputs.docs_only }}")
     expect(validate?.env?.TYPECHECK_RESULT).toBe("${{ needs.typecheck.result }}")
     expect(validate?.env?.UNIT_APP_RESULT).toBe("${{ needs['unit-app'].result }}")
