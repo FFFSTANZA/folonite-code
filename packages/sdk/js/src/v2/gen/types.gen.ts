@@ -3008,9 +3008,9 @@ export type ExperimentalSessionListData = {
      */
     start?: number
     /**
-     * Return sessions updated before this timestamp (milliseconds since epoch)
+     * Cursor for loading the next page
      */
-    cursor?: number
+    cursor?: number | string
     /**
      * Filter sessions by title (case-insensitive)
      */
@@ -3023,6 +3023,10 @@ export type ExperimentalSessionListData = {
      * Include archived sessions (default false)
      */
     archived?: boolean
+    /**
+     * Sort sessions by last update or creation time
+     */
+    sort?: "updated" | "created"
   }
   url: "/experimental/session"
 }
@@ -3083,6 +3087,10 @@ export type SessionListData = {
      * Maximum number of sessions to return
      */
     limit?: number
+    /**
+     * Sort sessions by last update or creation time
+     */
+    sort?: "updated" | "created"
   }
   url: "/session"
 }
