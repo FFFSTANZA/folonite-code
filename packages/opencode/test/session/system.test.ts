@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { readdir, readFile } from "fs/promises"
 import path from "path"
 import { Effect } from "effect"
 import { Agent } from "../../src/agent/agent"
@@ -52,6 +53,28 @@ describe("session.system", () => {
     expect(prompt).not.toContain("anomalyco/opencode")
     expect(prompt).not.toContain("Get help with using opencode")
     expect(prompt).not.toContain("To give feedback")
+  })
+
+  test("provider prompt path has no model-family behavior routing", async () => {
+    const source = await readFile(path.resolve(import.meta.dir, "../../src/session/system.ts"), "utf8")
+
+    expect(source).not.toContain("model.api.id.includes")
+    expect(source).not.toContain("toLowerCase().includes")
+    expect(source).not.toContain("PROMPT_ANTHROPIC")
+    expect(source).not.toContain("PROMPT_BEAST")
+    expect(source).not.toContain("PROMPT_CODEX")
+    expect(source).not.toContain("PROMPT_DEFAULT")
+    expect(source).not.toContain("PROMPT_GEMINI")
+    expect(source).not.toContain("PROMPT_GPT")
+    expect(source).not.toContain("PROMPT_KIMI")
+    expect(source).not.toContain("PROMPT_TRINITY")
+  })
+
+  test("session prompt files have an explicit keep inventory", async () => {
+    const promptDir = path.resolve(import.meta.dir, "../../src/session/prompt")
+    const files = (await readdir(promptDir)).sort()
+
+    expect(files).toEqual(["build-switch.txt", "max-steps.txt", "pawwork.txt", "plan.txt"])
   })
 
   test("environment includes user locale only when provided", async () => {
