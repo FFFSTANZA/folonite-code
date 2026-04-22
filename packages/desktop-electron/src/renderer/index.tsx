@@ -32,6 +32,14 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 }
 
 void initI18n()
+  .then((locale) =>
+    window.api.initializeDesktopContext(locale).catch((error) => {
+      console.debug("[desktop] initializeDesktopContext failed", error)
+    }),
+  )
+  .catch((error) => {
+    console.debug("[desktop] initI18n failed", error)
+  })
 
 const deepLinkEvent = "opencode:deep-link"
 const emitDeepLinks = (urls: string[]) => {
@@ -218,7 +226,7 @@ const createPlatform = (): Platform => {
     storage,
 
     checkUpdate: async () => {
-      if (!UPDATER_ENABLED()) return { updateAvailable: false }
+      if (!UPDATER_ENABLED()) return { updateAvailable: false, status: "disabled" }
       return window.api.checkUpdate()
     },
 

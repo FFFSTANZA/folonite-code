@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto"
 import { EventEmitter } from "node:events"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { createServer } from "node:net"
-import { homedir } from "node:os"
+import os, { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import type { Event } from "electron"
-import { app, BrowserWindow, dialog } from "electron"
+import { app, BrowserWindow, clipboard, dialog, shell } from "electron"
 import pkg from "electron-updater"
 
 import contextMenu from "electron-context-menu"
@@ -42,15 +42,22 @@ app.setPath("userData", join(userDataRoot, app.isPackaged ? APP_IDS[CHANNEL] : "
 const CI_SMOKE_READY_FILE = join(app.getPath("userData"), "ci-smoke-ready.json")
 const { autoUpdater } = pkg
 
-import type { InitStep, ServerReadyData, SqliteMigrationProgress, WslConfig } from "../preload/types"
+import type { DesktopContext, InitStep, ServerReadyData, SqliteMigrationProgress, WslConfig } from "../preload/types"
 import { checkAppExists, resolveAppPath, wslPath } from "./apps"
-import { CHANNEL, UPDATER_ENABLED } from "./constants"
+import { CHANNEL, FEEDBACK_FORM_URL, UPDATER_ENABLED } from "./constants"
+import { createDesktopContextStore } from "./desktop-context-store"
+import { errorMessage } from "./error"
+import { createFeedbackHandler, feedbackDialogLabels } from "./feedback"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand, sendSqliteMigrationProgress } from "./ipc"
-import { initLogging } from "./logging"
+import { filePath, initLogging, tail } from "./logging"
 import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
+import { type MenuLocale } from "./menu-labels"
+import { readStoredMenuLocale, writeStoredMenuLocale } from "./menu-i18n"
 import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, spawnLocalServer } from "./server"
 import { PAWWORK_RUNTIME } from "./runtime-namespace"
+import { createUpdaterController } from "./updater"
+import { updaterDialogLabels } from "./updater-dialog-labels"
 import { createLoadingWindow, createMainWindow, setBackgroundColor, setDockIcon } from "./windows"
 import {
   registerWindowLifecycle,
@@ -69,11 +76,133 @@ let mainWindow: BrowserWindow | null = null
 let server: Server.Listener | null = null
 const loadingComplete = defer<void>()
 const deepLinkReadyWindows = new WeakSet<BrowserWindow>()
+let menuLocale: MenuLocale = readStoredMenuLocale(app.getLocale())
+const defaultDesktopContext = (): DesktopContext => ({
+  directory: null,
+  sessionID: null,
+  route: "/",
+  locale: menuLocale,
+})
+const desktopContexts = createDesktopContextStore(defaultDesktopContext)
+const contextWindowCleanup = new Set<number>()
 
 const pendingDeepLinks: string[] = []
 
 const serverReady = defer<ServerReadyData>()
 const logger = initLogging()
+const updater = createUpdaterController({
+  enabled: UPDATER_ENABLED,
+  currentVersion: () => app.getVersion(),
+  checkForUpdates: () => autoUpdater.checkForUpdates(),
+  downloadUpdate: () => autoUpdater.downloadUpdate(),
+  quitAndInstall: () => {
+    killSidecar()
+    autoUpdater.quitAndInstall()
+  },
+  log: (message, data) => logger.log(message, data),
+  error: (message, error) => logger.error(message, error),
+})
+
+function diagnostics(context = currentDesktopContext()) {
+  return {
+    appVersion: app.getVersion(),
+    channel: CHANNEL,
+    packaged: app.isPackaged,
+    updaterEnabled: UPDATER_ENABLED,
+    platform: process.platform,
+    osVersion: `${os.type()} ${os.release()}`,
+    arch: process.arch,
+    electronVersion: process.versions.electron,
+    locale: context.locale,
+    route: context.route,
+    directory: context.directory,
+    sessionID: context.sessionID,
+    logPath: filePath(),
+  }
+}
+
+async function sessionExport(context = currentDesktopContext()) {
+  if (!context.sessionID) return { status: "none" as const }
+  const ready = await serverReady.promise
+  const sessionID = encodeURIComponent(context.sessionID)
+  const url = new URL(`/session/${sessionID}/message`, ready.url)
+  const headers: Record<string, string> = {}
+  if (ready.username || ready.password) {
+    headers.authorization = `Basic ${Buffer.from(`${ready.username ?? "opencode"}:${ready.password ?? ""}`).toString("base64")}`
+  }
+  const controller = new AbortController()
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  let res: Response
+  try {
+    const timeoutPromise = new Promise<Response>((_, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort()
+        reject(new Error("session export timed out"))
+      }, 10_000)
+    })
+    res = await Promise.race([fetch(url, { headers, signal: controller.signal }), timeoutPromise])
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout)
+  }
+  if (!res.ok) throw new Error(`session export failed: ${res.status}`)
+  return {
+    status: "ok" as const,
+    info: context,
+    messages: (await res.json()) as unknown[],
+  }
+}
+
+function currentDesktopContext() {
+  return desktopContexts.current(BrowserWindow.getFocusedWindow()?.id)
+}
+
+function normalizeDesktopContext(context: unknown): DesktopContext {
+  const value = context && typeof context === "object" ? (context as Record<string, unknown>) : {}
+  return {
+    directory: typeof value.directory === "string" ? value.directory : null,
+    sessionID: typeof value.sessionID === "string" ? value.sessionID : null,
+    route: typeof value.route === "string" && value.route.length > 0 ? value.route : "/",
+    locale: value.locale === "zh" ? "zh" : "en",
+  }
+}
+
+function feedbackContext(context: unknown): DesktopContext {
+  return context === undefined ? currentDesktopContext() : normalizeDesktopContext(context)
+}
+
+const reportProblem = createFeedbackHandler({
+  feedbackUrl: FEEDBACK_FORM_URL,
+  context: currentDesktopContext,
+  confirm: async (context) => {
+    const labels = feedbackDialogLabels(context === undefined ? menuLocale : feedbackContext(context).locale)
+    const response = await dialog.showMessageBox({
+      type: "warning",
+      title: labels.title,
+      message: labels.message,
+      buttons: [labels.confirm, labels.cancel],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    return response.response === 0
+  },
+  copy: (value) => clipboard.writeText(value),
+  openExternal: (url) => {
+    return shell.openExternal(url).then(() => undefined)
+  },
+  diagnostics: (context) => diagnostics(feedbackContext(context)),
+  logTail: tail,
+  sessionExport: (context) => sessionExport(feedbackContext(context)),
+  onError: async (error) => {
+    logger.error("problem report failed", error)
+    const labels = feedbackDialogLabels(currentDesktopContext().locale)
+    await dialog.showMessageBox({
+      type: "error",
+      title: labels.failedTitle,
+      message: labels.failedMessage,
+      detail: errorMessage(error),
+    })
+  },
+})
 
 logger.log("app starting", {
   version: app.getVersion(),
@@ -184,10 +313,12 @@ function mainWindowGlobals() {
 function openMainWindow() {
   const win = createMainWindow(mainWindowGlobals())
   mainWindow = win
+  win.on("focus", () => syncMenuLocaleForWindow(win))
   win.on("closed", () => {
     if (mainWindow !== win) return
     mainWindow = selectNextMainWindow(win, BrowserWindow.getAllWindows())
     flushPendingDeepLinksForReadyWindow(mainWindow)
+    syncMenuLocaleForWindow(mainWindow)
   })
   wireMenu()
   return win
@@ -263,6 +394,21 @@ async function initialize() {
   overlay?.close()
 }
 
+function focusedMenuLocale() {
+  const focused = BrowserWindow.getFocusedWindow()
+  if (!focused) return menuLocale
+  return desktopContexts.current(focused.id).locale
+}
+
+function syncMenuLocaleForWindow(win: BrowserWindow | null) {
+  if (!win) return
+  const next = desktopContexts.current(win.id).locale
+  if (next === menuLocale) return
+  menuLocale = next
+  writeStoredMenuLocale(next)
+  wireMenu()
+}
+
 function wireMenu() {
   if (!mainWindow) return
   const commandWindow = () => selectCommandWindow(BrowserWindow.getFocusedWindow(), mainWindow)
@@ -281,7 +427,10 @@ function wireMenu() {
       app.exit(0)
     },
     newWindow: () => openMainWindow(),
-  })
+    reportProblem: () => {
+      void reportProblem()
+    },
+  }, focusedMenuLocale())
 }
 
 registerIpcHandlers({
@@ -316,6 +465,18 @@ registerIpcHandlers({
   setBackgroundColor: (color) => setBackgroundColor(color),
   reportDeepLinkReady: (win) => reportDeepLinkReady(win),
   reportCiSmokeReady: () => reportCiSmokeReady(),
+  setDesktopContext: (context, win) => {
+    const next = normalizeDesktopContext(context)
+    desktopContexts.set(win.id, next)
+    if (!contextWindowCleanup.has(win.id)) {
+      contextWindowCleanup.add(win.id)
+      win.once("closed", () => {
+        desktopContexts.delete(win.id)
+        contextWindowCleanup.delete(win.id)
+      })
+    }
+    if (BrowserWindow.getFocusedWindow()?.id === win.id) syncMenuLocaleForWindow(win)
+  },
 })
 
 function killSidecar() {
@@ -389,81 +550,70 @@ function setupAutoUpdater() {
   })
 }
 
-let updateReady = false
-
 async function checkUpdate() {
-  if (!UPDATER_ENABLED) return { updateAvailable: false }
-  updateReady = false
-  logger.log("checking for updates", {
-    currentVersion: app.getVersion(),
-    channel: autoUpdater.channel,
-    allowPrerelease: autoUpdater.allowPrerelease,
-    allowDowngrade: autoUpdater.allowDowngrade,
-  })
-  try {
-    const result = await autoUpdater.checkForUpdates()
-    const updateInfo = result?.updateInfo
-    logger.log("update metadata fetched", {
-      releaseVersion: updateInfo?.version ?? null,
-      releaseDate: updateInfo?.releaseDate ?? null,
-      releaseName: updateInfo?.releaseName ?? null,
-      files: updateInfo?.files?.map((file) => file.url) ?? [],
-    })
-    const version = result?.updateInfo?.version
-    if (result?.isUpdateAvailable === false || !version) {
-      logger.log("no update available", {
-        reason: "provider returned no newer version",
-      })
-      return { updateAvailable: false }
-    }
-    logger.log("update available", { version })
-    await autoUpdater.downloadUpdate()
-    logger.log("update download completed", { version })
-    updateReady = true
-    return { updateAvailable: true, version }
-  } catch (error) {
-    logger.error("update check failed", error)
-    return { updateAvailable: false, failed: true }
+  const result = await updater.check()
+  if (result.status === "ready") return { updateAvailable: true as const, status: result.status, version: result.version }
+  if (result.status === "failed") {
+    return { updateAvailable: false as const, status: result.status, reason: result.reason, message: result.message }
   }
+  return { updateAvailable: false as const, status: result.status }
 }
 
 async function installUpdate() {
-  if (!updateReady) return
-  killSidecar()
-  autoUpdater.quitAndInstall()
+  const started = updater.install()
+  if (!started) logger.log("install update skipped", { reason: "no ready update" })
+  return started
 }
 
 async function checkForUpdates(alertOnFail: boolean) {
-  if (!UPDATER_ENABLED) return
+  const labels = updaterDialogLabels(currentDesktopContext().locale)
   logger.log("checkForUpdates invoked", { alertOnFail })
   const result = await checkUpdate()
+  if (result.status === "busy") {
+    if (!alertOnFail) return
+    await dialog.showMessageBox({
+      type: "info",
+      title: labels.busy.title,
+      message: labels.busy.message,
+    })
+    return
+  }
+  if (result.status === "disabled") {
+    logger.log("no update decision", { reason: "updates disabled" })
+    if (!alertOnFail) return
+    await dialog.showMessageBox({
+      type: "info",
+      title: labels.disabled.title,
+      message: labels.disabled.message,
+    })
+    return
+  }
+  if (result.status === "failed") {
+    logger.log("no update decision", { reason: result.reason ?? "update check failed" })
+    if (!alertOnFail) return
+    await dialog.showMessageBox({
+      type: "error",
+      message: result.message ?? labels.failed.fallbackMessage,
+      title: labels.failed.title,
+    })
+    return
+  }
   if (!result.updateAvailable) {
-    if (result.failed) {
-      logger.log("no update decision", { reason: "update check failed" })
-      if (!alertOnFail) return
-      await dialog.showMessageBox({
-        type: "error",
-        message: "Update check failed.",
-        title: "Update Error",
-      })
-      return
-    }
-
     logger.log("no update decision", { reason: "already up to date" })
     if (!alertOnFail) return
     await dialog.showMessageBox({
       type: "info",
-      message: "You're up to date.",
-      title: "No Updates",
+      message: labels.none.message,
+      title: labels.none.title,
     })
     return
   }
 
   const response = await dialog.showMessageBox({
     type: "info",
-    message: `Update ${result.version ?? ""} downloaded. Restart now?`,
-    title: "Update Ready",
-    buttons: ["Restart", "Later"],
+    message: labels.ready.message(result.version),
+    title: labels.ready.title,
+    buttons: labels.ready.buttons,
     defaultId: 0,
     cancelId: 1,
   })
@@ -472,7 +622,25 @@ async function checkForUpdates(alertOnFail: boolean) {
     restartNow: response.response === 0,
   })
   if (response.response === 0) {
-    await installUpdate()
+    try {
+      const started = await installUpdate()
+      if (!started) {
+        await dialog.showMessageBox({
+          type: "info",
+          title: labels.none.title,
+          message: labels.none.message,
+        })
+      }
+    } catch (error) {
+      logger.error("install update failed", error)
+      await dialog.showMessageBox({
+        type: "error",
+        title: labels.failed.title,
+        message: error instanceof Error ? error.message : labels.failed.fallbackMessage,
+      })
+    }
+  } else {
+    updater.dismissReady()
   }
 }
 

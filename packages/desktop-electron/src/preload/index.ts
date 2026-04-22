@@ -1,8 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron"
-import type { ElectronAPI, InitStep, SqliteMigrationProgress } from "./types"
+import type { DesktopContext, ElectronAPI, InitStep, SqliteMigrationProgress } from "./types"
 import { getRuntimeFlags } from "./runtime-flags"
 
 const runtimeFlags = getRuntimeFlags(process.env)
+const invokeSetDesktopContext = (context: DesktopContext) => ipcRenderer.invoke("set-desktop-context", context)
 
 const api: ElectronAPI = {
   ciSmokeEnabled: runtimeFlags.ciSmokeEnabled,
@@ -68,6 +69,14 @@ const api: ElectronAPI = {
   getZoomFactor: () => ipcRenderer.invoke("get-zoom-factor"),
   setZoomFactor: (factor) => ipcRenderer.invoke("set-zoom-factor", factor),
   setTitlebar: (theme) => ipcRenderer.invoke("set-titlebar", theme),
+  setDesktopContext: (context) => invokeSetDesktopContext(context),
+  initializeDesktopContext: (locale) =>
+    invokeSetDesktopContext({
+      directory: null,
+      sessionID: null,
+      route: "/",
+      locale,
+    }),
   loadingWindowComplete: () => ipcRenderer.send("loading-window-complete"),
   runUpdater: (alertOnFail) => ipcRenderer.invoke("run-updater", alertOnFail),
   checkUpdate: () => ipcRenderer.invoke("check-update"),

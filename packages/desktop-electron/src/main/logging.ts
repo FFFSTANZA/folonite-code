@@ -13,8 +13,7 @@ export function initLogging() {
 
 export function tail(): string {
   try {
-    const path = log.transports.file.getFile().path
-    const contents = readFileSync(path, "utf8")
+    const contents = readFileSync(filePath(), "utf8")
     const lines = contents.split("\n")
     return lines.slice(Math.max(0, lines.length - TAIL_LINES)).join("\n")
   } catch {
@@ -22,8 +21,12 @@ export function tail(): string {
   }
 }
 
+export function filePath() {
+  return log.transports.file.getFile().path
+}
+
 function cleanup() {
-  const path = log.transports.file.getFile().path
+  const path = filePath()
   const dir = dirname(path)
   const cutoff = Date.now() - MAX_LOG_AGE_DAYS * 24 * 60 * 60 * 1000
 
