@@ -753,7 +753,7 @@ export class Session extends HeyApiClient {
   /**
    * List sessions
    *
-   * Get a list of all OpenCode sessions across projects, sorted by most recently updated. Archived sessions are excluded by default.
+   * Get a list of all OpenCode sessions across projects. Defaults to most recently updated; use sort=created for creation-time order. Archived sessions are excluded by default.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -761,10 +761,11 @@ export class Session extends HeyApiClient {
       workspace?: string
       roots?: boolean
       start?: number
-      cursor?: number
+      cursor?: number | string
       search?: string
       limit?: number
       archived?: boolean
+      sort?: "updated" | "created"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -781,6 +782,7 @@ export class Session extends HeyApiClient {
             { in: "query", key: "search" },
             { in: "query", key: "limit" },
             { in: "query", key: "archived" },
+            { in: "query", key: "sort" },
           ],
         },
       ],
@@ -1522,7 +1524,7 @@ export class Session2 extends HeyApiClient {
   /**
    * List sessions
    *
-   * Get a list of all OpenCode sessions, sorted by most recently updated.
+   * Get a list of all OpenCode sessions. Defaults to most recently updated; use sort=created for creation-time order.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1532,6 +1534,7 @@ export class Session2 extends HeyApiClient {
       start?: number
       search?: string
       limit?: number
+      sort?: "updated" | "created"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1546,6 +1549,7 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "start" },
             { in: "query", key: "search" },
             { in: "query", key: "limit" },
+            { in: "query", key: "sort" },
           ],
         },
       ],
