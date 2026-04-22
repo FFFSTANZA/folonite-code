@@ -9,6 +9,7 @@ import { Npm } from "../npm"
 import { Hash } from "../util/hash"
 import { Plugin } from "../plugin"
 import { NamedError } from "@opencode-ai/util/error"
+import { VOLCENGINE_PLAN_DEFAULT_MODEL_ID, VOLCENGINE_PLAN_PROVIDER_ID } from "@opencode-ai/util/volcengine-plan"
 import { type LanguageModelV3 } from "@ai-sdk/provider"
 import * as ModelsDev from "./models"
 import { Auth } from "../auth"
@@ -905,6 +906,9 @@ export const Info = Schema.Struct({
 export type Info = Types.DeepMutable<Schema.Schema.Type<typeof Info>>
 
 const DefaultModelIDs = Schema.Record(Schema.String, Schema.String)
+const defaultModelOverride: Record<string, string> = {
+  [VOLCENGINE_PLAN_PROVIDER_ID]: VOLCENGINE_PLAN_DEFAULT_MODEL_ID,
+}
 
 export const ListResult = Schema.Struct({
   all: Schema.Array(Info),
@@ -920,8 +924,22 @@ export const ConfigProvidersResult = Schema.Struct({
 export type ConfigProvidersResult = Types.DeepMutable<Schema.Schema.Type<typeof ConfigProvidersResult>>
 export type Language = LanguageModelV3
 
-export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {
-  return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
+export function defaultModelID<T extends { id?: string; models: Record<string, { id: string }> }>(
+  provider: T,
+  fallbackID?: string,
+) {
+  const preferred = defaultModelOverride[provider.id ?? fallbackID ?? ""]
+  if (preferred && provider.models[preferred]) return preferred
+  const models = sort(Object.values(provider.models))
+  const defaultModel = models[0]
+  if (!defaultModel) throw new Error(`Provider ${provider.id ?? fallbackID ?? "unknown"} has no models`)
+  return defaultModel.id
+}
+
+export function defaultModelIDs<T extends { id?: string; models: Record<string, { id: string }> }>(
+  providers: Record<string, T>,
+) {
+  return mapValues(providers, (item, id) => defaultModelID(item, id))
 }
 
 export interface Interface {
@@ -1684,7 +1702,8 @@ const layer: Layer.Layer<
 
       const provider = Object.values(s.providers).find((p) => !cfg.provider || Object.keys(cfg.provider).includes(p.id))
       if (!provider) throw new Error("no providers found")
-      const [model] = sort(Object.values(provider.models))
+      const modelID = defaultModelID(provider)
+      const model = provider.models[modelID]
       if (!model) throw new Error("no models found")
       return {
         providerID: provider.id,
@@ -1776,6 +1795,7 @@ const ProviderModelValue = Model
 const ProviderInfoValue = Info
 const ProviderListResultValue = ListResult
 const ProviderConfigProvidersResultValue = ConfigProvidersResult
+const ProviderDefaultModelIDValue = defaultModelID
 const ProviderDefaultModelIDsValue = defaultModelIDs
 const ProviderFromModelsDevProviderValue = fromModelsDevProvider
 const ProviderListValue = list
@@ -1803,6 +1823,7 @@ export namespace Provider {
   export const Info = ProviderInfoValue.zod
   export const ListResult = ProviderListResultValue.zod
   export const ConfigProvidersResult = ProviderConfigProvidersResultValue.zod
+  export const defaultModelID = ProviderDefaultModelIDValue
   export const defaultModelIDs = ProviderDefaultModelIDsValue
   export const fromModelsDevProvider = ProviderFromModelsDevProviderValue
   export const list = ProviderListValue

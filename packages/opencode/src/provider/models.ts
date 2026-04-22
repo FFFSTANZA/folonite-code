@@ -8,6 +8,7 @@ import { lazy } from "@/util/lazy"
 import { Filesystem } from "../util/filesystem"
 import { Flock } from "../util/flock"
 import { Hash } from "../util/hash"
+import { withPawWorkProviders } from "./pawwork-providers"
 
 // Try to import bundled snapshot (generated at build time)
 // Falls back to undefined in dev mode when snapshot doesn't exist
@@ -151,7 +152,7 @@ export const Data = lazy(async () => {
 
 export async function get() {
   const result = await Data()
-  return result as Record<string, Provider>
+  return withPawWorkProviders(result as Record<string, Provider>)
 }
 
 export async function refresh(force = false) {
