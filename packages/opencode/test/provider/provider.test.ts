@@ -14,6 +14,12 @@ import { Env } from "../../src/env"
 import { Effect } from "effect"
 import { AppRuntime } from "../../src/effect/app-runtime"
 import { makeRuntime } from "../../src/effect/run-service"
+import {
+  VOLCENGINE_PLAN_DEFAULT_MODEL_ID,
+  VOLCENGINE_PLAN_HIDDEN_MODEL_IDS,
+  VOLCENGINE_PLAN_PROVIDER_ID,
+  VOLCENGINE_PLAN_VISIBLE_MODEL_IDS,
+} from "@opencode-ai/util/volcengine-plan"
 
 const env = makeRuntime(Env.Service, Env.defaultLayer)
 const set = (k: string, v: string) => env.runSync((svc) => svc.set(k, v))
@@ -1093,6 +1099,65 @@ test("provider.sort prioritizes preferred models", () => {
   expect(sorted[0].id).toContain("latest")
   expect(sorted[sorted.length - 1].id).not.toContain("gpt-5")
   expect(sorted[sorted.length - 1].id).not.toContain("sonnet-4")
+})
+
+test("includes Volcano Engine Coding Plan as a PawWork provider overlay", async () => {
+  const models = await ModelsDev.get()
+  const provider = models[VOLCENGINE_PLAN_PROVIDER_ID]
+
+  expect(provider).toBeDefined()
+  expect(provider.id).toBe(VOLCENGINE_PLAN_PROVIDER_ID)
+  expect(provider.name).toBe("Volcano Engine Coding Plan")
+  expect(provider.npm).toBe("@ai-sdk/openai-compatible")
+  expect(provider.api).toBe("https://ark.cn-beijing.volces.com/api/coding/v3")
+  expect(provider.env).toEqual(["ARK_API_KEY"])
+
+  expect(
+    Object.keys(provider.models).filter((id) => !VOLCENGINE_PLAN_HIDDEN_MODEL_IDS.some((hidden) => hidden === id)),
+  ).toEqual([...VOLCENGINE_PLAN_VISIBLE_MODEL_IDS])
+  expect(provider.models[VOLCENGINE_PLAN_HIDDEN_MODEL_IDS[0]]).toBeDefined()
+  expect(provider.models[VOLCENGINE_PLAN_DEFAULT_MODEL_ID].cost).toEqual({
+    input: 0,
+    output: 0,
+    cache_read: 0,
+    cache_write: 0,
+  })
+  expect(provider.models["glm-5.1"].family).toBe("glm")
+  expect(provider.models["glm-4.7"].family).toBe("glm")
+  expect(provider.models["deepseek-v3.2"].family).toBe("deepseek")
+})
+
+test("uses doubao-seed-2.0-code as the Volcano Coding Plan default model", async () => {
+  const models = await ModelsDev.get()
+  const provider = models[VOLCENGINE_PLAN_PROVIDER_ID]
+
+  expect(Provider.defaultModelIDs({ [provider.id]: provider })).toEqual({
+    [VOLCENGINE_PLAN_PROVIDER_ID]: VOLCENGINE_PLAN_DEFAULT_MODEL_ID,
+  })
+  expect(Provider.defaultModelID(Provider.fromModelsDevProvider(provider))).toBe(VOLCENGINE_PLAN_DEFAULT_MODEL_ID)
+})
+
+test("does not change defaults for non-Volcano providers with the same Doubao model id", () => {
+  const providers = {
+    "qiniu-ai": {
+      id: "qiniu-ai",
+      models: {
+        "doubao-seed-2.0-code": { id: "doubao-seed-2.0-code" },
+        "ark-code-latest": { id: "ark-code-latest" },
+      },
+    },
+  }
+
+  expect(Provider.defaultModelIDs(providers)).toEqual({
+    "qiniu-ai": "ark-code-latest",
+  })
+  expect(Provider.defaultModelID(providers["qiniu-ai"])).toBe("ark-code-latest")
+})
+
+test("reports a clear error when a provider has no defaultable models", () => {
+  expect(() => Provider.defaultModelID({ id: "empty-provider", models: {} })).toThrow(
+    "Provider empty-provider has no models",
+  )
 })
 
 test("multiple providers can be configured simultaneously", async () => {
