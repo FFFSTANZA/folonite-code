@@ -62,7 +62,14 @@ import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, s
 import { PAWWORK_RUNTIME } from "./runtime-namespace"
 import { createUpdaterController } from "./updater"
 import { updaterDialogLabels } from "./updater-dialog-labels"
-import { createLoadingWindow, createMainWindow, setBackgroundColor, setDockIcon } from "./windows"
+import {
+  createLoadingWindow,
+  createMainWindow,
+  registerRendererProtocol,
+  registerRendererScheme,
+  setBackgroundColor,
+  setDockIcon,
+} from "./windows"
 import {
   registerWindowLifecycle,
   selectCommandWindow,
@@ -218,6 +225,7 @@ setupApp()
 function setupApp() {
   ensureLoopbackNoProxy()
   app.commandLine.appendSwitch("proxy-bypass-list", "<-loopback>")
+  registerRendererScheme()
 
   // CI smoke should not fail just because a local desktop instance already holds
   // the singleton lock on the runner or developer machine.
@@ -270,6 +278,7 @@ function setupApp() {
 
   void app.whenReady().then(async () => {
     app.setAsDefaultProtocolClient("opencode")
+    registerRendererProtocol()
     setDockIcon()
     setupAutoUpdater()
     await initialize()
@@ -307,15 +316,8 @@ function focusMainWindow(options: { openIfMissing?: boolean } = {}) {
   mainWindow.focus()
 }
 
-function mainWindowGlobals() {
-  return {
-    updaterEnabled: UPDATER_ENABLED,
-    deepLinks: pendingDeepLinks,
-  }
-}
-
 function openMainWindow() {
-  const win = createMainWindow(mainWindowGlobals())
+  const win = createMainWindow()
   mainWindow = win
   win.on("focus", () => syncMenuLocaleForWindow(win))
   win.on("closed", () => {
@@ -377,12 +379,10 @@ async function initialize() {
     logger.log("loading task finished")
   })()
 
-  const globals = mainWindowGlobals()
-
   if (needsMigration) {
     const show = await Promise.race([loadingTask.then(() => false), delay(1_000).then(() => true)])
     if (show) {
-      overlay = createLoadingWindow(globals)
+      overlay = createLoadingWindow()
       await delay(1_000)
     }
   }
@@ -457,6 +457,11 @@ registerIpcHandlers({
   setDefaultServerUrl: (url) => setDefaultServerUrl(url),
   getWslConfig: () => Promise.resolve(getWslConfig()),
   setWslConfig: (config: WslConfig) => setWslConfig(config),
+  getWindowConfig: () => ({
+    updaterEnabled: UPDATER_ENABLED,
+    wslEnabled: getWslConfig().enabled,
+  }),
+  consumeInitialDeepLinks: () => pendingDeepLinks.splice(0),
   getDisplayBackend: async () => null,
   setDisplayBackend: async () => undefined,
   parseMarkdown: async (markdown) => parseMarkdown(markdown),

@@ -1,16 +1,15 @@
 import windowState from "electron-window-state"
-import { app, BrowserWindow, nativeImage, nativeTheme } from "electron"
+import { app, BrowserWindow, nativeImage, nativeTheme, net, protocol } from "electron"
 import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import type { TitlebarTheme } from "../preload/types"
+import { rendererProtocol, rendererUrl, resolveRendererFile } from "./renderer-protocol"
 import { WINDOWS_TITLEBAR_OVERLAY_HEIGHT, macTrafficLightPosition } from "./window-chrome"
-
-type Globals = {
-  updaterEnabled: boolean
-  deepLinks?: string[]
-}
+import { rendererWebPreferences } from "./window-options"
 
 const root = dirname(fileURLToPath(import.meta.url))
+const rendererRoot = join(root, "../renderer")
+let rendererSchemeRegistered = false
 
 let backgroundColor: string | undefined
 
@@ -55,7 +54,32 @@ export function setDockIcon() {
   if (!icon.isEmpty()) app.dock?.setIcon(icon)
 }
 
-export function createMainWindow(globals: Globals) {
+export function registerRendererScheme() {
+  // Must run once before app.whenReady(); the guard only avoids duplicate pre-ready registration attempts.
+  if (rendererSchemeRegistered) return
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: rendererProtocol,
+      privileges: {
+        secure: true,
+        standard: true,
+        corsEnabled: true,
+        supportFetchAPI: true,
+      },
+    },
+  ])
+  rendererSchemeRegistered = true
+}
+
+export function registerRendererProtocol() {
+  protocol.handle(rendererProtocol, (request) => {
+    const file = resolveRendererFile(rendererRoot, request.url)
+    if (!file) return new Response(null, { status: 404 })
+    return net.fetch(pathToFileURL(file).toString())
+  })
+}
+
+export function createMainWindow() {
   const state = windowState({
     defaultWidth: 1280,
     defaultHeight: 800,
@@ -84,16 +108,12 @@ export function createMainWindow(globals: Globals) {
           titleBarOverlay: overlay({ mode }),
         }
       : {}),
-    webPreferences: {
-      preload: join(root, "../preload/index.mjs"),
-      sandbox: false,
-    },
+    webPreferences: rendererWebPreferences(root),
   })
 
   state.manage(win)
   loadWindow(win, "index.html")
   wireZoom(win)
-  injectGlobals(win, globals)
 
   win.once("ready-to-show", () => {
     win.show()
@@ -102,7 +122,7 @@ export function createMainWindow(globals: Globals) {
   return win
 }
 
-export function createLoadingWindow(globals: Globals) {
+export function createLoadingWindow() {
   const mode = tone()
   const win = new BrowserWindow({
     width: 640,
@@ -120,14 +140,10 @@ export function createLoadingWindow(globals: Globals) {
           titleBarOverlay: overlay({ mode }),
         }
       : {}),
-    webPreferences: {
-      preload: join(root, "../preload/index.mjs"),
-      sandbox: false,
-    },
+    webPreferences: rendererWebPreferences(root),
   })
 
   loadWindow(win, "loading.html")
-  injectGlobals(win, globals)
 
   return win
 }
@@ -140,20 +156,7 @@ function loadWindow(win: BrowserWindow, html: string) {
     return
   }
 
-  void win.loadFile(join(root, `../renderer/${html}`))
-}
-
-function injectGlobals(win: BrowserWindow, globals: Globals) {
-  win.webContents.on("dom-ready", () => {
-    const deepLinks = globals.deepLinks ?? []
-    const data = {
-      updaterEnabled: globals.updaterEnabled,
-      deepLinks: Array.isArray(deepLinks) ? deepLinks.splice(0) : deepLinks,
-    }
-    void win.webContents.executeJavaScript(
-      `window.__OPENCODE__ = Object.assign(window.__OPENCODE__ ?? {}, ${JSON.stringify(data)})`,
-    )
-  })
+  void win.loadURL(rendererUrl(html))
 }
 
 function wireZoom(win: BrowserWindow) {
