@@ -76,8 +76,12 @@ function buildServerEnv(password: string) {
   const shell = process.platform === "win32" ? null : getUserShell()
   const shellEnv = shell ? (loadShellEnv(shell) ?? {}) : {}
   const roots = runtimeRoots(app.getPath("userData"))
-  const mergedEnv = { ...shellEnv, ...process.env }
-  const ghConfigDir = githubConfigDir(mergedEnv, process.platform)
+  const originalEnv = { ...shellEnv, ...process.env }
+  const ghConfigDir = githubConfigDir(originalEnv, process.platform)
+  const mergedEnv = {
+    ...originalEnv,
+    ...(shellEnv.PATH ? { PATH: shellEnv.PATH } : {}),
+  }
   return {
     ...mergedEnv,
     OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: "true",
