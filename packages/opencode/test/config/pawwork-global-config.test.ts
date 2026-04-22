@@ -41,8 +41,6 @@ const saveGlobal = (config: Config.Info) =>
   Effect.runPromise(Config.Service.use((svc) => svc.updateGlobal(config)).pipe(Effect.scoped, Effect.provide(layer)))
 const clear = (wait = false) =>
   Effect.runPromise(Config.Service.use((svc) => svc.invalidate(wait)).pipe(Effect.scoped, Effect.provide(layer)))
-const ready = () =>
-  Effect.runPromise(Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(layer)))
 const listConfigDirs = (directory: string, worktree: string) =>
   Effect.runPromise(ConfigPaths.directories(directory, worktree).pipe(Effect.provide(AppFileSystem.defaultLayer)))
 
@@ -98,15 +96,17 @@ describe("default OpenCode config compatibility", () => {
     }
   })
 
-  test("PawWork runtime mode computes Global config under PawWork before module load", () => {
+  test("PawWork runtime mode computes Global config under PawWork before module load", async () => {
+    await using root = await tmpdir()
+    const project = path.join(root.path, "project")
     const script = `
       process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-      process.env.XDG_CONFIG_HOME = "/tmp/pawwork-config-root-test"
+      process.env.XDG_CONFIG_HOME = ${JSON.stringify(root.path)}
       const { ConfigPaths } = await import("./src/config/paths.ts")
       const { AppFileSystem } = await import("./src/filesystem/index.ts")
       const { Effect } = await import("effect")
       const dirs = await Effect.runPromise(
-        ConfigPaths.directories("/tmp/project", "/tmp/project").pipe(Effect.provide(AppFileSystem.defaultLayer)),
+        ConfigPaths.directories(${JSON.stringify(project)}, ${JSON.stringify(project)}).pipe(Effect.provide(AppFileSystem.defaultLayer)),
       )
       console.log(JSON.stringify(dirs[0]))
     `
@@ -119,7 +119,7 @@ describe("default OpenCode config compatibility", () => {
     })
 
     if (result.exitCode !== 0) throw new Error(Buffer.from(result.stderr).toString())
-    expect(JSON.parse(Buffer.from(result.stdout).toString())).toBe("/tmp/pawwork-config-root-test/pawwork")
+    expect(JSON.parse(Buffer.from(result.stdout).toString())).toBe(path.join(root.path, "pawwork"))
   })
 
   test("keeps legacy project .opencode config.json compatibility", async () => {
@@ -136,6 +136,57 @@ describe("default OpenCode config compatibility", () => {
         expect(config.model).toBe("compat/config")
       },
     })
+  })
+
+  test("OpenCode runtime ignores PawWork project config aliases", async () => {
+    await using project = await tmpdir({ git: true })
+    const previousRuntime = process.env.PAWWORK_RUNTIME_NAMESPACE
+    delete process.env.PAWWORK_RUNTIME_NAMESPACE
+
+    try {
+      await Filesystem.write(path.join(project.path, "pawwork.json"), JSON.stringify({ model: "leaked/root" }))
+      await fs.mkdir(path.join(project.path, ".pawwork"), { recursive: true })
+      await Filesystem.write(
+        path.join(project.path, ".pawwork", "pawwork.json"),
+        JSON.stringify({ model: "leaked/directory" }),
+      )
+
+      await Instance.provide({
+        directory: project.path,
+        fn: async () => {
+          const config = await load()
+          expect(config.model).not.toBe("leaked/root")
+          expect(config.model).not.toBe("leaked/directory")
+        },
+      })
+    } finally {
+      if (previousRuntime === undefined) delete process.env.PAWWORK_RUNTIME_NAMESPACE
+      else process.env.PAWWORK_RUNTIME_NAMESPACE = previousRuntime
+    }
+  })
+
+  test("OpenCode runtime ignores PawWork global config aliases", async () => {
+    await using global = await tmpdir()
+    await using project = await tmpdir({ git: true })
+    const previousRuntime = process.env.PAWWORK_RUNTIME_NAMESPACE
+    const previousConfig = Global.Path.config
+    delete process.env.PAWWORK_RUNTIME_NAMESPACE
+    ;(Global.Path as { config: string }).config = global.path
+
+    try {
+      await Filesystem.write(path.join(global.path, "pawwork.json"), JSON.stringify({ model: "leaked/global" }))
+      await Instance.provide({
+        directory: project.path,
+        fn: async () => {
+          const config = await load()
+          expect(config.model).not.toBe("leaked/global")
+        },
+      })
+    } finally {
+      ;(Global.Path as { config: string }).config = previousConfig
+      if (previousRuntime === undefined) delete process.env.PAWWORK_RUNTIME_NAMESPACE
+      else process.env.PAWWORK_RUNTIME_NAMESPACE = previousRuntime
+    }
   })
 })
 
@@ -280,8 +331,6 @@ describe("PawWork global config isolation", () => {
         const config = await load()
         expect(config.model).toBe("compat/model")
 
-        await ready()
-
         expect(await Bun.file(path.join(opencodeDir, "package.json")).exists()).toBeFalse()
         expect(await Bun.file(path.join(opencodeDir, ".gitignore")).exists()).toBeFalse()
       },
@@ -329,7 +378,8 @@ describe("PawWork global config isolation", () => {
 
   test("global config update writes pawwork.json and ignores app-level opencode.json", async () => {
     await using project = await tmpdir({ git: true })
-    const globalDir = await fs.mkdtemp(path.join("/tmp", "pawwork-global-config-"))
+    await using global = await tmpdir()
+    const globalDir = global.path
     const previousConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalDir
 
@@ -350,13 +400,13 @@ describe("PawWork global config isolation", () => {
       })
     } finally {
       ;(Global.Path as { config: string }).config = previousConfig
-      await fs.rm(globalDir, { recursive: true, force: true })
     }
   })
 
   test("global config update writes to the active PawWork config file", async () => {
     await using project = await tmpdir({ git: true })
-    const globalDir = await fs.mkdtemp(path.join("/tmp", "pawwork-global-config-"))
+    await using global = await tmpdir()
+    const globalDir = global.path
     const previousConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalDir
 
@@ -378,7 +428,6 @@ describe("PawWork global config isolation", () => {
       })
     } finally {
       ;(Global.Path as { config: string }).config = previousConfig
-      await fs.rm(globalDir, { recursive: true, force: true })
     }
   })
 

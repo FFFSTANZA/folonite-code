@@ -60,6 +60,19 @@ const listDirs = () =>
 const ready = () =>
   Effect.runPromise(Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(layer)))
 
+async function withPawWorkRuntime(fn: () => Promise<void>) {
+  const previous = process.env.PAWWORK_RUNTIME_NAMESPACE
+  process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
+  await clear(true)
+  try {
+    await fn()
+  } finally {
+    if (previous === undefined) delete process.env.PAWWORK_RUNTIME_NAMESPACE
+    else process.env.PAWWORK_RUNTIME_NAMESPACE = previous
+    await clear(true)
+  }
+}
+
 async function waitFor(fn: () => Promise<boolean>, timeout = 2000) {
   const start = Date.now()
   while (!(await fn())) {
@@ -198,151 +211,161 @@ test("config entry names tolerate unnormalized roots", () => {
 })
 
 test("loads PawWork project config aliases", async () => {
-  await using tmp = await tmpdir({
-    init: async (dir) => {
-      await writeConfig(
-        dir,
-        {
-          $schema: "https://opencode.ai/config.json",
-          model: "test/pawwork-root",
-        },
-        "pawwork.json",
-      )
-    },
-  })
-  await Instance.provide({
-    directory: tmp.path,
-    fn: async () => {
-      const config = await load()
-      expect(config.model).toBe("test/pawwork-root")
-    },
-  })
-})
-
-test("loads PawWork configs from .opencode directories", async () => {
-  await using tmp = await tmpdir({
-    init: async (dir) => {
-      const configDir = path.join(dir, ".opencode")
-      await fs.mkdir(configDir, { recursive: true })
-      await writeConfig(
-        configDir,
-        {
-          $schema: "https://opencode.ai/config.json",
-          model: "test/pawwork-dir",
-        },
-        "pawwork.json",
-      )
-    },
-  })
-  await Instance.provide({
-    directory: tmp.path,
-    fn: async () => {
-      const config = await load()
-      expect(config.model).toBe("test/pawwork-dir")
-    },
-  })
-})
-
-test("loads and updates global PawWork config aliases", async () => {
-  await using globalTmp = await tmpdir()
-  await using tmp = await tmpdir()
-  const prev = Global.Path.config
-  ;(Global.Path as { config: string }).config = globalTmp.path
-  await clear()
-  try {
-    await writeConfig(
-      globalTmp.path,
-      {
-        $schema: "https://opencode.ai/config.json",
-        username: "global-pawwork",
+  await withPawWorkRuntime(async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await writeConfig(
+          dir,
+          {
+            $schema: "https://opencode.ai/config.json",
+            model: "test/pawwork-root",
+          },
+          "pawwork.json",
+        )
       },
-      "pawwork.json",
-    )
-
+    })
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
         const config = await load()
-        expect(config.username).toBe("global-pawwork")
-
-        const updated = await Effect.runPromise(
-          Config.Service.use((svc) => svc.updateGlobal({ ...config, username: "updated-pawwork" })).pipe(
-            Effect.scoped,
-            Effect.provide(layer),
-          ),
-        )
-        expect(updated.username).toBe("updated-pawwork")
+        expect(config.model).toBe("test/pawwork-root")
       },
     })
-
-    const content = await Filesystem.readJson<{ username?: string }>(path.join(globalTmp.path, "pawwork.json"))
-    expect(content.username).toBe("updated-pawwork")
-    expect(await Filesystem.exists(path.join(globalTmp.path, "opencode.jsonc"))).toBe(false)
-  } finally {
-    ;(Global.Path as { config: string }).config = prev
-    await clear()
-  }
+  })
 })
 
-test("PawWork config aliases win consistently when OpenCode aliases coexist", async () => {
-  await using tmp = await tmpdir({
-    init: async (dir) => {
+test("loads PawWork configs from .opencode directories", async () => {
+  await withPawWorkRuntime(async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        const configDir = path.join(dir, ".opencode")
+        await fs.mkdir(configDir, { recursive: true })
+        await writeConfig(
+          configDir,
+          {
+            $schema: "https://opencode.ai/config.json",
+            model: "test/pawwork-dir",
+          },
+          "pawwork.json",
+        )
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const config = await load()
+        expect(config.model).toBe("test/pawwork-dir")
+      },
+    })
+  })
+})
+
+test("loads and updates global PawWork config aliases", async () => {
+  await withPawWorkRuntime(async () => {
+    await using globalTmp = await tmpdir()
+    await using tmp = await tmpdir()
+    const prev = Global.Path.config
+    ;(Global.Path as { config: string }).config = globalTmp.path
+    await clear()
+    try {
       await writeConfig(
-        dir,
+        globalTmp.path,
         {
           $schema: "https://opencode.ai/config.json",
-          model: "test/opencode-root",
-        },
-        "opencode.json",
-      )
-      await writeConfig(
-        dir,
-        {
-          $schema: "https://opencode.ai/config.json",
-          model: "test/pawwork-root",
+          username: "global-pawwork",
         },
         "pawwork.json",
       )
-    },
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const config = await load()
+          expect(config.username).toBe("global-pawwork")
+
+          const updated = await Effect.runPromise(
+            Config.Service.use((svc) => svc.updateGlobal({ ...config, username: "updated-pawwork" })).pipe(
+              Effect.scoped,
+              Effect.provide(layer),
+            ),
+          )
+          expect(updated.username).toBe("updated-pawwork")
+        },
+      })
+
+      const content = await Filesystem.readJson<{ username?: string }>(path.join(globalTmp.path, "pawwork.json"))
+      expect(content.username).toBe("updated-pawwork")
+      expect(await Filesystem.exists(path.join(globalTmp.path, "opencode.jsonc"))).toBe(false)
+    } finally {
+      ;(Global.Path as { config: string }).config = prev
+      await clear()
+    }
   })
-  await Instance.provide({
-    directory: tmp.path,
-    fn: async () => {
-      const config = await load()
-      expect(config.model).toBe("test/pawwork-root")
-    },
+})
+
+test("PawWork config aliases win consistently when OpenCode aliases coexist", async () => {
+  await withPawWorkRuntime(async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await writeConfig(
+          dir,
+          {
+            $schema: "https://opencode.ai/config.json",
+            model: "test/opencode-root",
+          },
+          "opencode.json",
+        )
+        await writeConfig(
+          dir,
+          {
+            $schema: "https://opencode.ai/config.json",
+            model: "test/pawwork-root",
+          },
+          "pawwork.json",
+        )
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const config = await load()
+        expect(config.model).toBe("test/pawwork-root")
+      },
+    })
   })
 })
 
 test("PawWork .opencode aliases win consistently when OpenCode aliases coexist", async () => {
-  await using tmp = await tmpdir({
-    init: async (dir) => {
-      const configDir = path.join(dir, ".opencode")
-      await fs.mkdir(configDir, { recursive: true })
-      await writeConfig(
-        configDir,
-        {
-          $schema: "https://opencode.ai/config.json",
-          model: "test/opencode-dir",
-        },
-        "opencode.json",
-      )
-      await writeConfig(
-        configDir,
-        {
-          $schema: "https://opencode.ai/config.json",
-          model: "test/pawwork-dir",
-        },
-        "pawwork.json",
-      )
-    },
-  })
-  await Instance.provide({
-    directory: tmp.path,
-    fn: async () => {
-      const config = await load()
-      expect(config.model).toBe("test/pawwork-dir")
-    },
+  await withPawWorkRuntime(async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        const configDir = path.join(dir, ".opencode")
+        await fs.mkdir(configDir, { recursive: true })
+        await writeConfig(
+          configDir,
+          {
+            $schema: "https://opencode.ai/config.json",
+            model: "test/opencode-dir",
+          },
+          "opencode.json",
+        )
+        await writeConfig(
+          configDir,
+          {
+            $schema: "https://opencode.ai/config.json",
+            model: "test/pawwork-dir",
+          },
+          "pawwork.json",
+        )
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const config = await load()
+        expect(config.model).toBe("test/pawwork-dir")
+      },
+    })
   })
 })
 
@@ -1318,6 +1341,7 @@ it.live(
 
     const prev = process.env.OPENCODE_CONFIG_DIR
     const gitignorePath = path.join(tmp.extra, ".gitignore")
+    const install = spyOn(Npm, "install").mockResolvedValue(undefined)
 
     const testLayer = Config.layer.pipe(
       Layer.provide(AppFileSystem.defaultLayer),
@@ -1326,25 +1350,29 @@ it.live(
       Layer.provideMerge(infra),
     )
 
-    await withConfigDepsLock(async () => {
-      process.env.OPENCODE_CONFIG_DIR = tmp.extra
-      try {
-        await Instance.provide({
-          directory: tmp.path,
-          fn: async () => {
-            await Effect.runPromise(
-              Config.Service.use((svc) => svc.get()).pipe(Effect.scoped, Effect.provide(testLayer)),
-            )
-            await Effect.runPromise(
-              Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(testLayer)),
-            )
-          },
-        })
-      } finally {
-        if (prev === undefined) delete process.env.OPENCODE_CONFIG_DIR
-        else process.env.OPENCODE_CONFIG_DIR = prev
-      }
-    })
+    try {
+      await withConfigDepsLock(async () => {
+        process.env.OPENCODE_CONFIG_DIR = tmp.extra
+        try {
+          await Instance.provide({
+            directory: tmp.path,
+            fn: async () => {
+              await Effect.runPromise(
+                Config.Service.use((svc) => svc.get()).pipe(Effect.scoped, Effect.provide(testLayer)),
+              )
+              await Effect.runPromise(
+                Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(testLayer)),
+              )
+            },
+          })
+        } finally {
+          if (prev === undefined) delete process.env.OPENCODE_CONFIG_DIR
+          else process.env.OPENCODE_CONFIG_DIR = prev
+        }
+      })
+    } finally {
+      install.mockRestore()
+    }
 
     await waitFor(async () => {
       if (!(await Filesystem.exists(gitignorePath))) return false
@@ -1869,29 +1897,31 @@ test("managed settings override project settings", async () => {
 })
 
 test("managed settings honor PawWork config aliases", async () => {
-  await using tmp = await tmpdir({
-    init: async (dir) => {
-      await writeConfig(dir, {
+  await withPawWorkRuntime(async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await writeConfig(dir, {
+          $schema: "https://opencode.ai/config.json",
+          model: "user/model",
+        })
+      },
+    })
+
+    await writeManagedSettings(
+      {
         $schema: "https://opencode.ai/config.json",
-        model: "user/model",
-      })
-    },
-  })
+        model: "managed/pawwork",
+      },
+      "pawwork.json",
+    )
 
-  await writeManagedSettings(
-    {
-      $schema: "https://opencode.ai/config.json",
-      model: "managed/pawwork",
-    },
-    "pawwork.json",
-  )
-
-  await Instance.provide({
-    directory: tmp.path,
-    fn: async () => {
-      const config = await load()
-      expect(config.model).toBe("managed/pawwork")
-    },
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const config = await load()
+        expect(config.model).toBe("managed/pawwork")
+      },
+    })
   })
 })
 

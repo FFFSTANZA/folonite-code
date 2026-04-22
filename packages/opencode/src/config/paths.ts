@@ -41,7 +41,7 @@ export const directories = Effect.fn("ConfigPaths.directories")(function* (direc
             stop: worktree,
           })
         : []),
-      ...(process.env.PAWWORK_CONFIG_DIR ? [process.env.PAWWORK_CONFIG_DIR] : []),
+      ...(Flag.PAWWORK_CONFIG_DIR ? [Flag.PAWWORK_CONFIG_DIR] : []),
     ])
   }
 

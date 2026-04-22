@@ -23,7 +23,7 @@ const FILES = [
 ]
 
 function configDir() {
-  return Runtime.isPawWork() ? process.env.PAWWORK_CONFIG_DIR : Flag.OPENCODE_CONFIG_DIR
+  return Runtime.isPawWork() ? Flag.PAWWORK_CONFIG_DIR : Flag.OPENCODE_CONFIG_DIR
 }
 
 function globalInstructionFiles() {

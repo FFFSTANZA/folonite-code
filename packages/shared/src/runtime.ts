@@ -1,6 +1,6 @@
 export namespace Runtime {
   export function isPawWork() {
-    return process.env.PAWWORK_RUNTIME_NAMESPACE === "pawwork"
+    return process.env.PAWWORK_RUNTIME_NAMESPACE?.startsWith("pawwork") ?? false
   }
 
   export function appName() {

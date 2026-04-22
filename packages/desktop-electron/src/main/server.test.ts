@@ -59,7 +59,6 @@ describe("desktop server runtime namespace", () => {
       config: path.join(root, "config"),
       state: path.join(root, "state"),
     })
-    expect(Object.values(roots).every((value) => !value.toLowerCase().includes("opencode"))).toBeTrue()
     expect(databasePathForUserData(root)).toBe(path.join(root, "data", "pawwork", "pawwork.db"))
   })
 

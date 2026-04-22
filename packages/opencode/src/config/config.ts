@@ -49,13 +49,28 @@ import { Installation } from "@/installation"
 import { Runtime } from "@opencode-ai/shared/runtime"
 
 const log = Log.create({ service: "config" })
-const PROJECT_CONFIG_NAMES = ["config", "opencode", "pawwork"] as const
-const PROJECT_CONFIG_FILES = PROJECT_CONFIG_NAMES.flatMap((name) => [`${name}.json`, `${name}.jsonc`])
+const OPENCODE_PROJECT_CONFIG_NAMES = ["config", "opencode"] as const
+const PAWWORK_PROJECT_CONFIG_NAMES = ["config", "opencode", "pawwork"] as const
+const OPENCODE_PROJECT_CONFIG_FILES = OPENCODE_PROJECT_CONFIG_NAMES.flatMap((name) => [`${name}.json`, `${name}.jsonc`])
+const PAWWORK_PROJECT_CONFIG_FILES = PAWWORK_PROJECT_CONFIG_NAMES.flatMap((name) => [`${name}.json`, `${name}.jsonc`])
 const PAWWORK_GLOBAL_CONFIG_FILES = ["pawwork.json", "pawwork.jsonc"] as const
-const OPENCODE_GLOBAL_CONFIG_FILES = PROJECT_CONFIG_FILES
+const OPENCODE_GLOBAL_CONFIG_FILES = OPENCODE_PROJECT_CONFIG_FILES
 
 function globalConfigFiles() {
   return Runtime.isPawWork() ? PAWWORK_GLOBAL_CONFIG_FILES : OPENCODE_GLOBAL_CONFIG_FILES
+}
+
+function projectConfigNames() {
+  return Runtime.isPawWork() ? PAWWORK_PROJECT_CONFIG_NAMES : OPENCODE_PROJECT_CONFIG_NAMES
+}
+
+function projectConfigFilesForDirectory(dir: string) {
+  const base = path.basename(dir)
+  if (base === ".pawwork") return Runtime.isPawWork() ? PAWWORK_PROJECT_CONFIG_FILES : []
+  if (base === ".opencode" || dir === Flag.OPENCODE_CONFIG_DIR) {
+    return Runtime.isPawWork() ? PAWWORK_PROJECT_CONFIG_FILES : OPENCODE_PROJECT_CONFIG_FILES
+  }
+  return []
 }
 
 function shouldGenerateInDirectory(dir: string) {
@@ -564,7 +579,9 @@ const rawLayer = Layer.effect(
         }
 
         if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
-          for (const file of yield* ConfigPaths.files(PROJECT_CONFIG_NAMES, ctx.directory, ctx.worktree).pipe(Effect.orDie)) {
+          for (const file of yield* ConfigPaths.files(projectConfigNames(), ctx.directory, ctx.worktree).pipe(
+            Effect.orDie,
+          )) {
             yield* merge(file, yield* loadFile(file), "local")
           }
         }
@@ -575,7 +592,7 @@ const rawLayer = Layer.effect(
 
         const directories = yield* ConfigPaths.directories(ctx.directory, ctx.worktree)
 
-        const pawworkConfigDir = process.env.PAWWORK_CONFIG_DIR
+        const pawworkConfigDir = Flag.PAWWORK_CONFIG_DIR
         if (Runtime.isPawWork() && pawworkConfigDir) {
           log.debug("loading config from PAWWORK_CONFIG_DIR", { path: pawworkConfigDir })
         } else if (Flag.OPENCODE_CONFIG_DIR) {
@@ -588,9 +605,7 @@ const rawLayer = Layer.effect(
           const configFiles =
             Runtime.isPawWork() && pawworkConfigDir && dir === pawworkConfigDir
               ? globalConfigFiles()
-              : dir.endsWith(".opencode") || dir.endsWith(".pawwork") || dir === Flag.OPENCODE_CONFIG_DIR
-                ? PROJECT_CONFIG_FILES
-                : []
+              : projectConfigFilesForDirectory(dir)
 
           if (configFiles.length > 0) {
             for (const file of configFiles) {
@@ -680,7 +695,7 @@ const rawLayer = Layer.effect(
 
         const managedDir = ConfigManaged.managedConfigDir()
         if (existsSync(managedDir)) {
-          for (const file of Runtime.isPawWork() ? globalConfigFiles() : PROJECT_CONFIG_FILES) {
+          for (const file of Runtime.isPawWork() ? globalConfigFiles() : OPENCODE_PROJECT_CONFIG_FILES) {
             const source = path.join(managedDir, file)
             yield* merge(source, yield* loadFile(source), "global")
           }

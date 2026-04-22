@@ -85,7 +85,7 @@ test.skip("changing theme persists in localStorage", async () => {
   // and cannot exercise switching. Revisit once a second theme is added.
 })
 
-test("unknown theme ids migrate to pawwork and clear cached CSS", async ({ page, gotoSession }) => {
+test("unknown theme ids migrate to pawwork and clear cached css", async ({ page, gotoSession }) => {
   await page.addInitScript(() => {
     localStorage.setItem("pawwork-theme-id", "dracula")
     localStorage.setItem("pawwork-theme-css-light", "--background-base:#fff;")
