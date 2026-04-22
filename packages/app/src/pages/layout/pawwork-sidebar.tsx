@@ -20,22 +20,23 @@ export type PawworkSidebarSession = {
 const FilterIcon = (props: { size?: number }) => {
   const size = props.size ?? 14
   return (
-    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path d="M1.5 3h9M3 6h6M4.5 9h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M2.5 5h15M5 10h10M7.5 15h5" stroke="currentColor" stroke-linecap="square" />
     </svg>
   )
 }
 
 const PinIcon = (props: { filled?: boolean; size?: number }) => {
-  const size = props.size ?? 12
+  const size = props.size ?? 16
   return (
-    <svg width={size} height={size} viewBox="0 0 12 12" fill={props.filled ? "currentColor" : "none"} aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
       <path
-        d="M7.5 1.5l3 3-2 .5-1.5 3-1.5-1.5-2.5 2.5L3.5 9 6 6.5 4.5 5l3-1.5.5-2z"
+        d="M11 2L18 9L14 11L11 14L6 9L9 6Z"
         stroke="currentColor"
-        stroke-width="1.1"
-        stroke-linejoin="round"
+        stroke-linejoin="miter"
+        fill={props.filled ? "currentColor" : "none"}
       />
+      <path d="M8 11L2 18" stroke="currentColor" stroke-linecap="square" />
     </svg>
   )
 }
