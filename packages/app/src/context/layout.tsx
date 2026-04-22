@@ -10,9 +10,20 @@ import { Project } from "@opencode-ai/sdk/v2"
 import { Persist, persisted, removePersisted } from "@/utils/persist"
 import { decode64 } from "@/utils/base64"
 import { same } from "@/utils/same"
+import { isRecord } from "@/utils/is-record"
 import { createScrollPersistence, type SessionScroll } from "./layout-scroll"
 import { createPathHelpers } from "./file/path"
-import { defaultRightPanelTab, type RightPanelTab } from "@/pages/session/right-panel-tabs"
+import {
+  closeShellTab,
+  defaultRightPanelTab,
+  moveShellTab,
+  normalizeShellTabs,
+  openShellTab,
+  toggleShellTab,
+  type RightPanelTab,
+  type ShellTabState,
+} from "@/pages/session/right-panel-tabs"
+import { migrateSessionView } from "@/pages/session/migrate-session-view"
 
 const AVATAR_COLOR_KEYS = ["pink", "mint", "orange", "purple", "cyan", "lime"] as const
 const DEFAULT_SIDEBAR_WIDTH = 344
@@ -50,6 +61,7 @@ type SessionTabs = {
 type SessionView = {
   scroll: Record<string, SessionScroll>
   reviewOpen?: string[]
+  openShellTabs?: RightPanelTab[]
   sidePanelTab?: RightPanelTab | "changes"
   filesAutoOpenSeen?: boolean
   filesAutoOpenDismissed?: boolean
@@ -84,6 +96,16 @@ export function createSessionKeyReader(sessionKey: string | Accessor<string>, en
 
 export function defaultSidePanelTab(tab?: RightPanelTab | "changes") {
   return defaultRightPanelTab(tab)
+}
+
+export function legacyOpenShellTabs(openShellTabs: unknown, sidePanelTab?: RightPanelTab | "changes"): RightPanelTab[] {
+  if (Array.isArray(openShellTabs)) {
+    const normalized = normalizeShellTabs({ openShellTabs, sidePanelTab })
+    return normalized.openShellTabs
+  }
+
+  const active = defaultSidePanelTab(sidePanelTab)
+  return active === "status" ? ["status"] : ["status", active]
 }
 
 export function pruneSessionKeys(input: {
@@ -148,6 +170,112 @@ const normalizeStoredSessionTabs = (key: string, tabs: SessionTabs) => {
   }
 }
 
+export function legacyRightPanelOpened(rightPanel: unknown, review: unknown, fileTree: unknown): boolean {
+  if (isRecord(rightPanel) && typeof rightPanel.opened === "boolean") return rightPanel.opened
+  if (isRecord(review) && typeof review.panelOpened === "boolean") return review.panelOpened
+  if (isRecord(fileTree) && typeof fileTree.opened === "boolean") return fileTree.opened
+  return true
+}
+
+export function migrateStoredLayout(value: unknown) {
+  if (!isRecord(value)) return value
+
+  const sidebar = value.sidebar
+  const migratedSidebar = (() => {
+    if (!isRecord(sidebar)) return sidebar
+    if (typeof sidebar.workspaces !== "boolean") return sidebar
+    return {
+      ...sidebar,
+      workspaces: {},
+      workspacesDefault: sidebar.workspaces,
+    }
+  })()
+
+  const review = value.review
+  const fileTree = value.fileTree
+  const migratedFileTree = (() => {
+    if (!isRecord(fileTree)) return fileTree
+    if (fileTree.tab === "changes" || fileTree.tab === "all") return fileTree
+
+    const width = typeof fileTree.width === "number" ? fileTree.width : DEFAULT_FILE_TREE_WIDTH
+    return {
+      ...fileTree,
+      opened: true,
+      width: width === 260 ? DEFAULT_FILE_TREE_WIDTH : width,
+      tab: "changes",
+    }
+  })()
+
+  const rightPanel = value.rightPanel
+  const migratedRightPanel = (() => {
+    const opened = legacyRightPanelOpened(rightPanel, review, fileTree)
+    if (typeof rightPanel === "boolean") return { width: DEFAULT_RIGHT_PANEL_WIDTH, opened: rightPanel }
+    if (!isRecord(rightPanel)) return { width: DEFAULT_RIGHT_PANEL_WIDTH, opened }
+    if (typeof rightPanel.opened === "boolean") return rightPanel
+    return { ...rightPanel, opened }
+  })()
+
+  const migratedReview = (() => {
+    if (!isRecord(review)) return review
+    if (typeof review.panelOpened === "boolean") return review
+
+    const opened = isRecord(fileTree) && typeof fileTree.opened === "boolean" ? fileTree.opened : true
+    return {
+      ...review,
+      panelOpened: opened,
+    }
+  })()
+
+  const sessionTabs = value.sessionTabs
+  const migratedSessionTabs = (() => {
+    if (!isRecord(sessionTabs)) return sessionTabs
+
+    let changed = false
+    const next = Object.fromEntries(
+      Object.entries(sessionTabs).map(([key, tabs]) => {
+        if (!isRecord(tabs) || !Array.isArray(tabs.all)) return [key, tabs]
+
+        const current = {
+          all: tabs.all.filter((tab): tab is string => typeof tab === "string"),
+          active: typeof tabs.active === "string" ? tabs.active : undefined,
+        }
+        const normalized = normalizeStoredSessionTabs(key, current)
+        if (current.all.length !== tabs.all.length) changed = true
+        if (!same(current.all, normalized.all) || current.active !== normalized.active) changed = true
+        if (tabs.active !== undefined && typeof tabs.active !== "string") changed = true
+        return [key, normalized]
+      }),
+    )
+
+    if (!changed) return sessionTabs
+    return next
+  })()
+
+  const sessionViewMigration = migrateSessionView(value.sessionView, migratedSessionTabs)
+  const sessionStateChanged = sessionViewMigration.changed
+
+  if (
+    migratedSidebar === sidebar &&
+    migratedReview === review &&
+    migratedFileTree === fileTree &&
+    migratedRightPanel === rightPanel &&
+    migratedSessionTabs === sessionTabs &&
+    !sessionStateChanged
+  ) {
+    return value
+  }
+
+  return {
+    ...value,
+    sidebar: migratedSidebar,
+    review: migratedReview,
+    fileTree: migratedFileTree,
+    rightPanel: migratedRightPanel,
+    sessionView: sessionViewMigration.sessionView,
+    sessionTabs: sessionViewMigration.sessionTabs,
+  }
+}
+
 export const { use: useLayout, provider: LayoutProvider } = createSimpleContext({
   name: "Layout",
   init: () => {
@@ -156,95 +284,9 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     const server = useServer()
     const platform = usePlatform()
 
-    const isRecord = (value: unknown): value is Record<string, unknown> =>
-      typeof value === "object" && value !== null && !Array.isArray(value)
-
-    const migrate = (value: unknown) => {
-      if (!isRecord(value)) return value
-
-      const sidebar = value.sidebar
-      const migratedSidebar = (() => {
-        if (!isRecord(sidebar)) return sidebar
-        if (typeof sidebar.workspaces !== "boolean") return sidebar
-        return {
-          ...sidebar,
-          workspaces: {},
-          workspacesDefault: sidebar.workspaces,
-        }
-      })()
-
-      const review = value.review
-      const fileTree = value.fileTree
-      const migratedFileTree = (() => {
-        if (!isRecord(fileTree)) return fileTree
-        if (fileTree.tab === "changes" || fileTree.tab === "all") return fileTree
-
-        const width = typeof fileTree.width === "number" ? fileTree.width : DEFAULT_FILE_TREE_WIDTH
-        return {
-          ...fileTree,
-          opened: true,
-          width: width === 260 ? DEFAULT_FILE_TREE_WIDTH : width,
-          tab: "changes",
-        }
-      })()
-
-      const migratedReview = (() => {
-        if (!isRecord(review)) return review
-        if (typeof review.panelOpened === "boolean") return review
-
-        const opened = isRecord(fileTree) && typeof fileTree.opened === "boolean" ? fileTree.opened : true
-        return {
-          ...review,
-          panelOpened: opened,
-        }
-      })()
-
-      const sessionTabs = value.sessionTabs
-      const migratedSessionTabs = (() => {
-        if (!isRecord(sessionTabs)) return sessionTabs
-
-        let changed = false
-        const next = Object.fromEntries(
-          Object.entries(sessionTabs).map(([key, tabs]) => {
-            if (!isRecord(tabs) || !Array.isArray(tabs.all)) return [key, tabs]
-
-            const current = {
-              all: tabs.all.filter((tab): tab is string => typeof tab === "string"),
-              active: typeof tabs.active === "string" ? tabs.active : undefined,
-            }
-            const normalized = normalizeStoredSessionTabs(key, current)
-            if (current.all.length !== tabs.all.length) changed = true
-            if (!same(current.all, normalized.all) || current.active !== normalized.active) changed = true
-            if (tabs.active !== undefined && typeof tabs.active !== "string") changed = true
-            return [key, normalized]
-          }),
-        )
-
-        if (!changed) return sessionTabs
-        return next
-      })()
-
-      if (
-        migratedSidebar === sidebar &&
-        migratedReview === review &&
-        migratedFileTree === fileTree &&
-        migratedSessionTabs === sessionTabs
-      ) {
-        return value
-      }
-
-      return {
-        ...value,
-        sidebar: migratedSidebar,
-        review: migratedReview,
-        fileTree: migratedFileTree,
-        sessionTabs: migratedSessionTabs,
-      }
-    }
-
     const target = Persist.global("layout", ["layout.v6"])
     const [store, setStore, _, ready] = persisted(
-      { ...target, migrate },
+      { ...target, migrate: migrateStoredLayout },
       createStore({
         sidebar: {
           opened: true,
@@ -270,6 +312,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         },
         rightPanel: {
           width: DEFAULT_RIGHT_PANEL_WIDTH,
+          opened: true,
         },
         mobileSidebar: {
           opened: false,
@@ -775,6 +818,13 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         const s = createMemo(() => store.sessionView[key()] ?? { scroll: {} })
         const terminalOpened = createMemo(() => store.terminal?.opened ?? false)
         const reviewPanelOpened = createMemo(() => store.review?.panelOpened ?? false)
+        const sidePanelOpened = createMemo(() => store.rightPanel?.opened ?? true)
+        const shellTabState = createMemo(() =>
+          normalizeShellTabs({
+            openShellTabs: legacyOpenShellTabs(s().openShellTabs, s().sidePanelTab),
+            sidePanelTab: s().sidePanelTab,
+          }),
+        )
 
         function setTerminalOpened(next: boolean) {
           const current = store.terminal
@@ -798,6 +848,39 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           const value = current.panelOpened ?? true
           if (value === next) return
           setStore("review", "panelOpened", next)
+        }
+
+        function setSidePanelOpened(next: boolean) {
+          const current = store.rightPanel
+          if (!current) {
+            setStore("rightPanel", { width: DEFAULT_RIGHT_PANEL_WIDTH, opened: next })
+            return
+          }
+
+          const value = current.opened ?? true
+          if (value === next) return
+          setStore("rightPanel", "opened", next)
+        }
+
+        function setShellTabState(session: string, next: ShellTabState) {
+          const current = store.sessionView[session]
+          if (!current) {
+            setStore("sessionView", session, {
+              scroll: {},
+              openShellTabs: next.openShellTabs,
+              sidePanelTab: next.sidePanelTab,
+            })
+            return
+          }
+
+          setStore(
+            "sessionView",
+            session,
+            produce((draft) => {
+              draft.openShellTabs = next.openShellTabs
+              draft.sidePanelTab = next.sidePanelTab
+            }),
+          )
         }
 
         return {
@@ -832,40 +915,51 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
             },
           },
           sidePanel: {
-            opened: reviewPanelOpened,
+            opened: sidePanelOpened,
             open() {
-              setReviewPanelOpened(true)
+              setSidePanelOpened(true)
             },
             close() {
-              const session = key()
-              if (s().sidePanelTab === "files" && (s().filesAutoOpenSeen ?? false)) {
-                setStore("sessionView", session, "filesAutoOpenDismissed", true)
-              }
-              setReviewPanelOpened(false)
+              setSidePanelOpened(false)
             },
             toggle() {
-              if (reviewPanelOpened()) {
+              if (sidePanelOpened()) {
                 this.close()
                 return
               }
               this.open()
             },
-            tab: createMemo(() => defaultSidePanelTab(s().sidePanelTab)),
+            openTabs: createMemo(() => shellTabState().openShellTabs),
+            tab: createMemo(() => shellTabState().sidePanelTab),
             setTab(tab: RightPanelTab | "changes") {
+              this.openTab(defaultSidePanelTab(tab))
+            },
+            openTab(tab: RightPanelTab) {
               const session = key()
-              if (!store.sessionView[session]) {
-                setStore("sessionView", session, { scroll: {}, sidePanelTab: tab })
-                return
+              setShellTabState(session, openShellTab(shellTabState(), tab))
+              this.open()
+            },
+            closeTab(tab: RightPanelTab) {
+              if (tab === "status") return
+              const session = key()
+              if (tab === "files" && (s().filesAutoOpenSeen ?? false)) {
+                setStore("sessionView", session, "filesAutoOpenDismissed", true)
               }
-              setStore("sessionView", session, "sidePanelTab", tab)
+              setShellTabState(session, closeShellTab(shellTabState(), tab))
             },
             toggleTab(tab: RightPanelTab | "changes") {
-              if (reviewPanelOpened() && defaultSidePanelTab(s().sidePanelTab) === tab) {
+              const target = defaultSidePanelTab(tab)
+              const next = toggleShellTab(shellTabState(), target, sidePanelOpened())
+              if (next.closePanel) {
                 this.close()
                 return
               }
-              this.setTab(tab)
+              setShellTabState(key(), next.state)
               this.open()
+            },
+            moveTab(tab: RightPanelTab, to: number) {
+              if (tab === "status") return
+              setShellTabState(key(), moveShellTab(shellTabState(), tab, to))
             },
             filesAutoOpenSeen: createMemo(() => s().filesAutoOpenSeen ?? false),
             filesAutoOpenDismissed: createMemo(() => s().filesAutoOpenDismissed ?? false),

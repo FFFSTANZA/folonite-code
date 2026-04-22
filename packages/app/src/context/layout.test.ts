@@ -6,6 +6,8 @@ import {
   DEFAULT_RIGHT_PANEL_WIDTH,
   defaultSidePanelTab,
   ensureSessionKey,
+  legacyRightPanelOpened,
+  migrateStoredLayout,
   MAX_RIGHT_PANEL_WIDTH,
   MIN_RIGHT_PANEL_WIDTH,
   pruneSessionKeys,
@@ -128,5 +130,39 @@ describe("layout.rightPanel clamping", () => {
     // the type signature says number | undefined but defence matters.
     expect(clampRightPanelWidth("400" as unknown as number)).toBe(DEFAULT_RIGHT_PANEL_WIDTH)
     expect(clampRightPanelWidth(null as unknown as number)).toBe(DEFAULT_RIGHT_PANEL_WIDTH)
+  })
+})
+
+describe("legacyRightPanelOpened", () => {
+  test("preserves legacy review panel closed state", () => {
+    expect(legacyRightPanelOpened({ width: 380 }, { panelOpened: false }, { opened: true })).toBe(false)
+  })
+
+  test("falls back to legacy file tree opened state", () => {
+    expect(legacyRightPanelOpened({ width: 380 }, {}, { opened: false })).toBe(false)
+  })
+})
+
+describe("migrateStoredLayout", () => {
+  test("migrates legacy boolean rightPanel to the new object shape", () => {
+    const migrated = migrateStoredLayout({
+      rightPanel: false,
+      sessionView: {},
+      sessionTabs: {},
+    }) as { rightPanel: { opened: boolean; width: number } }
+
+    expect(migrated.rightPanel).toEqual({ opened: false, width: DEFAULT_RIGHT_PANEL_WIDTH })
+  })
+
+  test("preserves legacy closed review panel when right panel state is missing", () => {
+    const migrated = migrateStoredLayout({
+      review: { panelOpened: false },
+      fileTree: { opened: true },
+      sessionView: {},
+      sessionTabs: {},
+    }) as { rightPanel: { opened: boolean; width: number } }
+
+    expect(migrated.rightPanel.opened).toBe(false)
+    expect(migrated.rightPanel.width).toBe(DEFAULT_RIGHT_PANEL_WIDTH)
   })
 })
