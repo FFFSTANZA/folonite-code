@@ -71,6 +71,7 @@ export const dict = {
 
   "command.review.toggle": "切换审查",
   "session.panel.files": "文件",
+  "session.panel.addTab": "添加标签页",
   "session.panel.changes": "变更",
   "session.panel.utility": "右侧工具面板",
 

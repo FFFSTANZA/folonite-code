@@ -16,6 +16,16 @@ beforeAll(async () => {
   })
 
   mock.module("@opencode-ai/ui/icon-button", () => ({ IconButton: () => null }))
+  mock.module("@opencode-ai/ui/dropdown-menu", () => {
+    const DropdownMenu = (_props: any) => null
+    DropdownMenu.Trigger = (_props: any) => null
+    DropdownMenu.Portal = (_props: any) => null
+    DropdownMenu.Content = (_props: any) => null
+    DropdownMenu.Item = (_props: any) => null
+    DropdownMenu.ItemLabel = (_props: any) => null
+    DropdownMenu.Separator = () => null
+    return { DropdownMenu }
+  })
   mock.module("@opencode-ai/ui/tooltip", () => ({ TooltipKeybind: (_props: any) => null }))
   mock.module("@opencode-ai/ui/resize-handle", () => ({ ResizeHandle: () => null }))
   mock.module("@opencode-ai/ui/logo", () => ({ Mark: () => null }))
@@ -35,6 +45,8 @@ beforeAll(async () => {
   mock.module("@/components/session", () => ({
     SessionContextTab: () => null,
     SortableTab: () => null,
+    ShellTab: () => null,
+    SortableShellTab: () => null,
     FileVisual: () => null,
   }))
   mock.module("@/components/session/session-status-panel", () => ({ SessionStatusPanel: () => null }))
@@ -101,9 +113,12 @@ describe("SessionSidePanel", () => {
   test("preserves helper exports for later session tests", async () => {
     const helpers = await import("./helpers")
     const fileTabScroll = await import("./file-tab-scroll")
+    const sessionComponents = await import("@/components/session")
 
     expect(typeof helpers.createOpenReviewFile).toBe("function")
     expect(typeof fileTabScroll.nextTabListScrollLeft).toBe("function")
+    expect(typeof sessionComponents.ShellTab).toBe("function")
+    expect(typeof sessionComponents.SortableShellTab).toBe("function")
   })
 })
 
@@ -128,6 +143,25 @@ describe("shouldShowReviewFileOpenButton", () => {
     expect(shouldShowReviewFileOpenButton("review", false)).toBe(false)
     expect(shouldShowReviewFileOpenButton("context", false)).toBe(true)
     expect(shouldShowReviewFileOpenButton("review", true)).toBe(true)
+  })
+})
+
+describe("sortableShellTabIds", () => {
+  test("keeps the pinned status tab out of sortable ids", async () => {
+    const { sortableShellTabIds } = await import("./session-side-panel")
+
+    expect(sortableShellTabIds(["status", "files", "review", "terminal"])).toEqual(["files", "review", "terminal"])
+  })
+})
+
+describe("openReviewShellTab", () => {
+  test("opens and activates the review shell tab", async () => {
+    const { openReviewShellTab } = await import("./session-side-panel")
+    const calls: string[] = []
+
+    openReviewShellTab({ openTab: (tab) => calls.push(tab) })
+
+    expect(calls).toEqual(["review"])
   })
 })
 

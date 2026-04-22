@@ -57,6 +57,7 @@ export const dict = {
   "command.panel.toggle.description": "Open or close the right utility panel (⌥⌘B)",
   "command.review.toggle": "Toggle review",
   "session.panel.files": "Files",
+  "session.panel.addTab": "Add tab",
   "session.panel.changes": "Changes",
   "session.panel.utility": "Right utility panel",
   "command.terminal.new": "New terminal",

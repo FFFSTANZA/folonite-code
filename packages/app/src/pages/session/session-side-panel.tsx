@@ -4,6 +4,7 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Mark } from "@opencode-ai/ui/logo"
@@ -14,7 +15,7 @@ import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
 import { SessionContextUsage } from "@/components/session-context-usage"
-import { SessionContextTab, SortableTab, FileVisual } from "@/components/session"
+import { FileVisual, SessionContextTab, ShellTab, SortableShellTab, SortableTab } from "@/components/session"
 import { SessionStatusPanel } from "@/components/session/session-status-panel"
 import { useCommand } from "@/context/command"
 import { useFile, type SelectedLineRange } from "@/context/file"
@@ -26,7 +27,14 @@ import { FilesTab } from "@/pages/session/files-tab"
 import type { FilesTabEntry } from "@/pages/session/files-tab-state"
 import { createOpenSessionFileTab, createSessionTabs, getTabReorderIndex, type Sizing } from "@/pages/session/helpers"
 import { setSessionHandoff } from "@/pages/session/handoff"
-import type { RightPanelTab } from "@/pages/session/right-panel-tabs"
+import {
+  isRightPanelTab,
+  RIGHT_PANEL_TAB_META,
+  RIGHT_PANEL_TAB_VALUES,
+  type RightPanelShellIconName,
+  type RightPanelTab,
+  type ShellTabIcon,
+} from "@/pages/session/right-panel-tabs"
 import { useSessionLayout } from "@/pages/session/session-layout"
 
 /** Converts right-panel state into the CSS width applied to the shell. */
@@ -50,22 +58,33 @@ export function shouldShowReviewFileOpenButton(activeTab: string | undefined, ha
   return hasSecondaryTabs || activeTab !== "review"
 }
 
-type RightPanelShellIconName = "status" | "folder" | "review" | "terminal"
+/** Returns shell tabs that can be reordered by the user. Status is pinned. */
+export function sortableShellTabIds(tabs: readonly RightPanelTab[]): RightPanelTab[] {
+  return tabs.filter((tab) => tab !== "status")
+}
+
+/** Names the file-opening transition that must activate Review before showing file-specific content. */
+export function openReviewShellTab(sidePanel: { openTab: (tab: "review") => void }) {
+  sidePanel.openTab("review")
+}
 
 /** Maps right-panel tab names to their shell icon components. */
-function RightPanelShellIcon(props: { icon: RightPanelShellIconName }) {
+function RightPanelShellIcon(props: { icon: ShellTabIcon }) {
   return (
     <Switch>
-      <Match when={props.icon === "status"}>
+      <Match when={props.icon.kind === "indicator"}>
+        <SessionContextUsage variant="indicator" />
+      </Match>
+      <Match when={props.icon.kind === "icon" && props.icon.name === "status"}>
         <Icon name="status" size="small" class="text-text-weaker" />
       </Match>
-      <Match when={props.icon === "folder"}>
+      <Match when={props.icon.kind === "icon" && props.icon.name === "folder"}>
         <Icon name="folder" size="small" class="text-text-weaker" />
       </Match>
-      <Match when={props.icon === "review"}>
+      <Match when={props.icon.kind === "icon" && props.icon.name === "review"}>
         <Icon name="review" size="small" class="text-text-weaker" />
       </Match>
-      <Match when={props.icon === "terminal"}>
+      <Match when={props.icon.kind === "icon" && props.icon.name === "terminal"}>
         <Icon name="terminal" size="small" class="text-text-weaker" />
       </Match>
     </Switch>
@@ -103,7 +122,7 @@ export function SessionSidePanel(props: {
   }
 
   const openReviewPanel = () => {
-    if (!view().reviewPanel.opened()) view().reviewPanel.open()
+    openReviewShellTab(view().sidePanel)
   }
 
   const openTab = createOpenSessionFileTab({
@@ -122,29 +141,37 @@ export function SessionSidePanel(props: {
     review: reviewTab,
     hasReview: props.canReview,
   })
-  const contextOpen = tabState.contextOpen
   const openedTabs = tabState.openedTabs
   const activeTab = tabState.activeTab
   const activeFileTab = tabState.activeFileTab
-  const showSecondaryReviewTabs = createMemo(() => contextOpen() || openedTabs().length > 0)
+  const showSecondaryReviewTabs = createMemo(() => openedTabs().length > 0)
   const shellTabs = createMemo(
     () =>
-      [
-        { value: "status", label: language.t("status.popover.trigger"), icon: "status" as const },
-        { value: "files", label: language.t("session.panel.files"), icon: "folder" as const },
-        { value: "review", label: language.t("session.tab.review"), icon: "review" as const },
-        { value: "terminal", label: language.t("terminal.title"), icon: "terminal" as const },
-      ] satisfies Array<{
-        value: RightPanelTab
-        label: string
-        icon: RightPanelShellIconName
-      }>,
+      view()
+        .sidePanel.openTabs()
+        .map((value) => {
+          const meta = RIGHT_PANEL_TAB_META[value]
+          return {
+            value,
+            label: language.t(meta.labelKey),
+            icon: meta.icon,
+            closable: meta.closable,
+          }
+        }),
   )
+  const closableMissingTabs = createMemo(() => {
+    const open = new Set(view().sidePanel.openTabs())
+    return RIGHT_PANEL_TAB_VALUES.filter((tab) => tab !== "status" && !open.has(tab)).map((value) => {
+      const meta = RIGHT_PANEL_TAB_META[value]
+      const iconName: RightPanelShellIconName = meta.icon.kind === "icon" ? meta.icon.name : meta.icon.fallbackIcon
+      const keybind = meta.commandId ? command.keybind(meta.commandId) : undefined
+      return { value, label: language.t(meta.labelKey), iconName, keybind }
+    })
+  })
 
   const setSidePanelTabValue = (value: string) => {
-    if (value !== "status" && value !== "files" && value !== "review" && value !== "terminal") return
-    view().sidePanel.setTab(value as RightPanelTab)
-    view().sidePanel.open()
+    if (!isRightPanelTab(value)) return
+    view().sidePanel.openTab(value)
   }
   const showAllFiles = () => {
     if (view().sidePanel.explorer.tab() !== "changes") return
@@ -185,6 +212,20 @@ export function SessionSidePanel(props: {
     const toIndex = getTabReorderIndex(currentTabs, draggable.id.toString(), droppable.id.toString())
     if (toIndex === undefined) return
     tabs().move(draggable.id.toString(), toIndex)
+  }
+
+  const handleShellDragOver = (event: DragEvent) => {
+    const { draggable, droppable } = event
+    if (!draggable || !droppable) return
+
+    const from = draggable.id.toString()
+    const to = droppable.id.toString()
+    if (!isRightPanelTab(from) || !isRightPanelTab(to)) return
+
+    const currentTabs = view().sidePanel.openTabs()
+    const toIndex = getTabReorderIndex(currentTabs, from, to)
+    if (toIndex === undefined) return
+    view().sidePanel.moveTab(from, toIndex)
   }
 
   const handleDragEnd = () => {
@@ -248,34 +289,90 @@ export function SessionSidePanel(props: {
           />
         </div>
         <div class="size-full border-l border-border-weaker-base">
-          <Tabs
-            variant="sidepanel"
-            value={sidePanelTab()}
-            onChange={setSidePanelTabValue}
-            class="h-full flex flex-col"
-            data-scope="right-panel"
+          <DragDropProvider
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleShellDragOver}
+            collisionDetector={closestCenter}
           >
-            <Tabs.List class="h-11 shrink-0 px-2 py-0 border-b border-border-weaker-base gap-1 items-center">
-              <For each={shellTabs()}>
-                {(tab) => (
-                  <Tabs.Trigger
-                    value={tab.value}
-                    class="shrink-0 h-7"
-                    classes={{
-                      button:
-                        "h-7 min-h-7 inline-flex items-center whitespace-nowrap rounded-md text-12-medium text-text-weak gap-1.5 px-2.5",
-                    }}
-                  >
-                    <RightPanelShellIcon icon={tab.icon} />
-                    <span>{tab.label}</span>
-                  </Tabs.Trigger>
-                )}
-              </For>
-              <div class="flex-1" />
-              {/* 40px right-gutter reserve — matches docs/design/src/rightpanel.jsx,
+            <DragDropSensors />
+            <ConstrainDragYAxis />
+            <Tabs
+              variant="sidepanel"
+              value={sidePanelTab()}
+              onChange={setSidePanelTabValue}
+              class="h-full flex flex-col"
+              data-scope="right-panel"
+            >
+              <Tabs.List class="h-11 shrink-0 px-2 py-0 border-b border-border-weaker-base gap-1 items-center">
+                <SortableProvider ids={sortableShellTabIds(view().sidePanel.openTabs())}>
+                  <For each={shellTabs()}>
+                    {(tab) => (
+                      <Show
+                        when={tab.value !== "status"}
+                        fallback={
+                          <ShellTab
+                            value={tab.value}
+                            label={tab.label}
+                            closable={tab.closable}
+                            onClose={view().sidePanel.closeTab}
+                          >
+                            <RightPanelShellIcon icon={tab.icon} />
+                            <span>{tab.label}</span>
+                          </ShellTab>
+                        }
+                      >
+                        <SortableShellTab
+                          value={tab.value}
+                          label={tab.label}
+                          closable={tab.closable}
+                          onClose={view().sidePanel.closeTab}
+                        >
+                          <RightPanelShellIcon icon={tab.icon} />
+                          <span>{tab.label}</span>
+                        </SortableShellTab>
+                      </Show>
+                    )}
+                  </For>
+                </SortableProvider>
+                <div class="flex-1" />
+                {/* 40px right-gutter reserve — matches docs/design/src/rightpanel.jsx,
                   gives the tab row breathing room against the panel edge. */}
-              <div class="w-10 shrink-0" aria-hidden />
-            </Tabs.List>
+                <DropdownMenu gutter={4} placement="bottom-end">
+                  <DropdownMenu.Trigger
+                    as={IconButton}
+                    icon="plus-small"
+                    variant="ghost"
+                    class="w-8 h-7 shrink-0"
+                    aria-label={language.t("session.panel.addTab")}
+                  />
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content>
+                      <DropdownMenu.Item onSelect={() => openFilePicker(showAllFiles)}>
+                        <Icon name="folder-add-left" size="small" />
+                        <DropdownMenu.ItemLabel>{language.t("command.file.open")}</DropdownMenu.ItemLabel>
+                        <span class="ml-auto text-12-regular text-text-weaker">{command.keybind("file.open")}</span>
+                      </DropdownMenu.Item>
+                      <Show when={closableMissingTabs().length > 0}>
+                        <DropdownMenu.Separator />
+                        <For each={closableMissingTabs()}>
+                          {(tab) => (
+                            <DropdownMenu.Item onSelect={() => view().sidePanel.openTab(tab.value)}>
+                              <Icon name={tab.iconName} size="small" />
+                              <DropdownMenu.ItemLabel>{tab.label}</DropdownMenu.ItemLabel>
+                              <Show when={tab.keybind}>
+                                {(keybind) => (
+                                  <span class="ml-auto text-12-regular text-text-weaker">{keybind()}</span>
+                                )}
+                              </Show>
+                            </DropdownMenu.Item>
+                          )}
+                        </For>
+                      </Show>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu>
+              </Tabs.List>
 
             <Tabs.Content value="status" class="min-h-0 flex-1 overflow-hidden">
               <SessionStatusPanel shown={() => open() && sidePanelTab() === "status"} />
@@ -323,7 +420,7 @@ export function SessionSidePanel(props: {
                           >
                             <Tabs.List
                               ref={(el: HTMLDivElement) => {
-                                const stop = createFileTabListSync({ el, contextOpen })
+                                const stop = createFileTabListSync({ el })
                                 onCleanup(stop)
                               }}
                             >
@@ -334,34 +431,6 @@ export function SessionSidePanel(props: {
                                     <Show when={props.hasReview()}>
                                       <div>{props.reviewCount()}</div>
                                     </Show>
-                                  </div>
-                                </Tabs.Trigger>
-                              </Show>
-                              <Show when={contextOpen()}>
-                                <Tabs.Trigger
-                                  value="context"
-                                  closeButton={
-                                    <TooltipKeybind
-                                      title={language.t("common.closeTab")}
-                                      keybind={command.keybind("tab.close")}
-                                      placement="bottom"
-                                      gutter={10}
-                                    >
-                                      <IconButton
-                                        icon="close-small"
-                                        variant="ghost"
-                                        class="h-5 w-5"
-                                        onClick={() => tabs().close("context")}
-                                        aria-label={language.t("common.closeTab")}
-                                      />
-                                    </TooltipKeybind>
-                                  }
-                                  hideCloseButton
-                                  onMiddleClick={() => tabs().close("context")}
-                                >
-                                  <div class="flex items-center gap-2">
-                                    <SessionContextUsage variant="indicator" />
-                                    <div>{language.t("session.tab.context")}</div>
                                   </div>
                                 </Tabs.Trigger>
                               </Show>
@@ -407,16 +476,6 @@ export function SessionSidePanel(props: {
                           </Show>
                         </Tabs.Content>
 
-                        <Show when={contextOpen()}>
-                          <Tabs.Content value="context" class="flex flex-col h-full overflow-hidden contain-strict">
-                            <Show when={activeTab() === "context"}>
-                              <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
-                                <SessionContextTab />
-                              </div>
-                            </Show>
-                          </Tabs.Content>
-                        </Show>
-
                         <Show when={activeFileTab()} keyed>
                           {(tab) => <FileTabContent tab={tab} />}
                         </Show>
@@ -438,17 +497,24 @@ export function SessionSidePanel(props: {
                 </div>
             </Tabs.Content>
 
-            <Tabs.Content value="terminal" class="min-h-0 flex-1 overflow-hidden">
-              <Show when={sidePanelTab() === "terminal"}>
-                <Show
-                  when={props.terminalPanel}
-                  fallback={<div class="px-4 py-3 text-14-regular text-text-weak">{language.t("terminal.loading")}</div>}
-                >
-                  {(renderTerminal) => renderTerminal()()}
+              <Tabs.Content value="terminal" class="min-h-0 flex-1 overflow-hidden">
+                <Show when={sidePanelTab() === "terminal"}>
+                  <Show
+                    when={props.terminalPanel}
+                    fallback={
+                      <div class="px-4 py-3 text-14-regular text-text-weak">{language.t("terminal.loading")}</div>
+                    }
+                  >
+                    {(renderTerminal) => renderTerminal()()}
+                  </Show>
                 </Show>
-              </Show>
-            </Tabs.Content>
-          </Tabs>
+              </Tabs.Content>
+
+              <Tabs.Content value="context" class="min-h-0 flex-1 overflow-hidden">
+                <SessionContextTab />
+              </Tabs.Content>
+            </Tabs>
+          </DragDropProvider>
         </div>
       </aside>
     </Show>
