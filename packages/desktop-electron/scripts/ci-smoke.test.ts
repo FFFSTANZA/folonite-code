@@ -15,6 +15,9 @@ describe("ci smoke helpers", () => {
     expect(env.PAWWORK_CI_SMOKE_HOME).toBe("/tmp/pawwork-ci-smoke")
     expect(env.HOME).toBe("/tmp/pawwork-ci-smoke")
     expect(env.XDG_DATA_HOME).toBe("/tmp/pawwork-ci-smoke")
+    expect(env.XDG_CACHE_HOME).toBe("/tmp/pawwork-ci-smoke")
+    expect(env.XDG_CONFIG_HOME).toBe("/tmp/pawwork-ci-smoke")
+    expect(env.XDG_STATE_HOME).toBe("/tmp/pawwork-ci-smoke")
     expect(env.CI).toBe("true")
   })
 

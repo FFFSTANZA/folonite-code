@@ -1,5 +1,6 @@
 import { app } from "electron"
 import { DEFAULT_SERVER_URL_KEY, WSL_ENABLED_KEY } from "./constants"
+import { PAWWORK_RUNTIME, runtimeRoots } from "./runtime-namespace"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { store } from "./store"
 
@@ -58,18 +59,25 @@ export async function spawnLocalServer(hostname: string, port: number, password:
 function prepareServerEnv(password: string) {
   const shell = process.platform === "win32" ? null : getUserShell()
   const shellEnv = shell ? (loadShellEnv(shell) ?? {}) : {}
+  const roots = runtimeRoots(app.getPath("userData"))
   const env = {
     ...process.env,
     ...shellEnv,
     OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: "true",
     OPENCODE_EXPERIMENTAL_FILEWATCHER: "true",
-    OPENCODE_CLIENT: "desktop",
-    OPENCODE_SERVER_USERNAME: "opencode",
+    OPENCODE_CLIENT: PAWWORK_RUNTIME.client,
+    OPENCODE_SERVER_USERNAME: PAWWORK_RUNTIME.serverUsername,
     OPENCODE_SERVER_PASSWORD: password,
-    XDG_STATE_HOME: app.getPath("userData"),
+    PAWWORK_RUNTIME_NAMESPACE: "pawwork",
+    XDG_DATA_HOME: roots.data,
+    XDG_CACHE_HOME: roots.cache,
+    XDG_CONFIG_HOME: roots.config,
+    XDG_STATE_HOME: roots.state,
   }
   Object.assign(process.env, env)
 }
+
+export const prepareServerEnvForTest = prepareServerEnv
 
 export async function checkHealth(url: string, password?: string | null): Promise<boolean> {
   let healthUrl: URL
@@ -81,7 +89,7 @@ export async function checkHealth(url: string, password?: string | null): Promis
 
   const headers = new Headers()
   if (password) {
-    const auth = Buffer.from(`opencode:${password}`).toString("base64")
+    const auth = Buffer.from(`${PAWWORK_RUNTIME.serverUsername}:${password}`).toString("base64")
     headers.set("authorization", `Basic ${auth}`)
   }
 
