@@ -116,6 +116,35 @@ describe("desktop server runtime namespace", () => {
     expect(env.PAWWORK_TEST_ENV).toBe("process")
   })
 
+  nonWindowsTest("keeps login shell PATH so Homebrew commands remain discoverable", async () => {
+    process.env.PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
+    mockShellEnv = {
+      PATH: "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin",
+    }
+    const { buildServerEnvForTest } = await import("./server")
+
+    const env = buildServerEnvForTest("secret")
+
+    expect(env.PATH).toBe("/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin")
+  })
+
+  nonWindowsTest("keeps process GitHub CLI config priority without letting process PATH override shell PATH", async () => {
+    process.env.PATH = "/usr/bin:/bin"
+    process.env.GH_CONFIG_DIR = "/process/gh"
+    mockShellEnv = {
+      PATH: "/opt/homebrew/bin:/usr/bin:/bin",
+      GH_CONFIG_DIR: "/shell/gh",
+      XDG_CONFIG_HOME: "/shell/config",
+    }
+    const { buildServerEnvForTest } = await import("./server")
+
+    const env = buildServerEnvForTest("secret")
+
+    expect(env.PATH).toBe("/opt/homebrew/bin:/usr/bin:/bin")
+    expect(env.GH_CONFIG_DIR).toBe("/process/gh")
+    expect(env.XDG_CONFIG_HOME).toBe(serverRoots.config)
+  })
+
   nonWindowsTest("derives GitHub CLI config directory from shell XDG config home", async () => {
     delete process.env.GH_CONFIG_DIR
     delete process.env.XDG_CONFIG_HOME
