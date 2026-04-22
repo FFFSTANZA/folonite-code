@@ -96,6 +96,29 @@ export namespace SessionEntry {
     text: Schema.String,
   }) {}
 
+  export class AssistantRetry extends Schema.Class<AssistantRetry>("Session.Entry.Assistant.Retry")({
+    attempt: Schema.Number,
+    error: SessionEvent.RetryError,
+    time: Schema.Struct({
+      created: Schema.DateTimeUtc,
+    }),
+  }) {
+    static fromEvent(event: SessionEvent.Retried) {
+      const error =
+        typeof event.error === "string"
+          // Legacy retry events stored only the message, so retryability cannot be recovered.
+          ? new SessionEvent.RetryError({ message: event.error, isRetryable: true })
+          : event.error
+      return new AssistantRetry({
+        attempt: event.attempt ?? 0,
+        error,
+        time: {
+          created: event.timestamp,
+        },
+      })
+    }
+  }
+
   export const AssistantContent = Schema.Union([AssistantText, AssistantReasoning, AssistantTool])
   export type AssistantContent = Schema.Schema.Type<typeof AssistantContent>
 
@@ -103,6 +126,7 @@ export namespace SessionEntry {
     ...Base,
     type: Schema.Literal("assistant"),
     content: AssistantContent.pipe(Schema.Array),
+    retries: AssistantRetry.pipe(Schema.Array, Schema.optional),
     cost: Schema.Number.pipe(Schema.optional),
     tokens: Schema.Struct({
       input: Schema.Number,
@@ -280,6 +304,11 @@ export namespace SessionEntry {
         if (!pendingAssistant) break
         const match = lastReasoning(pendingAssistant)
         if (match) match.text = event.text
+        break
+      }
+      case "retried": {
+        if (!pendingAssistant) break
+        pendingAssistant.retries = [...(pendingAssistant.retries ?? []), AssistantRetry.fromEvent(event)]
         break
       }
       case "step.ended": {

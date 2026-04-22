@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { Schema } from "effect"
 import * as DateTime from "effect/DateTime"
 import * as FastCheck from "effect/testing/FastCheck"
 import { SessionEntry } from "../../src/v2/session-entry"
@@ -75,6 +76,18 @@ function tools(state: SessionEntry.History) {
 
 function tool(state: SessionEntry.History, callID: string) {
   return tools(state).find((x) => x.callID === callID)
+}
+
+function retryError(message: string) {
+  return new SessionEvent.RetryError({
+    message,
+    isRetryable: true,
+  })
+}
+
+function retries(state: SessionEntry.History) {
+  const entry = last(state)
+  return entry?.retries ?? []
 }
 
 describe("session-entry step", () => {
@@ -345,6 +358,54 @@ describe("session-entry step", () => {
       expect(second?.state.status).toBe("pending")
     })
 
+    test("records retry attempts on the pending assistant", () => {
+      const next = run(
+        [
+          SessionEvent.Retried.create({
+            attempt: 1,
+            error: retryError("rate limited"),
+            timestamp: time(1),
+          }),
+          SessionEvent.Retried.create({
+            attempt: 2,
+            error: retryError("provider overloaded"),
+            timestamp: time(2),
+          }),
+        ],
+        active(),
+      )
+
+      expect(retries(next).map((retry) => retry.attempt)).toEqual([1, 2])
+      expect(retries(next).map((retry) => retry.error.message)).toEqual(["rate limited", "provider overloaded"])
+    })
+
+    test("normalizes legacy retry string errors", () => {
+      const decode = Schema.decodeUnknownSync(SessionEvent.Retried)
+      const event = decode({
+        id: SessionEvent.ID.create(),
+        type: "retried",
+        attempt: 1,
+        error: "rate limited",
+        timestamp: time(1),
+      })
+
+      const next = SessionEntry.step(active(), event)
+
+      expect(retries(next).map((retry) => retry.error.message)).toEqual(["rate limited"])
+      expect(retries(next).map((retry) => retry.error.isRetryable)).toEqual([true])
+    })
+
+    test("normalizes legacy retry events without attempt", () => {
+      const event = SessionEvent.Retried.create({
+        error: "rate limited",
+        timestamp: time(1),
+      })
+
+      const next = SessionEntry.step(active(), event)
+
+      expect(retries(next).map((retry) => retry.attempt)).toEqual([0])
+      expect(retries(next).map((retry) => retry.error.isRetryable)).toEqual([true])
+    })
   })
 
   describe("known reducer gaps", () => {
