@@ -11,11 +11,53 @@ import { desktopShellMainSelector, titlebarShellSelector } from "../src/renderer
 export const requiredSelectors = [titlebarShellSelector, desktopShellMainSelector]
 const require = createRequire(import.meta.url)
 
+export type SmokeChannel = "dev" | "beta" | "prod"
+export type SmokeMode = "raw" | "packaged"
+
+export type SmokeTarget =
+  | { mode: "raw"; channel: SmokeChannel }
+  | { mode: "packaged"; channel: SmokeChannel; executablePath: string }
+
+type LaunchedApp = {
+  child: ChildProcessWithoutNullStreams
+  spawnError: { current: Error | undefined }
+}
+
+const APP_ID_BY_CHANNEL: Record<SmokeChannel, string> = {
+  dev: "ai.pawwork.desktop.dev",
+  beta: "ai.pawwork.desktop.beta",
+  prod: "ai.pawwork.desktop",
+}
+
+function parseChannel(raw: string | undefined): SmokeChannel {
+  if (raw === undefined || raw === "") return "dev"
+  if (raw === "dev" || raw === "beta" || raw === "prod") return raw
+  throw new Error(`Unsupported smoke channel: ${raw}`)
+}
+
+export function appIdForSmoke(channel: SmokeChannel, mode: SmokeMode) {
+  if (mode === "raw") return APP_ID_BY_CHANNEL.dev
+  return APP_ID_BY_CHANNEL[channel]
+}
+
+export function parseSmokeArgs(argv: string[]): SmokeTarget {
+  const mode = argv[0] as SmokeMode | undefined
+  if (mode === undefined || mode === "raw") {
+    return { mode: "raw", channel: parseChannel(argv[1]) }
+  }
+  if (mode !== "packaged") throw new Error(`Unsupported smoke mode: ${mode}`)
+
+  const executablePath = argv[2]
+  if (!executablePath) throw new Error("Packaged smoke requires an executable path")
+  if (!existsSync(executablePath)) throw new Error(`Packaged smoke executable not found: ${executablePath}`)
+  return { mode, channel: parseChannel(argv[1]), executablePath }
+}
+
 export function resolveMainEntry() {
   return resolve(import.meta.dir, "../out/main/index.js")
 }
 
-export function buildSmokeEnv(homeDir: string) {
+export function buildSmokeEnv(homeDir: string, channel: SmokeChannel = "dev") {
   return {
     ...process.env,
     CI: "true",
@@ -26,16 +68,25 @@ export function buildSmokeEnv(homeDir: string) {
     XDG_CACHE_HOME: homeDir,
     XDG_CONFIG_HOME: homeDir,
     XDG_STATE_HOME: homeDir,
-    OPENCODE_CHANNEL: "dev",
+    OPENCODE_CHANNEL: channel,
   }
 }
 
-export function resolveCiSmokeReadyFile(homeDir: string) {
-  return join(homeDir, "ai.pawwork.desktop.dev", "ci-smoke-ready.json")
+export function resolveCiSmokeReadyFile(homeDir: string, options: { channel?: SmokeChannel; mode?: SmokeMode } = {}) {
+  const channel = options.channel ?? "dev"
+  const mode = options.mode ?? "raw"
+  return join(homeDir, appIdForSmoke(channel, mode), "ci-smoke-ready.json")
 }
 
 function resolveElectronBinary() {
   return require("electron/index.js") as string
+}
+
+export function resolveLaunchCommand(target: SmokeTarget) {
+  if (target.mode === "packaged") {
+    return { command: target.executablePath, args: [] as string[] }
+  }
+  return { command: resolveElectronBinary(), args: [resolveMainEntry()] }
 }
 
 function watchChildLogs(child: ChildProcessWithoutNullStreams) {
@@ -60,11 +111,18 @@ function watchChildLogs(child: ChildProcessWithoutNullStreams) {
   }
 }
 
-async function waitForCiSmokeReady(homeDir: string, child: ChildProcessWithoutNullStreams, recent: string[]) {
-  const readyFile = resolveCiSmokeReadyFile(homeDir)
+async function waitForCiSmokeReady(
+  homeDir: string,
+  target: SmokeTarget,
+  child: ChildProcessWithoutNullStreams,
+  spawnError: { current: Error | undefined },
+  recent: string[],
+) {
+  const readyFile = resolveCiSmokeReadyFile(homeDir, { channel: target.channel, mode: target.mode })
   const timeoutAt = Date.now() + 60_000
 
   while (Date.now() < timeoutAt) {
+    if (spawnError.current) throw new Error(`Failed to launch desktop app: ${spawnError.current.message}`)
     if (existsSync(readyFile)) return
 
     if (child.exitCode !== null || child.signalCode !== null) {
@@ -79,11 +137,22 @@ async function waitForCiSmokeReady(homeDir: string, child: ChildProcessWithoutNu
   throw new Error(`Timed out waiting for the desktop app to report CI smoke readiness${tail}`)
 }
 
-function launchApp(homeDir: string) {
-  return spawn(resolveElectronBinary(), [resolveMainEntry()], {
-    env: buildSmokeEnv(homeDir),
-    stdio: ["ignore", "pipe", "pipe"],
-  })
+function launchApp(homeDir: string, target: SmokeTarget): LaunchedApp {
+  const launch = resolveLaunchCommand(target)
+  const spawnError = { current: undefined as Error | undefined }
+  try {
+    const child = spawn(launch.command, launch.args, {
+      env: buildSmokeEnv(homeDir, target.channel),
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+    child.on("error", (error) => {
+      spawnError.current = error
+    })
+    return { child, spawnError }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to launch desktop app: ${message}`)
+  }
 }
 
 async function stopChild(child: ChildProcessWithoutNullStreams) {
@@ -99,12 +168,13 @@ async function stopChild(child: ChildProcessWithoutNullStreams) {
 }
 
 async function main() {
+  const target = parseSmokeArgs(Bun.argv.slice(2))
   const homeDir = mkdtempSync(join(tmpdir(), "pawwork-ci-smoke-"))
-  const child = launchApp(homeDir)
+  const { child, spawnError } = launchApp(homeDir, target)
   const logs = watchChildLogs(child)
 
   try {
-    await waitForCiSmokeReady(homeDir, child, logs.recent)
+    await waitForCiSmokeReady(homeDir, target, child, spawnError, logs.recent)
   } finally {
     logs.close()
     await stopChild(child)
