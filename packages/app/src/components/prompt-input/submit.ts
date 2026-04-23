@@ -19,6 +19,7 @@ import { Identifier } from "@/utils/id"
 import { Worktree as WorktreeState } from "@/utils/worktree"
 import { buildRequestParts } from "./build-request-parts"
 import { setCursorPosition } from "./editor-dom"
+import { buildHomeOverride } from "./home-override"
 import { formatServerError } from "@/utils/server-errors"
 
 type PendingPrompt = {
@@ -412,11 +413,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     const locale = language.intl()
     const agent = isNewSession ? "build" : currentAgent!.name
     const context = prompt.context.items().slice()
-    const outgoingTextOverride = homeSkill
-      ? text.trim().length > 0
-        ? `/${homeSkill} ${text.trim()}`
-        : `/${homeSkill}`
-      : undefined
+    const outgoingTextOverride = buildHomeOverride(homeSkill, text)
     const draft: FollowupDraft = {
       sessionID: session.id,
       sessionDirectory,
