@@ -1,6 +1,10 @@
-// Bound clipboard payloads while preserving recent logs and session snippets for diagnosis.
-// Default clipboard payload limit: 5 MB.
-const DEFAULT_MAX_BYTES = 5 * 1024 * 1024
+// Bound full report payloads while preserving recent logs and session snippets for diagnosis.
+// Default full report payload limit: 5 MB.
+export const DEFAULT_PROBLEM_REPORT_MAX_BYTES = 5 * 1024 * 1024
+const SUMMARY_ERROR_LINE_MAX_CHARS = 220
+const SUMMARY_FAILURE_REASON_MAX_CHARS = 80
+const SUMMARY_ROUTE_MAX_CHARS = 120
+const SUMMARY_SESSION_MAX_CHARS = 80
 
 export type ProblemReportDiagnostics = {
   appVersion: string
@@ -38,10 +42,13 @@ type Input = {
 
 type Options = {
   maxBytes?: number
+  reportId?: string
+  generatedAt?: string
 }
 
 type Payload = {
   reportVersion: 1
+  reportId: string
   generatedAt: string
   diagnostics: ProblemReportDiagnostics
   logTail: string
@@ -59,6 +66,15 @@ function bytes(value: string) {
   return Buffer.byteLength(value, "utf8")
 }
 
+function isCanonicalIsoTimestamp(value: string) {
+  const time = Date.parse(value)
+  return !Number.isNaN(time) && new Date(time).toISOString() === value
+}
+
+export function defaultReportId() {
+  return `pwr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
+
 function jsonBytes(value: unknown) {
   return bytes(JSON.stringify(toJsonSafe(value)) ?? "")
 }
@@ -67,7 +83,7 @@ function markdown(payload: Payload) {
   return [
     "# PawWork Problem Report",
     "",
-    "Paste this report into the feedback form after reviewing it.",
+    "Upload this markdown file to the feedback form after reviewing it.",
     "",
     "```json",
     JSON.stringify(payload, null, 2),
@@ -147,8 +163,12 @@ function truncateDiagnostics(diagnostics: ProblemReportDiagnostics, stringLimit:
 }
 
 export function buildProblemReport(input: Input, options: Options = {}) {
-  const maxBytes = Math.floor(options.maxBytes ?? DEFAULT_MAX_BYTES)
+  const maxBytes = Math.floor(options.maxBytes ?? DEFAULT_PROBLEM_REPORT_MAX_BYTES)
   if (!Number.isFinite(maxBytes) || maxBytes <= 0) throw new Error("maxBytes must be a positive finite number")
+  const reportId = options.reportId ?? defaultReportId()
+  const generatedAt = options.generatedAt ?? new Date().toISOString()
+  if (reportId.trim().length === 0) throw new Error("reportId must be a non-empty string")
+  if (!isCanonicalIsoTimestamp(generatedAt)) throw new Error("generatedAt must be a valid ISO timestamp")
   const sessionExport = sanitizeSessionExport(input.sessionExport)
   let diagnostics = input.diagnostics
   let logTail = input.logTail
@@ -163,7 +183,8 @@ export function buildProblemReport(input: Input, options: Options = {}) {
 
   const makePayload = (): Payload => ({
     reportVersion: 1,
-    generatedAt: new Date().toISOString(),
+    reportId,
+    generatedAt,
     diagnostics,
     logTail,
     sessionExport: withFailedExportError(withMessages(withSessionInfo(sessionExport, sessionInfo ?? null), messages), failedExportError),
@@ -224,7 +245,88 @@ export function buildProblemReport(input: Input, options: Options = {}) {
     throw new Error("Problem report exceeds maxBytes after truncation")
   }
 
-  return { markdown: output }
+  return { markdown: output, reportId, generatedAt }
+}
+
+type ProblemReportSummaryInput = {
+  reportId: string
+  generatedAt: string
+  diagnostics: ProblemReportDiagnostics
+  reportFileName: string | null
+  reportLocationHint: string | null
+  fullReportStatus: "ready" | "failed"
+  failureReason?: string
+  recentErrors: string[]
+}
+
+function oneLine(value: string) {
+  return (value.split(/\r?\n/)[0] ?? "").replace(/\s+/g, " ").trim()
+}
+
+function redactLocalPathFragments(value: string) {
+  return value
+    .replace(/[A-Za-z]:\\[^\r\n]*/g, "[path]")
+    .replace(/\\\\[^\\\s]+\\[^\r\n]*/g, "[path]")
+    .replace(/\/(?:Users|home|tmp|var\/folders|private\/tmp)\/[^\r\n]*/g, "[path]")
+}
+
+function truncateSummaryLine(value: string, maxChars: number) {
+  return value.length > maxChars ? `${value.slice(0, maxChars)}...` : value
+}
+
+function safeSummaryRoute(route: string) {
+  const pathOnly = oneLine(route).split(/[?#]/)[0] || "/"
+  return truncateSummaryLine(redactLocalPathFragments(pathOnly), SUMMARY_ROUTE_MAX_CHARS)
+}
+
+function safeSummarySession(sessionID: string | null) {
+  if (sessionID === null) return "none"
+  return truncateSummaryLine(oneLine(redactLocalPathFragments(sessionID)), SUMMARY_SESSION_MAX_CHARS)
+}
+
+function safeFailureReason(value: string | undefined) {
+  if (!value) return "unknown"
+  return truncateSummaryLine(oneLine(redactLocalPathFragments(value)), SUMMARY_FAILURE_REASON_MAX_CHARS)
+}
+
+function summaryRecentErrors(recentErrors: string[]) {
+  const lines = recentErrors
+    .map((line) => truncateSummaryLine(oneLine(redactLocalPathFragments(line)), SUMMARY_ERROR_LINE_MAX_CHARS))
+    .filter(Boolean)
+    .slice(0, 10)
+  return lines.length > 0 ? lines : ["No recent errors found"]
+}
+
+export function buildProblemReportSummary(input: ProblemReportSummaryInput) {
+  const fullReportLines =
+    input.fullReportStatus === "ready"
+      ? [
+          "Full report: ready for manual upload",
+          `Report file: ${input.reportFileName ?? "unknown"}`,
+          `Report location: ${input.reportLocationHint ?? "unknown"}`,
+        ]
+      : [
+          "Full report: not generated",
+          `Full report failure: ${safeFailureReason(input.failureReason)}`,
+          "Submit this summary without an attachment if needed.",
+        ]
+
+  return [
+    "PawWork Problem Report Summary",
+    "",
+    `Report ID: ${input.reportId}`,
+    `Generated: ${input.generatedAt}`,
+    `PawWork: ${input.diagnostics.appVersion} (${input.diagnostics.channel})`,
+    `Platform: ${input.diagnostics.platform} ${input.diagnostics.osVersion} ${input.diagnostics.arch}`,
+    `Electron: ${input.diagnostics.electronVersion}`,
+    `Route: ${safeSummaryRoute(input.diagnostics.route)}`,
+    `Session: ${safeSummarySession(input.diagnostics.sessionID)}`,
+    ...fullReportLines,
+    "",
+    "Recent key errors:",
+    ...summaryRecentErrors(input.recentErrors).map((line) => `- ${line}`),
+    "",
+  ].join("\n")
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -281,6 +383,8 @@ function isProblemReportPayload(value: unknown): value is Payload {
   if (!isRecord(value)) return false
   return (
     value.reportVersion === 1 &&
+    typeof value.reportId === "string" &&
+    value.reportId.length > 0 &&
     typeof value.generatedAt === "string" &&
     !Number.isNaN(Date.parse(value.generatedAt)) &&
     isDiagnostics(value.diagnostics) &&
