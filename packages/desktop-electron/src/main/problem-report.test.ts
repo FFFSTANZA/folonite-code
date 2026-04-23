@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildProblemReport, parseProblemReportPayload } from "./problem-report"
+import { buildProblemReport, buildProblemReportSummary, parseProblemReportPayload } from "./problem-report"
 
 const base = {
   diagnostics: {
@@ -31,13 +31,198 @@ const base = {
 }
 
 describe("problem report", () => {
+  test("uses caller-provided report id and generated time", () => {
+    const report = buildProblemReport(base, {
+      reportId: "pwr_20260423_abc123",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+    })
+
+    const payload = parseProblemReportPayload(report.markdown)
+    expect(report.reportId).toBe("pwr_20260423_abc123")
+    expect(report.generatedAt).toBe("2026-04-23T01:02:03.004Z")
+    expect(payload.reportId).toBe("pwr_20260423_abc123")
+    expect(payload.generatedAt).toBe("2026-04-23T01:02:03.004Z")
+  })
+
   test("creates markdown with valid fenced JSON", () => {
     const report = buildProblemReport(base)
     expect(report.markdown).toContain("# PawWork Problem Report")
+    expect(report.markdown).toContain("Upload this markdown file to the feedback form after reviewing it.")
+    expect(report.markdown).not.toContain("Paste this report into the feedback form")
     const payload = parseProblemReportPayload(report.markdown)
     expect(payload.reportVersion).toBe(1)
+    expect(payload.reportId).toBe(report.reportId)
     expect(payload.diagnostics.sessionID).toBe("ses_1")
     expect(payload.sessionExport.status).toBe("ok")
+  })
+
+  test("builds a short summary without full logs, paths, session export, tool output, or snippets", () => {
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_20260423_abc123",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: base.diagnostics,
+      reportFileName: "pawwork-problem-report-20260423-090203-004-abc123.md",
+      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-abc123.md",
+      fullReportStatus: "ready",
+      recentErrors: ["[error] launch failed", "[warn] retrying"],
+    })
+
+    expect(summary).toContain("PawWork Problem Report Summary")
+    expect(summary).toContain("Report ID: pwr_20260423_abc123")
+    expect(summary).toContain("Report file: pawwork-problem-report-20260423-090203-004-abc123.md")
+    expect(summary).toContain("Full report: ready for manual upload")
+    expect(summary).toContain("[error] launch failed")
+    expect(summary).not.toContain(base.diagnostics.logPath)
+    expect(summary).not.toContain(base.diagnostics.directory)
+    expect(summary).not.toContain("line one")
+    expect(summary).not.toContain("messages")
+    expect(summary.split(/\r?\n/).length).toBeLessThanOrEqual(28)
+  })
+
+  test("summary explains summary-only submission when the full report is unavailable", () => {
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_20260423_failed",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: base.diagnostics,
+      reportFileName: null,
+      reportLocationHint: null,
+      fullReportStatus: "failed",
+      failureReason: "file_write_failed",
+      recentErrors: [],
+    })
+
+    expect(summary).toContain("Full report: not generated")
+    expect(summary).toContain("Submit this summary without an attachment if needed.")
+    expect(summary).toContain("No recent errors found")
+  })
+
+  test("summary keeps recent errors to a small single-line set", () => {
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_20260423_errors",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: base.diagnostics,
+      reportFileName: "pawwork-problem-report-20260423-090203-004-errors.md",
+      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-errors.md",
+      fullReportStatus: "ready",
+      recentErrors: Array.from({ length: 20 }, (_, index) => `[error] failure ${index}\nstack line ${index}`),
+    })
+
+    expect(summary).toContain("[error] failure 0")
+    expect(summary).toContain("[error] failure 9")
+    expect(summary).not.toContain("[error] failure 10")
+    expect(summary).not.toContain("stack line")
+  })
+
+  test("summary truncates oversized recent error lines", () => {
+    const toolOutput = "x".repeat(5_000)
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_long_errors",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: base.diagnostics,
+      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_long_errors.md",
+      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_long_errors.md",
+      fullReportStatus: "ready",
+      recentErrors: [`[error] tool output ${toolOutput}`],
+    })
+
+    expect(summary).toContain("[error] tool output")
+    expect(summary).toContain("...")
+    expect(summary).not.toContain(toolOutput)
+    expect(summary.length).toBeLessThan(1_000)
+  })
+
+  test("summary omits prompt query and hash content from routes", () => {
+    const prompt = "write this exact code snippet ".repeat(200)
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_prompt_route",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: {
+        ...base.diagnostics,
+        route: `/session/new?prompt=${encodeURIComponent(prompt)}#${"hash".repeat(200)}`,
+      },
+      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_prompt_route.md",
+      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_prompt_route.md",
+      fullReportStatus: "ready",
+      recentErrors: [],
+    })
+
+    expect(summary).toContain("Route: /session/new")
+    expect(summary).not.toContain("prompt=")
+    expect(summary).not.toContain(encodeURIComponent(prompt))
+    expect(summary).not.toContain("hashhash")
+    expect(summary.length).toBeLessThan(1_000)
+  })
+
+  test("summary truncates and cleans session ids", () => {
+    const longSessionID = `ses_${"x".repeat(500)}`
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_long_session",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: {
+        ...base.diagnostics,
+        sessionID: `${longSessionID}/C:\\Users\\name\\secret`,
+      },
+      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_long_session.md",
+      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_long_session.md",
+      fullReportStatus: "ready",
+      recentErrors: [],
+    })
+
+    expect(summary).toContain("Session: ses_")
+    expect(summary).toContain("...")
+    expect(summary).not.toContain(longSessionID)
+    expect(summary).not.toContain("C:\\Users\\name")
+  })
+
+  test("summary omits raw Windows paths, spaces, and non-ASCII user directories", () => {
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_windows_paths",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: {
+        ...base.diagnostics,
+        platform: "win32",
+        directory: "C:\\Users\\张 三\\Project Space",
+        logPath: "C:\\Users\\张 三\\AppData\\Roaming\\PawWork\\logs\\main.log",
+      },
+      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_windows_paths.md",
+      reportLocationHint: "%APPDATA%/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_windows_paths.md",
+      fullReportStatus: "ready",
+      recentErrors: ["[error] failed to launch C:\\Users\\张 三\\Project Space\\app.log"],
+    })
+
+    expect(summary).toContain("%APPDATA%/.../problem-reports/")
+    expect(summary).not.toContain("C:\\Users\\张 三")
+    expect(summary).not.toContain("Project Space")
+    expect(summary).not.toContain("main.log")
+    expect(summary).not.toContain("Space\\app.log")
+    expect(summary).not.toContain("app.log")
+  })
+
+  test("summary omits Linux, temp, and network local paths from recent errors", () => {
+    const summary = buildProblemReportSummary({
+      reportId: "pwr_unix_paths",
+      generatedAt: "2026-04-23T01:02:03.004Z",
+      diagnostics: {
+        ...base.diagnostics,
+        platform: "linux",
+        directory: "/home/alice/workspace/project",
+        logPath: "/home/alice/.config/PawWork/logs/main.log",
+      },
+      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_unix_paths.md",
+      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_unix_paths.md",
+      fullReportStatus: "ready",
+      recentErrors: [
+        "[error] failed reading /home/alice/workspace/project/src/index.ts",
+        "[warn] temp output at /tmp/pawwork/session/output.log",
+        "[error] network path \\\\server\\share\\alice\\secret.log",
+      ],
+    })
+
+    expect(summary).toContain("[path]")
+    expect(summary).not.toContain("/home/alice")
+    expect(summary).not.toContain("/tmp/pawwork")
+    expect(summary).not.toContain("\\\\server\\share")
+    expect(summary).not.toContain("secret.log")
   })
 
   test("keeps no-session reports useful", () => {
@@ -148,11 +333,26 @@ describe("problem report", () => {
     expect(() => buildProblemReport(base, { maxBytes: 0 })).toThrow("maxBytes must be a positive finite number")
   })
 
+  test("rejects invalid caller-provided report metadata", () => {
+    expect(() => buildProblemReport(base, { reportId: "" })).toThrow("reportId must be a non-empty string")
+    expect(() => buildProblemReport(base, { reportId: "   " })).toThrow("reportId must be a non-empty string")
+    expect(() => buildProblemReport(base, { generatedAt: "not a date" })).toThrow(
+      "generatedAt must be a valid ISO timestamp",
+    )
+    expect(() => buildProblemReport(base, { generatedAt: "2026-04-23" })).toThrow(
+      "generatedAt must be a valid ISO timestamp",
+    )
+    expect(() => buildProblemReport(base, { generatedAt: "2026-04-23T01:02:03Z" })).toThrow(
+      "generatedAt must be a valid ISO timestamp",
+    )
+  })
+
   test("parses only the first JSON fence", () => {
     const report = [
       "```json",
       JSON.stringify({
         reportVersion: 1,
+        reportId: "pwr_fixture",
         generatedAt: new Date().toISOString(),
         diagnostics: base.diagnostics,
         logTail: "",
@@ -180,6 +380,7 @@ describe("problem report", () => {
       "```json",
       JSON.stringify({
         reportVersion: 1,
+        reportId: "pwr_fixture",
         generatedAt: new Date().toISOString(),
         diagnostics: base.diagnostics,
         logTail: "",
@@ -206,6 +407,7 @@ describe("problem report", () => {
       "```json",
       JSON.stringify({
         reportVersion: 1,
+        reportId: "pwr_fixture",
         generatedAt: new Date().toISOString(),
         diagnostics: base.diagnostics,
         logTail: "",
@@ -229,6 +431,7 @@ describe("problem report", () => {
       "```json",
       JSON.stringify({
         reportVersion: 1,
+        reportId: "pwr_invalid",
         diagnostics: base.diagnostics,
         logTail: "",
         sessionExport: { status: "none" },

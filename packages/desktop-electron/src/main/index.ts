@@ -33,6 +33,7 @@ const APP_IDS: Record<string, string> = {
 }
 const CI_SMOKE_HOME = process.env.PAWWORK_CI_SMOKE_HOME
 const CI_SMOKE_ENABLED = process.env.PAWWORK_CI_SMOKE === "true"
+const FEEDBACK_SESSION_EXPORT_TIMEOUT_MS = 3_000
 const userDataRoot = CI_SMOKE_HOME ?? app.getPath("appData")
 
 app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "PawWork Dev")
@@ -51,7 +52,6 @@ import type { DesktopContext, InitStep, ServerReadyData, SqliteMigrationProgress
 import { checkAppExists, resolveAppPath, wslPath } from "./apps"
 import { CHANNEL, FEEDBACK_FORM_URL, UPDATER_ENABLED } from "./constants"
 import { createDesktopContextStore } from "./desktop-context-store"
-import { errorMessage } from "./error"
 import { createFeedbackHandler, feedbackDialogLabels } from "./feedback"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand, sendSqliteMigrationProgress } from "./ipc"
 import { filePath, initLogging, tail } from "./logging"
@@ -59,6 +59,7 @@ import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
 import { type MenuLocale } from "./menu-labels"
 import { readStoredMenuLocale, writeStoredMenuLocale } from "./menu-i18n"
+import { cleanupProblemReports, problemReportsRoot, writeProblemReportFile } from "./problem-report-files"
 import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, spawnLocalServer } from "./server"
 import { PAWWORK_RUNTIME } from "./runtime-namespace"
 import { createUpdaterController } from "./updater"
@@ -103,6 +104,7 @@ const pendingDeepLinks: string[] = []
 
 const serverReady = defer<ServerReadyData>()
 const logger = initLogging()
+const problemReportRoot = problemReportsRoot(app.getPath("userData"))
 const updater = createUpdaterController({
   enabled: UPDATER_ENABLED,
   currentVersion: () => app.getVersion(),
@@ -135,7 +137,7 @@ function diagnostics(context = currentDesktopContext()) {
   }
 }
 
-async function sessionExport(context = currentDesktopContext()) {
+async function sessionExport(context = currentDesktopContext(), signal?: AbortSignal) {
   if (!context.sessionID) return { status: "none" as const }
   const ready = await serverReady.promise
   const sessionID = encodeURIComponent(context.sessionID)
@@ -145,9 +147,12 @@ async function sessionExport(context = currentDesktopContext()) {
     headers.authorization = `Basic ${Buffer.from(`${ready.username ?? "opencode"}:${ready.password ?? ""}`).toString("base64")}`
   }
   const controller = new AbortController()
+  const abort = () => controller.abort()
   let timeout: ReturnType<typeof setTimeout> | undefined
   let res: Response
   try {
+    if (signal?.aborted) controller.abort()
+    else signal?.addEventListener("abort", abort, { once: true })
     const timeoutPromise = new Promise<Response>((_, reject) => {
       timeout = setTimeout(() => {
         controller.abort()
@@ -157,6 +162,7 @@ async function sessionExport(context = currentDesktopContext()) {
     res = await Promise.race([fetch(url, { headers, signal: controller.signal }), timeoutPromise])
   } finally {
     if (timeout !== undefined) clearTimeout(timeout)
+    signal?.removeEventListener("abort", abort)
   }
   if (!res.ok) throw new Error(`session export failed: ${res.status}`)
   return {
@@ -186,6 +192,7 @@ function feedbackContext(context: unknown): DesktopContext {
 
 const reportProblem = createFeedbackHandler({
   feedbackUrl: FEEDBACK_FORM_URL,
+  reportRoot: problemReportRoot,
   context: currentDesktopContext,
   confirm: async (context) => {
     const labels = feedbackDialogLabels(context === undefined ? menuLocale : feedbackContext(context).locale)
@@ -203,9 +210,24 @@ const reportProblem = createFeedbackHandler({
   openExternal: (url) => {
     return shell.openExternal(url).then(() => undefined)
   },
+  showFeedbackUrlFallback: async (url) => {
+    const labels = feedbackDialogLabels(currentDesktopContext().locale)
+    await dialog.showMessageBox({
+      type: "warning",
+      title: labels.formOpenFailedTitle,
+      message: labels.formOpenFailedMessage,
+      detail: url,
+    })
+  },
+  showItemInFolder: (path) => shell.showItemInFolder(path),
+  openPath: (path) => shell.openPath(path),
+  saveReport: (input) => writeProblemReportFile({ root: problemReportRoot, ...input }),
+  cleanupReports: (currentPath) => cleanupProblemReports({ root: problemReportRoot, keep: 10, currentPath }),
+  sessionExportTimeoutMs: FEEDBACK_SESSION_EXPORT_TIMEOUT_MS,
   diagnostics: (context) => diagnostics(feedbackContext(context)),
   logTail: tail,
-  sessionExport: (context) => sessionExport(feedbackContext(context)),
+  sessionExport: (context, signal) => sessionExport(feedbackContext(context), signal),
+  onHandledError: (message, error) => logger.error(message, error),
   onError: async (error) => {
     logger.error("problem report failed", error)
     const labels = feedbackDialogLabels(currentDesktopContext().locale)
@@ -213,7 +235,6 @@ const reportProblem = createFeedbackHandler({
       type: "error",
       title: labels.failedTitle,
       message: labels.failedMessage,
-      detail: errorMessage(error),
     })
   },
 })
