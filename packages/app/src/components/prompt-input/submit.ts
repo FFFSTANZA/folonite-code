@@ -303,10 +303,11 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
+    const isNewSession = !params.id
     const currentModel = local.model.current()
     const currentAgent = local.agent.current()
     const variant = local.model.variant.current()
-    if (!currentModel || !currentAgent) {
+    if (!currentModel || (!currentAgent && !isNewSession)) {
       showToast({
         title: language.t("prompt.toast.modelAgentRequired.title"),
         description: language.t("prompt.toast.modelAgentRequired.description"),
@@ -319,7 +320,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     promptProbe.start()
 
     const projectDirectory = sdk.directory
-    const isNewSession = !params.id
     const shouldAutoAccept = isNewSession && input.autoAccept()
     const worktreeSelection = input.newSessionWorktree?.() || "main"
 
@@ -399,7 +399,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       providerID: currentModel.provider.id,
     }
     const locale = language.intl()
-    const agent = currentAgent.name
+    const agent = isNewSession ? "build" : currentAgent!.name
     const context = prompt.context.items().slice()
     const draft: FollowupDraft = {
       sessionID: session.id,
