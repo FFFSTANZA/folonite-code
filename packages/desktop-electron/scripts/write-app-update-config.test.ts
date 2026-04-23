@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { UPDATER_CACHE_DIR_NAME } from "../src/main/updater-cache"
 import { serializeAppUpdateConfig, writeAppUpdateConfig } from "./write-app-update-config"
 
 const roots: string[] = []
@@ -26,10 +27,21 @@ describe("write-app-update-config", () => {
         "owner: Astro-Han",
         "repo: pawwork",
         "channel: latest",
-        "updaterCacheDirName: pawwork-updater",
+        `updaterCacheDirName: ${UPDATER_CACHE_DIR_NAME}`,
         "",
       ].join("\n"),
     )
+  })
+
+  test("serializes updater cache dir from the shared constant", () => {
+    expect(
+      serializeAppUpdateConfig({
+        provider: "github",
+        owner: "Astro-Han",
+        repo: "pawwork",
+        channel: "latest",
+      }),
+    ).toContain(`updaterCacheDirName: ${UPDATER_CACHE_DIR_NAME}`)
   })
 
   test("serializes beta GitHub updater config", () => {
@@ -65,7 +77,8 @@ describe("write-app-update-config", () => {
     ).toBe(true)
 
     const configPath = join(root, "PawWork.app", "Contents", "Resources", "app-update.yml")
-    expect(readFileSync(configPath, "utf8")).toContain("repo: pawwork")
-    expect(readFileSync(configPath, "utf8")).toContain("updaterCacheDirName: pawwork-updater")
+    const config = readFileSync(configPath, "utf8")
+    expect(config).toContain("repo: pawwork")
+    expect(config).toContain(`updaterCacheDirName: ${UPDATER_CACHE_DIR_NAME}`)
   })
 })
