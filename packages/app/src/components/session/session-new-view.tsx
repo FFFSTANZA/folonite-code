@@ -5,7 +5,6 @@ import { useLanguage } from "@/context/language"
 import { useNavigate } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
 import { showToast } from "@opencode-ai/ui/toast"
-import { Mark } from "@opencode-ai/ui/logo"
 import { pawworkSkillCards, type PawworkSkillName } from "./pawwork-skill-meta"
 import { startPawworkSkillSession } from "./session-new-view-start"
 
@@ -60,10 +59,9 @@ export function NewSessionView(props: { composer?: JSX.Element }) {
   return (
     <div data-component="session-new-home" class="size-full overflow-y-auto">
       <div class="flex min-h-full flex-col items-center justify-center px-6 py-8 md:px-8 md:py-10">
-      <div class="mx-auto flex w-full max-w-200 flex-col items-center gap-6 text-center">
-        <Mark class="w-10" />
+      <div class="mx-auto flex w-full max-w-200 flex-col items-center gap-8 text-center">
         <div class="flex flex-col gap-2">
-          <h1 class="text-24-medium text-text-strong">{language.t("session.new.title")}</h1>
+          <h1 class="text-20-medium text-text-strong">{language.t("session.new.title")}</h1>
           <p class="text-14-regular text-text-weak">{language.t("session.new.subtitle")}</p>
         </div>
         <div class="grid w-full max-w-[640px] gap-3 md:grid-cols-3">
@@ -84,7 +82,10 @@ export function NewSessionView(props: { composer?: JSX.Element }) {
           </For>
         </div>
         <Show when={props.composer}>
-          <div class="w-full max-w-[640px]">{props.composer}</div>
+          <div class="flex w-full max-w-[640px] flex-col items-center gap-3">
+            {props.composer}
+            <p class="text-12-regular text-text-weaker">{language.t("session.new.reassurance")}</p>
+          </div>
         </Show>
       </div>
       </div>

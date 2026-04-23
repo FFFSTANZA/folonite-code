@@ -552,6 +552,7 @@ export const dict = {
   "session.revertDock.restore": "恢复消息",
   "session.new.title": "今天想做什么？",
   "session.new.subtitle": "选择一个场景开始，或直接输入你的需求",
+  "session.new.reassurance": "文件和对话仅在本机处理",
   "session.new.card.document.title": "处理文档",
   "session.new.card.document.description": "编辑、转换并提取 Word、Excel、PowerPoint 和 PDF 文件内容。",
   "session.new.card.analysis.title": "分析数据",

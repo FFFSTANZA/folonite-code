@@ -588,6 +588,7 @@ export const dict = {
 
   "session.new.title": "Choose what to do",
   "session.new.subtitle": "Start with a built-in workflow, then tell PawWork what you need.",
+  "session.new.reassurance": "Files and conversations stay on your computer",
   "session.new.card.document.title": "Process documents",
   "session.new.card.document.description": "Edit, convert, and extract from Word, Excel, PowerPoint, and PDF files.",
   "session.new.card.analysis.title": "Analyze data",
