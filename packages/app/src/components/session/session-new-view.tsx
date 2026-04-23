@@ -3,9 +3,9 @@ import { useSDK } from "@/context/sdk"
 import { useLocal } from "@/context/local"
 import { useLanguage } from "@/context/language"
 import { useNavigate } from "@solidjs/router"
-import { Icon } from "@opencode-ai/ui/icon"
 import { showToast } from "@opencode-ai/ui/toast"
 import { pawworkSkillCards, type PawworkSkillName } from "./pawwork-skill-meta"
+import { SkillIcon } from "./skill-icons"
 import { startPawworkSkillSession } from "./session-new-view-start"
 
 export function NewSessionView(props: { composer?: JSX.Element }) {
@@ -58,36 +58,31 @@ export function NewSessionView(props: { composer?: JSX.Element }) {
 
   return (
     <div data-component="session-new-home" class="size-full overflow-y-auto">
-      <div class="flex min-h-full flex-col items-center justify-center px-6 py-8 md:px-8 md:py-10">
-      <div class="mx-auto flex w-full max-w-200 flex-col items-center gap-8 text-center">
-        <div class="flex flex-col gap-2">
-          <h1 class="text-20-medium text-text-strong">{language.t("session.new.title")}</h1>
-          <p class="text-14-regular text-text-weak">{language.t("session.new.subtitle")}</p>
-        </div>
-        <div class="grid w-full max-w-[640px] gap-3 md:grid-cols-3">
+      <div class="mx-auto flex w-full max-w-200 flex-col items-center px-6 pt-[28vh] pb-10 text-center md:px-8">
+        <h1 class="text-20-medium text-text-strong">{language.t("session.new.title")}</h1>
+        <p class="mt-3 text-14-regular text-text-weak">{language.t("session.new.subtitle")}</p>
+        <div class="mt-8 flex w-full max-w-[640px] flex-wrap justify-center gap-3">
           <For each={pawworkSkillCards}>
             {(card) => (
               <button
                 type="button"
                 data-skill-card={card.name}
-                class="rounded-[10px] border border-border-weak-base bg-surface-raised-strong p-4 text-left transition-colors hover:bg-surface-raised-base-hover disabled:cursor-not-allowed disabled:opacity-70"
+                class="flex items-center gap-2 rounded-xl border border-border-weaker-base bg-surface-base px-6 py-3 transition-colors hover:border-border-weak-base hover:bg-surface-raised-base-hover disabled:cursor-not-allowed disabled:opacity-70"
                 disabled={pending() === card.name}
                 onClick={() => void start(card.name)}
               >
-                <Icon name={card.iconName} size="medium" class="text-text-weak" />
-                <div class="mt-3 text-16-medium text-text-strong">{language.t(card.titleKey)}</div>
-                <div class="mt-1 text-14-regular text-text-weak">{language.t(card.descriptionKey)}</div>
+                <SkillIcon name={card.homeIcon} class={`h-6 w-6 shrink-0 ${card.homeIconClass}`} />
+                <span class="text-14-medium text-text-strong">{language.t(card.titleKey)}</span>
               </button>
             )}
           </For>
         </div>
         <Show when={props.composer}>
-          <div class="flex w-full max-w-[640px] flex-col items-center gap-3">
+          <div class="mt-8 flex w-full max-w-[640px] flex-col items-center gap-3">
             {props.composer}
             <p class="text-12-regular text-text-weaker">{language.t("session.new.reassurance")}</p>
           </div>
         </Show>
-      </div>
       </div>
     </div>
   )
