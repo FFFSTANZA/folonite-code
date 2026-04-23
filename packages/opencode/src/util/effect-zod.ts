@@ -52,6 +52,22 @@ function isZodType(value: unknown): value is z.ZodTypeAny {
   return value instanceof z.ZodType
 }
 
+/**
+ * Emit a JSON Schema for a tool/route parameter schema — derives the zod form
+ * via the walker so Effect Schema inputs flow through the same zod-openapi
+ * pipeline the LLM/SDK layer already depends on.  `io: "input"` mirrors what
+ * `session/prompt.ts` has always passed to `ai`'s `jsonSchema()` helper.
+ *
+ * Honours a hand-authored `schema.zod` static the same way `zodObject()` does;
+ * otherwise the runtime validator (which respects `.zod`) and the published
+ * JSON Schema (which would re-walk the AST) can describe different shapes.
+ */
+export function toJsonSchema<S extends Schema.Top>(schema: S) {
+  const derived: z.ZodTypeAny = "zod" in schema && isZodType(schema.zod) ? schema.zod : zod(schema)
+  return z.toJSONSchema(derived, { io: "input" })
+}
+
+
 function walk(ast: SchemaAST.AST): z.ZodTypeAny {
   const cached = walkCache.get(ast)
   if (cached) return cached
