@@ -66,6 +66,22 @@ describe("release workflow", () => {
     }),
   )
 
+  it.live("writes the submit phase summary without executing Markdown backticks", () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.promise(() => runSummarizeSubmitPhase())
+
+      expect(result.status).toBe(0)
+      expect(result.output).not.toContain("command not found")
+      expect(result.summary).toContain("- Submission ID: `sample-submission-id`")
+      expect(result.summary).toContain("- Source run ID: `123456`")
+      expect(result.summary).toContain("- Source sha: `0123456789abcdef0123456789abcdef01234567`")
+      expect(result.summary).toContain(
+        "`gh workflow run build.yml --repo Astro-Han/pawwork --ref workflow-snapshot-123",
+      )
+      expect(result.summary).not.toContain("\\`gh workflow run")
+    }),
+  )
+
   it.live("validates the release workflow configuration", () =>
     Effect.gen(function* () {
       const workflow = readWorkflow(workflowPath)
@@ -237,6 +253,57 @@ async function runSelectBuildTarget(input: { target: string; arch: string; phase
     output: `${result.stdout}${result.stderr}`,
     outputs,
   }
+}
+
+/** Runs the submit summary step with sample GitHub expression values. */
+async function runSummarizeSubmitPhase() {
+  const parsed = parseWorkflow(workflowPath)
+  const step = parsed.jobs?.["build-electron"]?.steps?.find((entry) => entry.name === "Summarize submit phase")
+  if (!step?.run) {
+    throw new Error("Missing Summarize submit phase step")
+  }
+
+  const script = replaceGithubExpressions(step.run)
+  await using tmp = await tmpdir()
+  const summaryPath = path.join(tmp.path, "step-summary")
+  const result = spawnSync("bash", ["-ec", script], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      GITHUB_STEP_SUMMARY: summaryPath,
+    },
+  })
+
+  return {
+    status: result.status ?? 1,
+    output: `${result.stdout}${result.stderr}`,
+    summary: fs.existsSync(summaryPath) ? fs.readFileSync(summaryPath, "utf8") : "",
+  }
+}
+
+function replaceGithubExpressions(script: string) {
+  const replacements: Record<string, string> = {
+    "steps.submit_notarization.outputs.submission_id": "sample-submission-id",
+    "github.run_id": "123456",
+    "github.run_attempt": "2",
+    "github.ref_name": "dev",
+    "github.sha": "0123456789abcdef0123456789abcdef01234567",
+    "matrix.arch_label": "arm64",
+    "needs.create-snapshot-tag.outputs.workflow_ref": "workflow-snapshot-123",
+    "needs.create-snapshot-tag.outputs.workflow_sha": "abcdef0123456789abcdef0123456789abcdef01",
+    "inputs.channel || 'dev'": "prod",
+    "github.repository": "Astro-Han/pawwork",
+  }
+
+  const result = script.replace(/\$\{\{\s*(.*?)\s*\}\}/g, (match, expression) => {
+    const key = expression.trim()
+    return replacements[key] ?? match
+  })
+
+  if (result.includes("${{")) {
+    throw new Error(`Unreplaced GitHub expression in submit summary script:\n${result}`)
+  }
+  return result
 }
 
 /** Parses the simple key=value records emitted to GITHUB_OUTPUT by this workflow step. */

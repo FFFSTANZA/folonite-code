@@ -803,7 +803,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ## Notarization Submitted
 
           - Submission ID: `${{ steps.submit_notarization.outputs.submission_id }}`
@@ -818,7 +818,7 @@ jobs:
 
           To finalize later, run:
 
-          \`gh workflow run build.yml --repo ${{ github.repository }} --ref ${{ needs.create-snapshot-tag.outputs.workflow_ref }} -f phase=finalize -f channel=${{ inputs.channel || 'dev' }} -f arch=${{ matrix.arch_label }} -f source_run_id=${{ github.run_id }} -f source_run_attempt=${{ github.run_attempt }} -f source_ref=${{ github.ref_name }} -f source_sha=${{ github.sha }} -f source_workflow_ref=${{ needs.create-snapshot-tag.outputs.workflow_ref }} -f source_workflow_sha=${{ needs.create-snapshot-tag.outputs.workflow_sha }} -f submission_id=${{ steps.submit_notarization.outputs.submission_id }}\`
+          `gh workflow run build.yml --repo ${{ github.repository }} --ref ${{ needs.create-snapshot-tag.outputs.workflow_ref }} -f phase=finalize -f channel=${{ inputs.channel || 'dev' }} -f arch=${{ matrix.arch_label }} -f source_run_id=${{ github.run_id }} -f source_run_attempt=${{ github.run_attempt }} -f source_ref=${{ github.ref_name }} -f source_sha=${{ github.sha }} -f source_workflow_ref=${{ needs.create-snapshot-tag.outputs.workflow_ref }} -f source_workflow_sha=${{ needs.create-snapshot-tag.outputs.workflow_sha }} -f submission_id=${{ steps.submit_notarization.outputs.submission_id }}`
           EOF
 
       - name: Package app
