@@ -13,6 +13,7 @@ describe("desktop context", () => {
       sessionID: null,
       route: "/abc",
       locale: "zh",
+      title: "爪印",
     })
   })
 
@@ -29,6 +30,7 @@ describe("desktop context", () => {
       sessionID: "ses_123",
       route: "/abc/session/ses_123",
       locale: "en",
+      title: "PawWork",
     })
   })
 })

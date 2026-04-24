@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron"
+import { buildDesktopContext } from "../../../app/src/utils/desktop-context"
 import type { DesktopContext, ElectronAPI, InitStep, SqliteMigrationProgress } from "./types"
 import { getRuntimeFlags } from "./runtime-flags"
 
@@ -73,12 +74,7 @@ const api: ElectronAPI = {
   setTitlebar: (theme) => ipcRenderer.invoke("set-titlebar", theme),
   setDesktopContext: (context) => invokeSetDesktopContext(context),
   initializeDesktopContext: (locale) =>
-    invokeSetDesktopContext({
-      directory: null,
-      sessionID: null,
-      route: "/",
-      locale,
-    }),
+    invokeSetDesktopContext(buildDesktopContext({ route: "/", locale })),
   loadingWindowComplete: () => ipcRenderer.send("loading-window-complete"),
   runUpdater: (alertOnFail) => ipcRenderer.invoke("run-updater", alertOnFail),
   checkUpdate: () => ipcRenderer.invoke("check-update"),

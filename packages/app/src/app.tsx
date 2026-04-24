@@ -45,7 +45,7 @@ import { TerminalProvider } from "@/context/terminal"
 import DirectoryLayout from "@/pages/directory-layout"
 import Layout from "@/pages/layout"
 import { ErrorPage } from "./pages/error"
-import { buildDesktopContext, type DesktopContext } from "./utils/desktop-context"
+import { buildDesktopContext, desktopWindowTitle, type DesktopContext } from "./utils/desktop-context"
 import { useCheckServerHealth } from "./utils/server-health"
 
 const HomeRoute = lazy(() => import("@/pages/home"))
@@ -177,6 +177,11 @@ function DesktopContextRouteBridge() {
         }, retryDelay)
       })
   }
+
+  createEffect(() => {
+    if (typeof document !== "object") return
+    document.title = desktopWindowTitle(language.locale())
+  })
 
   createEffect(() => {
     if (!window.api?.setDesktopContext) return

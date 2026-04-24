@@ -8,6 +8,7 @@ import { dirname, join } from "node:path"
 import type { Event } from "electron"
 import { app, BrowserWindow, clipboard, dialog, shell } from "electron"
 import pkg from "electron-updater"
+import { buildDesktopContext } from "../../../app/src/utils/desktop-context"
 
 import contextMenu from "electron-context-menu"
 contextMenu({ showSaveImageAs: true, showLookUpSelection: false, showSearchWithGoogle: false })
@@ -51,6 +52,7 @@ const { autoUpdater } = pkg
 import type { DesktopContext, InitStep, ServerReadyData, SqliteMigrationProgress, WslConfig } from "../preload/types"
 import { checkAppExists, resolveAppPath, wslPath } from "./apps"
 import { CHANNEL, FEEDBACK_FORM_URL, UPDATER_ENABLED } from "./constants"
+import { normalizeDesktopContextPayload, syncWindowTitleForDesktopContext } from "./desktop-context-window"
 import { createDesktopContextStore } from "./desktop-context-store"
 import { createFeedbackHandler, feedbackDialogLabels } from "./feedback"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand, sendSqliteMigrationProgress } from "./ipc"
@@ -115,10 +117,7 @@ const loadingComplete = defer<void>()
 const deepLinkReadyWindows = new WeakSet<BrowserWindow>()
 let menuLocale: MenuLocale = readStoredMenuLocale(app.getLocale())
 const defaultDesktopContext = (): DesktopContext => ({
-  directory: null,
-  sessionID: null,
-  route: "/",
-  locale: menuLocale,
+  ...buildDesktopContext({ route: "/", locale: menuLocale }),
 })
 const desktopContexts = createDesktopContextStore(defaultDesktopContext)
 const contextWindowCleanup = new Set<number>()
@@ -199,18 +198,8 @@ function currentDesktopContext() {
   return desktopContexts.current(BrowserWindow.getFocusedWindow()?.id)
 }
 
-function normalizeDesktopContext(context: unknown): DesktopContext {
-  const value = context && typeof context === "object" ? (context as Record<string, unknown>) : {}
-  return {
-    directory: typeof value.directory === "string" ? value.directory : null,
-    sessionID: typeof value.sessionID === "string" ? value.sessionID : null,
-    route: typeof value.route === "string" && value.route.length > 0 ? value.route : "/",
-    locale: value.locale === "zh" ? "zh" : "en",
-  }
-}
-
 function feedbackContext(context: unknown): DesktopContext {
-  return context === undefined ? currentDesktopContext() : normalizeDesktopContext(context)
+  return context === undefined ? currentDesktopContext() : normalizeDesktopContextPayload(context, menuLocale)
 }
 
 const reportProblem = createFeedbackHandler({
@@ -529,8 +518,9 @@ registerIpcHandlers({
   reportDeepLinkReady: (win) => reportDeepLinkReady(win),
   reportCiSmokeReady: () => reportCiSmokeReady(),
   setDesktopContext: (context, win) => {
-    const next = normalizeDesktopContext(context)
+    const next = normalizeDesktopContextPayload(context, menuLocale)
     desktopContexts.set(win.id, next)
+    syncWindowTitleForDesktopContext(win, next)
     if (!contextWindowCleanup.has(win.id)) {
       contextWindowCleanup.add(win.id)
       win.once("closed", () => {

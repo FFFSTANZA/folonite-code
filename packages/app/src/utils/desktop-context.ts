@@ -5,6 +5,11 @@ export type DesktopContext = {
   sessionID: string | null
   route: string
   locale: Locale
+  title: string
+}
+
+export function desktopWindowTitle(locale: Locale) {
+  return locale === "zh" ? "爪印" : "PawWork"
 }
 
 export function buildDesktopContext(input: {
@@ -18,5 +23,6 @@ export function buildDesktopContext(input: {
     sessionID: input.sessionID ?? null,
     route: input.route,
     locale: input.locale,
+    title: desktopWindowTitle(input.locale),
   }
 }
