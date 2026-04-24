@@ -41,6 +41,17 @@ describe("electron builder app-update config", () => {
     expect(typeof createConfig("prod").afterPack).toBe("function")
   })
 
+  test("mac packaging enables a localized display name", () => {
+    const config = createConfig("prod")
+    expect(config.productName).toBe("PawWork")
+    expect(config.appId).toBe("ai.pawwork.desktop")
+    expect(config.artifactName).toBe("pawwork-${os}-${arch}.${ext}")
+    expect(config.publish).toMatchObject({ owner: "Astro-Han", repo: "pawwork" })
+    expect(createConfig("prod").mac?.extendInfo).toMatchObject({
+      LSHasLocalizedDisplayName: true,
+    })
+  })
+
   test("afterPack writes app-update.yml to the packager-reported macOS resources path", async () => {
     const root = mkdtempSync(join(tmpdir(), "pawwork-builder-config-"))
     roots.push(root)
@@ -51,6 +62,22 @@ describe("electron builder app-update config", () => {
     const configPath = join(root, "PawWork Product Filename.app", "Contents", "Resources", "app-update.yml")
     expect(existsSync(configPath)).toBe(true)
     expect(readFileSync(configPath, "utf8")).toContain("repo: pawwork\n")
+  })
+
+  test("afterPack writes localized macOS display names to the final resources path", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pawwork-builder-config-"))
+    roots.push(root)
+    const config = createConfig("prod")
+
+    await config.afterPack!(macAfterPackContext(root, "PawWork"))
+
+    const zhHans = join(root, "PawWork.app", "Contents", "Resources", "zh-Hans.lproj", "InfoPlist.strings")
+    const zhCn = join(root, "PawWork.app", "Contents", "Resources", "zh_CN.lproj", "InfoPlist.strings")
+
+    expect(existsSync(zhHans)).toBe(true)
+    expect(existsSync(zhCn)).toBe(true)
+    expect(readFileSync(zhHans, "utf8")).toContain('CFBundleDisplayName = "爪印";')
+    expect(readFileSync(zhHans, "utf8")).toContain('CFBundleName = "爪印";')
   })
 
   test("afterPack writes beta app-update.yml to the beta app resources path", async () => {

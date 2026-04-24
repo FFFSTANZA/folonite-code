@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
@@ -10,6 +11,11 @@ const execFileAsync = promisify(execFile)
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 type Channel = "dev" | "beta" | "prod"
+const localizedMacDisplayNameByChannel: Record<Channel, string> = {
+  dev: "爪印 Dev",
+  beta: "爪印 Beta",
+  prod: "爪印",
+}
 
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
@@ -32,6 +38,17 @@ export function getPublishConfig(channel: Channel): GitHubPublishConfig | undefi
   if (channel === "beta") return { provider: "github", owner: "Astro-Han", repo: "pawwork-beta", channel: "latest" }
   if (channel === "prod") return { provider: "github", owner: "Astro-Han", repo: "pawwork", channel: "latest" }
   return undefined
+}
+
+async function writeLocalizedMacDisplayName(resourcesDir: string, channel: Channel) {
+  const name = localizedMacDisplayNameByChannel[channel]
+  const content = [`CFBundleDisplayName = "${name}";`, `CFBundleName = "${name}";`, ""].join("\n")
+
+  for (const locale of ["zh-Hans.lproj", "zh_CN.lproj"]) {
+    const dir = path.join(resourcesDir, locale)
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, "InfoPlist.strings"), content, "utf8")
+  }
 }
 
 const getBase = (): Configuration => ({
@@ -63,6 +80,9 @@ const getBase = (): Configuration => ({
     icon: `resources/icons/icon.icns`,
     hardenedRuntime: true,
     gatekeeperAssess: false,
+    extendInfo: {
+      LSHasLocalizedDisplayName: true,
+    },
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
     notarize: true,
@@ -106,8 +126,11 @@ export function createConfig(channel: Channel = currentChannel(), baseOverrides:
       if (typeof configuration.afterPack === "function") {
         await configuration.afterPack(context)
       }
-      if (context.electronPlatformName !== "darwin" || publish === undefined) return
-      await writeAppUpdateConfig(context.packager.getMacOsResourcesDir(context.appOutDir), publish)
+      if (context.electronPlatformName !== "darwin") return
+      const resourcesDir = context.packager.getMacOsResourcesDir(context.appOutDir)
+      await writeLocalizedMacDisplayName(resourcesDir, channel)
+      if (publish === undefined) return
+      await writeAppUpdateConfig(resourcesDir, publish)
     },
   })
 
