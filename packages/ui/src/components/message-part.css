@@ -133,7 +133,7 @@
     background: var(--surface-base);
     border: 1px solid var(--border-weak-base);
     padding: 8px 12px;
-    border-radius: 6px;
+    border-radius: 12px;
 
     [data-highlight="file"] {
       color: var(--syntax-property);
@@ -953,7 +953,7 @@
     padding: 8px 8px 8px 10px;
     background-color: var(--surface-raised-stronger-non-alpha);
     border: 1px solid var(--border-weak-base);
-    border-radius: 6px;
+    border-radius: 20px;
     box-shadow: none;
     text-align: left;
     width: 100%;
