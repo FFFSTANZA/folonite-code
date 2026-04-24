@@ -110,6 +110,25 @@ export function ModelSelectorPopover(props: {
     setStore("dismiss", dismiss)
     setStore("open", false)
   }
+  let ignoreFocusOutsideForPointerInside = false
+
+  const handlePointerDownInside = () => {
+    ignoreFocusOutsideForPointerInside = true
+    window.setTimeout(() => {
+      ignoreFocusOutsideForPointerInside = false
+    }, 0)
+  }
+
+  const handleFocusOutside = (
+    event: Parameters<NonNullable<ComponentProps<typeof Kobalte.Content>["onFocusOutside"]>>[0],
+  ) => {
+    if (ignoreFocusOutsideForPointerInside) {
+      ignoreFocusOutsideForPointerInside = false
+      event.preventDefault()
+      return
+    }
+    close("outside")
+  }
 
   const handleManage = () => {
     close("manage")
@@ -148,8 +167,9 @@ export function ModelSelectorPopover(props: {
             event.preventDefault()
             event.stopPropagation()
           }}
+          onPointerDown={handlePointerDownInside}
           onPointerDownOutside={() => close("outside")}
-          onFocusOutside={() => close("outside")}
+          onFocusOutside={handleFocusOutside}
           onCloseAutoFocus={(event) => {
             const dismiss = store.dismiss
             if (dismiss === "outside") event.preventDefault()
