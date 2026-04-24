@@ -11,5 +11,6 @@ describe("localized app display name", () => {
     expect(localizedAppDisplayName("PawWork", "zh")).toBe("爪印")
     expect(localizedAppDisplayName("PawWork Beta", "zh")).toBe("爪印 Beta")
     expect(localizedAppDisplayName("PawWork Dev", "zh")).toBe("爪印 Dev")
+    expect(localizedAppDisplayName("PawWork Nightly", "zh")).toBe("爪印 Nightly")
   })
 })
