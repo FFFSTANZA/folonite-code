@@ -1601,7 +1601,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 {renderVariantControl(buttons)}
               </Show>
               <Show when={props.homeMode && store.mode === "normal"}>
-                <WorkspaceChip />
+                <WorkspaceChip style={buttons()} />
               </Show>
             </div>
 

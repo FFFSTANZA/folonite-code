@@ -3,7 +3,7 @@ import { Popover } from "@opencode-ai/ui/popover"
 import { base64Encode } from "@opencode-ai/util/encode"
 import { getFilename } from "@opencode-ai/util/path"
 import { useNavigate } from "@solidjs/router"
-import { createMemo, createResource, createSignal, For, Show } from "solid-js"
+import { createMemo, createResource, createSignal, For, type JSX, Show } from "solid-js"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
@@ -13,7 +13,7 @@ import { findWorkspaceProject, workspaceChipChoices } from "./workspace-chip-hel
 import { workspaceKey } from "@/pages/layout/helpers"
 import { decode64 } from "@/utils/base64"
 
-export function WorkspaceChip() {
+export function WorkspaceChip(props: { style?: JSX.CSSProperties | string } = {}) {
   const language = useLanguage()
   const globalSDK = useGlobalSDK()
   const layout = useLayout()
@@ -64,6 +64,7 @@ export function WorkspaceChip() {
           "aria-haspopup": "menu",
           class:
             "h-[32px] px-3 inline-flex items-center gap-1.5 rounded-full border border-border-strong-base text-14-medium text-text-base transition-colors hover:bg-surface-base-hover",
+          style: props.style,
         } as any
       }
       trigger={
