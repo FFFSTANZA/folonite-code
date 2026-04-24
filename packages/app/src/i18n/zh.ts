@@ -227,6 +227,7 @@ export const dict = {
 
   "model.tag.free": "免费",
   "model.tag.latest": "最新",
+  "model.tag.image": "图片",
   "model.provider.anthropic": "Anthropic",
   "model.provider.openai": "OpenAI",
   "model.provider.google": "Google",
