@@ -102,5 +102,5 @@ try {
   assert(summary.markdownHasReportPayload, "expected full report to include the fenced JSON payload")
 } finally {
   await app.close().catch(() => undefined)
-  rmSync(homeDir, { force: true, recursive: true })
+  rmSync(homeDir, { force: true, maxRetries: 5, recursive: true, retryDelay: 100 })
 }
