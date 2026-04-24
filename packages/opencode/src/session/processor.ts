@@ -1,6 +1,5 @@
 import { Cause, Deferred, Effect, Layer, Context, Scope } from "effect"
 import * as Stream from "effect/Stream"
-import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
 import { Config } from "@/config"
 import { Permission } from "@/permission"
@@ -15,13 +14,13 @@ import type { SessionID } from "./schema"
 import { SessionRetry } from "./retry"
 import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
+import { SessionDiagnostics } from "./diagnostics"
 import type { Provider } from "@/provider"
 import { Question } from "@/question"
 import { errorMessage } from "@/util/error"
 import { Log } from "@/util/log"
 import { isRecord } from "@/util/record"
 
-const DOOM_LOOP_THRESHOLD = 3
 const log = Log.create({ service: "session.processor" })
 
 export type Result = "compact" | "stop" | "continue"
@@ -84,7 +83,6 @@ export const layer: Layer.Layer<
   | Config.Service
   | Bus.Service
   | Snapshot.Service
-  | Agent.Service
   | LLM.Service
   | Permission.Service
   | Plugin.Service
@@ -97,9 +95,7 @@ export const layer: Layer.Layer<
     const config = yield* Config.Service
     const bus = yield* Bus.Service
     const snapshot = yield* Snapshot.Service
-    const agents = yield* Agent.Service
     const llm = yield* LLM.Service
-    const permission = yield* Permission.Service
     const plugin = yield* Plugin.Service
     const summary = yield* SessionSummary.Service
     const scope = yield* Scope.Scope
@@ -168,6 +164,58 @@ export const layer: Layer.Layer<
         return part
       })
 
+      const toolStateMetadata = (part: MessageV2.ToolPart) =>
+        "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : undefined
+
+      const toolDiagnostics = (part: MessageV2.ToolPart): SessionDiagnostics.Metadata["diagnostics"] | undefined => {
+        const diagnostics = toolStateMetadata(part)?.diagnostics
+        if (!isRecord(diagnostics)) return undefined
+        return diagnostics as SessionDiagnostics.Metadata["diagnostics"]
+      }
+
+      const loopRecords = (parentID: MessageV2.Assistant["parentID"]) => {
+        if (!parentID) return []
+        return Array.from(MessageV2.stream(ctx.sessionID)).flatMap((message) => {
+          if (message.info.role !== "assistant" || message.info.parentID !== parentID) return []
+          return message.parts.flatMap((part) => {
+            if (part.type !== "tool") return []
+            const loop = toolDiagnostics(part)?.loop
+            if (!loop?.inputHash || !loop.targetHash) return []
+            return [
+              {
+                sessionID: ctx.sessionID,
+                parentID,
+                tool: part.tool,
+                inputHash: loop.inputHash,
+                targetHash: loop.targetHash,
+                metadata: { diagnostics: { loop } },
+              } satisfies SessionDiagnostics.ToolCallRecord,
+            ]
+          })
+        })
+      }
+
+      const errorRecords = (parentID: MessageV2.Assistant["parentID"]) => {
+        if (!parentID) return []
+        return Array.from(MessageV2.stream(ctx.sessionID)).flatMap((message) => {
+          if (message.info.role !== "assistant" || message.info.parentID !== parentID) return []
+          return message.parts.flatMap((part) => {
+            if (part.type !== "tool") return []
+            const loop = toolDiagnostics(part)?.loop
+            if (!loop?.errorFingerprint) return []
+            return [
+              {
+                sessionID: ctx.sessionID,
+                parentID,
+                tool: part.tool,
+                errorFingerprint: loop.errorFingerprint,
+                metadata: { diagnostics: { loop } },
+              } satisfies SessionDiagnostics.ToolErrorRecord,
+            ]
+          })
+        })
+      }
+
       const completeToolCall = Effect.fn("SessionProcessor.completeToolCall")(function* (
         toolCallID: string,
         output: {
@@ -179,13 +227,14 @@ export const layer: Layer.Layer<
       ) {
         const match = yield* readToolCall(toolCallID)
         if (!match || match.part.state.status !== "running") return
+        const diagnostics = toolDiagnostics(match.part)
         yield* session.updatePart({
           ...match.part,
           state: {
             status: "completed",
             input: match.part.state.input,
             output: output.output,
-            metadata: output.metadata,
+            metadata: diagnostics ? SessionDiagnostics.mergeMetadata(output.metadata, { diagnostics }) : output.metadata,
             title: output.title,
             time: { start: match.part.state.time.start, end: Date.now() },
             attachments: output.attachments,
@@ -197,12 +246,22 @@ export const layer: Layer.Layer<
       const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
         const match = yield* readToolCall(toolCallID)
         if (!match || match.part.state.status !== "running") return false
+        const diagnostics: SessionDiagnostics.Metadata["diagnostics"] | undefined = ctx.assistantMessage.parentID
+          ? SessionDiagnostics.observeToolError({
+              records: errorRecords(ctx.assistantMessage.parentID),
+              sessionID: ctx.sessionID,
+              parentID: ctx.assistantMessage.parentID,
+              tool: match.part.tool,
+              error,
+            }).record.metadata.diagnostics
+          : toolDiagnostics(match.part)
         yield* session.updatePart({
           ...match.part,
           state: {
             status: "error",
             input: match.part.state.input,
             error: errorMessage(error),
+            metadata: SessionDiagnostics.mergeMetadata(toolStateMetadata(match.part), { diagnostics }),
             time: { start: match.part.state.time.start, end: Date.now() },
           },
         })
@@ -288,7 +347,7 @@ export const layer: Layer.Layer<
             if (ctx.assistantMessage.summary) {
               throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
             }
-            yield* updateToolCall(value.toolCallId, (match) => ({
+            const running = yield* updateToolCall(value.toolCallId, (match) => ({
               ...match,
               tool: value.toolName,
               state: {
@@ -301,31 +360,25 @@ export const layer: Layer.Layer<
                 ? { ...value.providerMetadata, providerExecuted: true }
                 : value.providerMetadata,
             }))
-
-            const parts = MessageV2.parts(ctx.assistantMessage.id)
-            const recentParts = parts.slice(-DOOM_LOOP_THRESHOLD)
-
-            if (
-              recentParts.length !== DOOM_LOOP_THRESHOLD ||
-              !recentParts.every(
-                (part) =>
-                  part.type === "tool" &&
-                  part.tool === value.toolName &&
-                  part.state.status !== "pending" &&
-                  JSON.stringify(part.state.input) === JSON.stringify(value.input),
-              )
-            ) {
-              return
-            }
-
-            const agent = yield* agents.get(ctx.assistantMessage.agent)
-            yield* permission.ask({
-              permission: "doom_loop",
-              patterns: [value.toolName],
-              sessionID: ctx.assistantMessage.sessionID,
-              metadata: { tool: value.toolName, input: value.input },
-              always: [value.toolName],
-              ruleset: agent.permission,
+            if (!running || !ctx.assistantMessage.parentID) return
+            const info = yield* session.get(ctx.sessionID)
+            const observed = SessionDiagnostics.observeToolCall({
+              records: loopRecords(ctx.assistantMessage.parentID),
+              sessionID: ctx.sessionID,
+              parentSessionID: info.parentID,
+              parentID: ctx.assistantMessage.parentID,
+              tool: value.toolName,
+              input: value.input,
+              agent: ctx.assistantMessage.agent,
+              modelID: ctx.model.id,
+              providerID: ctx.model.providerID,
+            })
+            yield* session.updatePart({
+              ...running,
+              state: {
+                ...running.state,
+                metadata: SessionDiagnostics.mergeMetadata(toolStateMetadata(running), observed.record.metadata),
+              },
             })
             return
           }
@@ -605,7 +658,6 @@ export const defaultLayer = Layer.suspend(() =>
   layer.pipe(
     Layer.provide(Session.defaultLayer),
     Layer.provide(Snapshot.defaultLayer),
-    Layer.provide(Agent.defaultLayer),
     Layer.provide(LLM.defaultLayer),
     Layer.provide(Permission.defaultLayer),
     Layer.provide(Plugin.defaultLayer),
