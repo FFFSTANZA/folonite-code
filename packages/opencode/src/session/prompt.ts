@@ -35,6 +35,7 @@ import { OFFICE_EXTS, pathBasename, pathSuffix } from "@opencode-ai/util/file-ex
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/util/error"
 import { SessionProcessor } from "./processor"
+import { SessionDiagnostics } from "./diagnostics"
 import { Tool } from "@/tool/tool"
 import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
@@ -883,7 +884,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   time: { ...part.state.time, end: Date.now() },
                   input: part.state.input,
                   title: "",
-                  metadata: { output, description: "" },
+                  metadata: { ...part.state.metadata, output, description: "" },
                   output,
                 }
                 yield* sessions.updatePart(part)
@@ -901,7 +902,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           Effect.sync(() => {
             output += chunk
             if (part.state.status === "running") {
-              part.state.metadata = { output, description: "" }
+              part.state.metadata = { ...part.state.metadata, output, description: "" }
               void run.fork(sessions.updatePart(part))
             }
           }),
@@ -1395,7 +1396,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           time: { ...runningTool.state.time, end: Date.now() },
           input: runningTool.state.input,
           title: "",
-          metadata: { output, description: "" },
+          metadata: { ...runningTool.state.metadata, output, description: "" },
           output,
         },
       }
@@ -1510,6 +1511,22 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           const maxSteps = agent.steps ?? Infinity
           const isLastStep = step >= maxSteps
           msgs = yield* insertReminders({ messages: msgs, agent, session })
+          const diagnostics = SessionDiagnostics.consumeReminders({ messages: msgs, parentID: lastUser.id })
+          if (diagnostics.text) {
+            const userMessage = msgs.findLast((msg) => msg.info.role === "user" && msg.info.id === lastUser.id)
+            userMessage?.parts.push({
+              id: PartID.ascending(),
+              messageID: lastUser.id,
+              sessionID,
+              type: "text",
+              text: diagnostics.text,
+              synthetic: true,
+            })
+          }
+          yield* Effect.forEach(diagnostics.parts, (part) => sessions.updatePart(part), {
+            concurrency: "unbounded",
+            discard: true,
+          })
 
           const msg: MessageV2.Assistant = {
             id: MessageID.ascending(),

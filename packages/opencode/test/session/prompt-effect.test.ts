@@ -491,6 +491,54 @@ it.live("loop continues when finish is tool-calls", () =>
   ),
 )
 
+it.live("loop injects diagnostics reminder after repeated tool input", () =>
+  provideTmpdirServer(
+    ({ dir, llm }) =>
+      Effect.gen(function* () {
+        const prompt = yield* SessionPrompt.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({
+          title: "Diagnostics",
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        })
+        const file = path.join(dir, "probe.txt")
+        yield* Effect.promise(() => Bun.write(file, "probe"))
+
+        yield* prompt.prompt({
+          sessionID: session.id,
+          agent: "build",
+          noReply: true,
+          parts: [{ type: "text", text: "repeat tool" }],
+        })
+        const input = { pattern: "**/*.txt" }
+        yield* llm.tool("glob", input)
+        yield* llm.tool("glob", input)
+        yield* llm.tool("glob", input)
+        yield* llm.text("done")
+
+        const result = yield* prompt.loop({ sessionID: session.id })
+        expect(result.info.role).toBe("assistant")
+        expect(yield* llm.calls).toBe(4)
+
+        const requests = yield* llm.inputs
+        expect(JSON.stringify(requests.at(-1))).toContain("Detected that you have repeated the same tool input 3 times")
+
+        const msgs = yield* MessageV2.filterCompactedEffect(session.id)
+        const tools = msgs.flatMap((msg) =>
+          msg.parts.filter((part): part is CompletedToolPart => part.type === "tool" && part.state.status === "completed"),
+        )
+        expect(tools).toHaveLength(3)
+        expect(tools[2]?.state.metadata.diagnostics.loop.inputRepeatCount).toBe(3)
+        expect(tools[2]?.state.metadata.diagnostics.loop.reminders?.[0]).toMatchObject({
+          type: "input_repeat",
+          status: "injected",
+          count: 3,
+        })
+      }),
+    { git: true, config: providerCfg },
+  ),
+)
+
 it.live("glob tool keeps instance context during prompt runs", () =>
   provideTmpdirServer(
     ({ dir, llm }) =>
