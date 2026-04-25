@@ -26,6 +26,12 @@ type ProxyDispatcherModule = {
   setGlobalDispatcher(dispatcher: unknown): void
 }
 
+type ProxyConfig = {
+  httpProxy?: string
+  httpsProxy?: string
+  noProxy?: string
+}
+
 export function getDefaultServerUrl(): string | null {
   const value = getStore().get(DEFAULT_SERVER_URL_KEY)
   return typeof value === "string" ? value : null
@@ -120,13 +126,51 @@ function prepareServerEnv(password: string) {
   Object.assign(process.env, buildServerEnv(password))
 }
 
-function proxyConfigFromEnv(env: NodeJS.ProcessEnv) {
+function proxyConfigFromEnv(env: NodeJS.ProcessEnv): ProxyConfig | null {
   const allProxy = env.ALL_PROXY ?? env.all_proxy
   const httpProxy = env.HTTP_PROXY ?? env.http_proxy ?? allProxy
   const httpsProxy = env.HTTPS_PROXY ?? env.https_proxy ?? allProxy
   const noProxy = env.NO_PROXY ?? env.no_proxy
   if (!httpProxy && !httpsProxy) return null
   return { httpProxy, httpsProxy, noProxy }
+}
+
+function presentProxyEnvKeys(env: NodeJS.ProcessEnv) {
+  return PROXY_ENV_KEYS.filter((key) => Boolean(env[key]))
+}
+
+function supportedProxyUrl(url: string | undefined) {
+  if (!url) return undefined
+  try {
+    const protocol = new URL(url).protocol
+    if (protocol === "http:" || protocol === "https:") return url
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+function normalizeProxyConfig(proxy: ProxyConfig) {
+  const httpProxy = supportedProxyUrl(proxy.httpProxy)
+  const httpsProxy = supportedProxyUrl(proxy.httpsProxy)
+  const skipped = {
+    httpProxy: Boolean(proxy.httpProxy && !httpProxy),
+    httpsProxy: Boolean(proxy.httpsProxy && !httpsProxy),
+  }
+  if (!httpProxy && !httpsProxy) {
+    return {
+      proxy: null,
+      skipped,
+    }
+  }
+  return {
+    proxy: {
+      httpProxy,
+      httpsProxy,
+      noProxy: proxy.noProxy,
+    },
+    skipped,
+  }
 }
 
 async function configureProxyDispatcher(
@@ -138,12 +182,30 @@ async function configureProxyDispatcher(
     console.log("[server] No Node fetch proxy env detected")
     return false
   }
-  const { EnvHttpProxyAgent, setGlobalDispatcher } = await load()
-  setGlobalDispatcher(new EnvHttpProxyAgent(proxy))
-  console.log("[server] Configured Node fetch proxy from env", {
-    keys: PROXY_ENV_KEYS.filter((key) => Boolean(env[key])),
-  })
-  return true
+  const configuredKeys = presentProxyEnvKeys(env)
+  const normalized = normalizeProxyConfig(proxy)
+  if (!normalized.proxy) {
+    console.warn("[server] Skipped Node fetch proxy env with unsupported protocol", {
+      keys: configuredKeys,
+      skipped: normalized.skipped,
+    })
+    return false
+  }
+  try {
+    const { EnvHttpProxyAgent, setGlobalDispatcher } = await load()
+    setGlobalDispatcher(new EnvHttpProxyAgent(normalized.proxy))
+    console.log("[server] Configured Node fetch proxy from env", {
+      keys: configuredKeys,
+    })
+    return true
+  } catch (error) {
+    console.warn("[server] Failed to configure Node fetch proxy from env", {
+      keys: configuredKeys,
+      skipped: normalized.skipped,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return false
+  }
 }
 
 export const buildServerEnvForTest = buildServerEnv

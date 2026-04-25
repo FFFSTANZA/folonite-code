@@ -345,12 +345,12 @@ describe("desktop server runtime namespace", () => {
 
     expect(
       proxyConfigFromEnvForTest({
-        ALL_PROXY: "socks5h://127.0.0.1:7897",
+        ALL_PROXY: "http://127.0.0.1:7897",
         NO_PROXY: "localhost,127.0.0.1",
       }),
     ).toEqual({
-      httpProxy: "socks5h://127.0.0.1:7897",
-      httpsProxy: "socks5h://127.0.0.1:7897",
+      httpProxy: "http://127.0.0.1:7897",
+      httpsProxy: "http://127.0.0.1:7897",
       noProxy: "localhost,127.0.0.1",
     })
   })
@@ -400,5 +400,39 @@ describe("desktop server runtime namespace", () => {
       noProxy: "localhost,127.0.0.1",
     })
     expect(capturedDispatcher).toBeTruthy()
+  })
+
+  test("configureProxyDispatcher skips unsupported proxy protocols without crashing startup", async () => {
+    const warnings: unknown[] = []
+    const previousWarn = console.warn
+    console.warn = (...args) => {
+      warnings.push(args)
+    }
+
+    try {
+      const { configureProxyDispatcherForTest } = await import("./server")
+      const configured = await configureProxyDispatcherForTest(
+        {
+          ALL_PROXY: "socks5h://127.0.0.1:7897",
+          NO_PROXY: "localhost,127.0.0.1",
+        },
+        () => import("undici"),
+      )
+
+      expect(configured).toBe(false)
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toEqual([
+        "[server] Skipped Node fetch proxy env with unsupported protocol",
+        {
+          keys: ["ALL_PROXY", "NO_PROXY"],
+          skipped: {
+            httpProxy: true,
+            httpsProxy: true,
+          },
+        },
+      ])
+    } finally {
+      console.warn = previousWarn
+    }
   })
 })
