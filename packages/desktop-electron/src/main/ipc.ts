@@ -176,19 +176,31 @@ export function registerIpcHandlers(deps: Deps) {
     const { Settings, LSP, ToolRegistry, Instance } = await import("virtual:opencode-server")
     await Settings.setLspEnabled(value)
     // LSP.invalidate / ToolRegistry.invalidate / LSP.shutdownAll all read
-    // InstanceState.directory, which requires an Instance scope. Iterate every
-    // active instance so caches and processes are reset per-project.
-    for (const directory of Instance.directories()) {
-      await Instance.provide({
-        directory,
-        fn: async () => {
-          if (!value) {
-            await LSP.shutdownAll()
-          }
-          await LSP.invalidate()
-          await ToolRegistry.invalidate()
-        },
-      })
+    // InstanceState.directory, which requires an Instance scope. Process every
+    // active instance with isolation so a single failure does not leave the
+    // remaining projects stuck on stale cache state.
+    const directories = Instance.directories()
+    const results = await Promise.allSettled(
+      directories.map((directory) =>
+        Instance.provide({
+          directory,
+          fn: async () => {
+            if (!value) {
+              await LSP.shutdownAll()
+            }
+            await LSP.invalidate()
+            await ToolRegistry.invalidate()
+          },
+        }),
+      ),
+    )
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") {
+        console.warn("lsp-set-enabled failed for instance", {
+          directory: directories[index],
+          error: result.reason,
+        })
+      }
     }
   })
 
