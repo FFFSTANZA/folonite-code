@@ -153,6 +153,8 @@ export namespace LSP {
     readonly prepareCallHierarchy: (input: LocInput) => Effect.Effect<any[]>
     readonly incomingCalls: (input: LocInput) => Effect.Effect<any[]>
     readonly outgoingCalls: (input: LocInput) => Effect.Effect<any[]>
+    readonly shutdownAll: () => Effect.Effect<void>
+    readonly invalidate: () => Effect.Effect<void>
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/LSP") {}
@@ -465,6 +467,20 @@ export namespace LSP {
         return yield* callHierarchyRequest(input, "callHierarchy/outgoingCalls")
       })
 
+      const shutdownAll = Effect.fn("LSP.shutdownAll")(function* () {
+        if (!(yield* InstanceState.has(state))) return
+        const s = yield* InstanceState.get(state)
+        const inFlight = Array.from(s.spawning.values())
+        s.spawning.clear()
+        yield* Effect.promise(() => Promise.allSettled(inFlight))
+        yield* Effect.promise(() => Promise.all(s.clients.map((c) => c.shutdown().catch(() => {}))))
+        s.clients.length = 0
+      })
+
+      const invalidate = Effect.fn("LSP.invalidate")(function* () {
+        yield* InstanceState.invalidate(state)
+      })
+
       return Service.of({
         init,
         status,
@@ -480,6 +496,8 @@ export namespace LSP {
         prepareCallHierarchy,
         incomingCalls,
         outgoingCalls,
+        shutdownAll,
+        invalidate,
       })
     }),
   )
@@ -516,6 +534,10 @@ export namespace LSP {
   export const incomingCalls = async (input: LocInput) => runPromise((svc) => svc.incomingCalls(input))
 
   export const outgoingCalls = async (input: LocInput) => runPromise((svc) => svc.outgoingCalls(input))
+
+  export const shutdownAll = async () => runPromise((svc) => svc.shutdownAll())
+
+  export const invalidate = async () => runPromise((svc) => svc.invalidate())
 
   export namespace Diagnostic {
     const MAX_PER_FILE = 20
