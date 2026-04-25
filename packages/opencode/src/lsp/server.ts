@@ -32,6 +32,16 @@ export namespace LSPServer {
 
   type RootFunction = (file: string) => Promise<string | undefined>
 
+  export const JavascriptPackageRoot = () => [
+    "tsconfig.json",
+    "package.json",
+    "package-lock.json",
+    "bun.lockb",
+    "bun.lock",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+  ]
+
   const NearestRoot = (includePatterns: string[], excludePatterns?: string[]): RootFunction => {
     return async (file) => {
       if (excludePatterns) {
@@ -94,10 +104,7 @@ export namespace LSPServer {
 
   export const Typescript: Info = {
     id: "typescript",
-    root: NearestRoot(
-      ["package-lock.json", "bun.lockb", "bun.lock", "pnpm-lock.yaml", "yarn.lock"],
-      ["deno.json", "deno.jsonc"],
-    ),
+    root: NearestRoot(JavascriptPackageRoot(), ["deno.json", "deno.jsonc"]),
     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
     async spawn(root) {
       const tsserver = Module.resolve("typescript/lib/tsserver.js", Instance.directory)
@@ -125,7 +132,7 @@ export namespace LSPServer {
   export const Vue: Info = {
     id: "vue",
     extensions: [".vue"],
-    root: NearestRoot(["package-lock.json", "bun.lockb", "bun.lock", "pnpm-lock.yaml", "yarn.lock"]),
+    root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       let binary = which("vue-language-server")
       const args: string[] = []
@@ -153,7 +160,7 @@ export namespace LSPServer {
 
   export const ESLint: Info = {
     id: "eslint",
-    root: NearestRoot(["package-lock.json", "bun.lockb", "bun.lock", "pnpm-lock.yaml", "yarn.lock"]),
+    root: NearestRoot(JavascriptPackageRoot()),
     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue"],
     async spawn(root) {
       const eslint = Module.resolve("eslint", Instance.directory)
@@ -1004,7 +1011,7 @@ export namespace LSPServer {
   export const Svelte: Info = {
     id: "svelte",
     extensions: [".svelte"],
-    root: NearestRoot(["package-lock.json", "bun.lockb", "bun.lock", "pnpm-lock.yaml", "yarn.lock"]),
+    root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       let binary = which("svelteserver")
       const args: string[] = []
@@ -1031,7 +1038,7 @@ export namespace LSPServer {
   export const Astro: Info = {
     id: "astro",
     extensions: [".astro"],
-    root: NearestRoot(["package-lock.json", "bun.lockb", "bun.lock", "pnpm-lock.yaml", "yarn.lock"]),
+    root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       const tsserver = Module.resolve("typescript/lib/tsserver.js", Instance.directory)
       if (!tsserver) {
@@ -1289,7 +1296,7 @@ export namespace LSPServer {
   export const YamlLS: Info = {
     id: "yaml-ls",
     extensions: [".yaml", ".yml"],
-    root: NearestRoot(["package-lock.json", "bun.lockb", "bun.lock", "pnpm-lock.yaml", "yarn.lock"]),
+    root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       let binary = which("yaml-language-server")
       const args: string[] = []

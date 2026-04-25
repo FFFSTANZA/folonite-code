@@ -173,6 +173,7 @@ export namespace LSP {
             log.info("all LSPs are disabled")
           } else {
             for (const server of Object.values(LSPServer)) {
+              if (typeof server !== "object" || server === null || !("id" in server)) continue
               servers[server.id] = server
             }
 
