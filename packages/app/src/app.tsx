@@ -237,7 +237,10 @@ export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
               <QueryProvider>
                 <DialogProvider>
                   <MarkedProvider>
-                    <FileComponentProvider component={File}>{props.children}</FileComponentProvider>
+                    <FileComponentProvider component={File}>
+                      <AboutModal />
+                      {props.children}
+                    </FileComponentProvider>
                   </MarkedProvider>
                 </DialogProvider>
               </QueryProvider>
