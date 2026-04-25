@@ -141,7 +141,11 @@ export namespace LSP {
     servers: Record<string, LSPServer.Info>
     broken: Set<string>
     spawning: Map<string, Promise<LSPClient.Info | undefined>>
+    /** Per-server-key cooldown timestamps after a transient install failure. */
+    installCooldownUntil: Map<string, number>
   }
+
+  const INSTALL_RETRY_COOLDOWN_MS = 60_000
 
   export interface Interface {
     readonly init: () => Effect.Effect<void>
@@ -197,6 +201,7 @@ export namespace LSP {
             servers,
             broken: new Set(),
             spawning: new Map(),
+            installCooldownUntil: new Map(),
           }
 
           yield* Effect.addFinalizer(() =>
@@ -227,7 +232,12 @@ export namespace LSP {
                 const isInstallFailure =
                   err instanceof Npm.InstallFailedError ||
                   (err && typeof err === "object" && "name" in err && err.name === "NpmInstallFailedError")
-                if (!isInstallFailure) {
+                if (isInstallFailure) {
+                  // Cooldown to avoid hammering npm + spamming toasts on every
+                  // touchFile/hover/definition while still allowing recovery
+                  // once the network/disk situation changes.
+                  s.installCooldownUntil.set(key, Date.now() + INSTALL_RETRY_COOLDOWN_MS)
+                } else {
                   s.broken.add(key)
                 }
                 log.error(`Failed to spawn LSP server ${server.id}`, { error: err })
@@ -265,7 +275,13 @@ export namespace LSP {
 
             const root = await server.root(file)
             if (!root) continue
-            if (s.broken.has(root + server.id)) continue
+            const key = root + server.id
+            if (s.broken.has(key)) continue
+            const cooldownUntil = s.installCooldownUntil.get(key)
+            if (cooldownUntil !== undefined) {
+              if (Date.now() < cooldownUntil) continue
+              s.installCooldownUntil.delete(key)
+            }
 
             const match = s.clients.find((x) => x.root === root && x.serverID === server.id)
             if (match) {
@@ -273,7 +289,7 @@ export namespace LSP {
               continue
             }
 
-            const inflight = s.spawning.get(root + server.id)
+            const inflight = s.spawning.get(key)
             if (inflight) {
               const client = await inflight
               if (!client) continue
@@ -281,12 +297,12 @@ export namespace LSP {
               continue
             }
 
-            const task = schedule(server, root, root + server.id)
-            s.spawning.set(root + server.id, task)
+            const task = schedule(server, root, key)
+            s.spawning.set(key, task)
 
             task.finally(() => {
-              if (s.spawning.get(root + server.id) === task) {
-                s.spawning.delete(root + server.id)
+              if (s.spawning.get(key) === task) {
+                s.spawning.delete(key)
               }
             })
 
@@ -337,7 +353,10 @@ export namespace LSP {
             if (server.extensions.length && !server.extensions.includes(extension)) continue
             const root = await server.root(file)
             if (!root) continue
-            if (s.broken.has(root + server.id)) continue
+            const key = root + server.id
+            if (s.broken.has(key)) continue
+            const cooldownUntil = s.installCooldownUntil.get(key)
+            if (cooldownUntil !== undefined && Date.now() < cooldownUntil) continue
             return true
           }
           return false
