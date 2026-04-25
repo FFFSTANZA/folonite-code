@@ -726,7 +726,7 @@ export const dict = {
   "settings.general.row.lsp.title": "语言服务器协议（LSP）",
   "settings.general.row.lsp.description": "修改代码时识别项目类型错误和符号引用",
   "toast.lsp.installFailed.title": "语言服务器下载失败",
-  "toast.lsp.installFailed.description": "{pkg}: {error}",
+  "toast.lsp.installFailed.description": "{{pkg}}: {{error}}",
   "settings.general.row.wayland.title": "使用原生 Wayland",
   "settings.general.row.wayland.description": "在 Wayland 上禁用 X11 回退。需要重启。",
   "settings.general.row.wayland.tooltip": "在混合刷新率显示器的 Linux 系统上，原生 Wayland 可能更稳定。",
