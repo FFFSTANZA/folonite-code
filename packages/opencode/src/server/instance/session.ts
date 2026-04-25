@@ -11,6 +11,7 @@ import { SessionCompaction } from "../../session/compaction"
 import { SessionRevert } from "../../session/revert"
 import { SessionShare } from "@/share/session"
 import { Export } from "@/session/export"
+import { ShareRuntime } from "@/share/runtime"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "../../session/todo"
@@ -440,6 +441,15 @@ export const SessionRoutes = lazy(() =>
       ),
       async (c) => {
         const sessionID = c.req.valid("param").sessionID
+        const enabled = await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const gate = yield* ShareRuntime.CloudShareGate
+            return gate.isEnabled()
+          }),
+        )
+        if (!enabled) {
+          return c.json({ error: "cloud_share_disabled" }, 410)
+        }
         const share = await SessionShare.share(sessionID)
         const session = await Session.get(sessionID)
         return c.json({
@@ -579,6 +589,15 @@ export const SessionRoutes = lazy(() =>
       ),
       async (c) => {
         const sessionID = c.req.valid("param").sessionID
+        const enabled = await AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const gate = yield* ShareRuntime.CloudShareGate
+            return gate.isEnabled()
+          }),
+        )
+        if (!enabled) {
+          return c.json({ error: "cloud_share_disabled" }, 410)
+        }
         await SessionShare.unshare(sessionID)
         const session = await Session.get(sessionID)
         return c.json({

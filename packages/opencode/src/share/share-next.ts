@@ -13,6 +13,7 @@ import { Database, eq } from "@/storage/db"
 import { Config } from "@/config/config"
 import { Log } from "@/util/log"
 import { SessionShareTable } from "./share.sql"
+import { ShareRuntime } from "./runtime"
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
@@ -115,6 +116,7 @@ export namespace ShareNext {
       const httpOk = HttpClient.filterStatusOk(http)
       const provider = yield* Provider.Service
       const session = yield* Session.Service
+      const gate = yield* ShareRuntime.CloudShareGate
 
       function sync(sessionID: SessionID, data: Data[]): Effect.Effect<void> {
         return Effect.gen(function* () {
@@ -156,7 +158,7 @@ export namespace ShareNext {
             ),
           )
 
-          if (disabled) return cache
+          if (disabled || !gate.isEnabled()) return cache
 
           const watch = <D extends { type: string }>(
             def: D,
@@ -288,7 +290,7 @@ export namespace ShareNext {
       })
 
       const create = Effect.fn("ShareNext.create")(function* (sessionID: SessionID) {
-        if (disabled) return { id: "", url: "", secret: "" }
+        if (disabled || !gate.isEnabled()) return { id: "", url: "", secret: "" }
         log.info("creating share", { sessionID })
         const req = yield* request()
         const result = yield* HttpClientRequest.post(`${req.baseUrl}${req.api.create}`).pipe(
@@ -320,7 +322,7 @@ export namespace ShareNext {
       })
 
       const remove = Effect.fn("ShareNext.remove")(function* (sessionID: SessionID) {
-        if (disabled) return
+        if (disabled || !gate.isEnabled()) return
         log.info("removing share", { sessionID })
         const share = yield* get(sessionID)
         if (!share) return
@@ -346,5 +348,6 @@ export namespace ShareNext {
     Layer.provide(FetchHttpClient.layer),
     Layer.provide(Provider.defaultLayer),
     Layer.provide(Session.defaultLayer),
+    Layer.provide(ShareRuntime.cloudShareGateDefaultLayer),
   )
 }

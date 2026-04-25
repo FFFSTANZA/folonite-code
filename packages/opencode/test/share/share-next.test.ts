@@ -13,6 +13,7 @@ import { Provider } from "../../src/provider/provider"
 import { Session } from "../../src/session"
 import type { SessionID } from "../../src/session/schema"
 import { ShareNext } from "../../src/share/share-next"
+import { ShareRuntime } from "../../src/share/runtime"
 import { Storage } from "../../src/storage/storage"
 import { SessionShareTable } from "../../src/share/share.sql"
 import { Database, eq } from "../../src/storage/db"
@@ -48,6 +49,7 @@ function live(client: HttpClient.HttpClient) {
     Layer.provide(http),
     Layer.provide(Provider.defaultLayer),
     Layer.provide(Session.defaultLayer),
+    Layer.provide(ShareRuntime.cloudShareGateDefaultLayer),
   )
 }
 
@@ -66,6 +68,7 @@ function wired(client: HttpClient.HttpClient) {
     Layer.provide(Config.defaultLayer),
     Layer.provide(http),
     Layer.provide(Provider.defaultLayer),
+    Layer.provide(ShareRuntime.cloudShareGateDefaultLayer),
   )
 }
 
