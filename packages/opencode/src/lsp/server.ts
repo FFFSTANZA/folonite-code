@@ -109,8 +109,13 @@ export namespace LSPServer {
     root: NearestRoot(JavascriptPackageRoot(), ["deno.json", "deno.jsonc"]),
     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
     async spawn(root) {
-      const tsserver = Module.resolve("typescript/lib/tsserver.js", Instance.directory)
-      log.info("typescript server", { tsserver })
+      // Prefer the package-local TypeScript SDK so diagnostics match the
+      // package's own version. Fall back to the worktree root install for
+      // monorepos that hoist typescript to the top level.
+      const tsserver =
+        Module.resolve("typescript/lib/tsserver.js", root) ??
+        Module.resolve("typescript/lib/tsserver.js", Instance.directory)
+      log.info("typescript server", { tsserver, root })
       if (!tsserver) return
       const bin = await Npm.which("typescript-language-server")
       if (!bin) return
@@ -1047,7 +1052,9 @@ export namespace LSPServer {
     packages: ["@astrojs/language-server"],
     root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
-      const tsserver = Module.resolve("typescript/lib/tsserver.js", Instance.directory)
+      const tsserver =
+        Module.resolve("typescript/lib/tsserver.js", root) ??
+        Module.resolve("typescript/lib/tsserver.js", Instance.directory)
       if (!tsserver) {
         log.info("typescript not found, required for Astro language server")
         return
