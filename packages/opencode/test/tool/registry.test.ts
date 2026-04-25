@@ -525,4 +525,30 @@ describe("tool.registry", () => {
       await Settings.setLspEnabled(false)
     }
   })
+
+  test("invalidate flips lsp visibility on next ids() call", async () => {
+    await using tmp = await tmpdir()
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          await Settings.setLspEnabled(true)
+          const before = await ToolRegistry.ids()
+          expect(before).toContain("lsp")
+
+          await Settings.setLspEnabled(false)
+          await ToolRegistry.invalidate()
+          const off = await ToolRegistry.ids()
+          expect(off).not.toContain("lsp")
+
+          await Settings.setLspEnabled(true)
+          await ToolRegistry.invalidate()
+          const on = await ToolRegistry.ids()
+          expect(on).toContain("lsp")
+        },
+      })
+    } finally {
+      await Settings.setLspEnabled(false)
+    }
+  })
 })

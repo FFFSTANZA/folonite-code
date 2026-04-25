@@ -77,6 +77,7 @@ export namespace ToolRegistry {
       modelID: ModelID
       agent: Agent.Info
     }) => Effect.Effect<Tool.Def[]>
+    readonly invalidate: () => Effect.Effect<void>
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/ToolRegistry") {}
@@ -365,7 +366,11 @@ export namespace ToolRegistry {
         return { task: s.task, read: s.read }
       })
 
-      return Service.of({ ids, all, named, tools })
+      const invalidate: Interface["invalidate"] = Effect.fn("ToolRegistry.invalidate")(function* () {
+        yield* InstanceState.invalidate(state)
+      })
+
+      return Service.of({ ids, all, named, tools, invalidate })
     }),
   )
 
@@ -404,5 +409,9 @@ export namespace ToolRegistry {
     agent: Agent.Info
   }): Promise<(Tool.Def & { id: string })[]> {
     return runPromise((svc) => svc.tools(input))
+  }
+
+  export async function invalidate() {
+    return runPromise((svc) => svc.invalidate())
   }
 }
