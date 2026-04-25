@@ -6,14 +6,13 @@ import path from "path"
 import { pathToFileURL, fileURLToPath } from "url"
 import { LSPServer } from "./server"
 import z from "zod"
-import { Config } from "../config/config"
 import { Instance } from "../project/instance"
 import { Flag } from "@/flag/flag"
 import { Process } from "../util/process"
-import { spawn as lspspawn } from "./launch"
 import { Effect, Layer, Context } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
+import { Settings } from "@/settings"
 
 export namespace LSP {
   const log = Log.create({ service: "lsp" })
@@ -161,16 +160,16 @@ export namespace LSP {
   export const layer = Layer.effect(
     Service,
     Effect.gen(function* () {
-      const config = yield* Config.Service
+      const settings = yield* Settings.Service
 
       const state = yield* InstanceState.make<State>(
         Effect.fn("LSP.state")(function* () {
-          const cfg = yield* config.get()
+          const lspEnabled = yield* settings.lspEnabled()
 
           const servers: Record<string, LSPServer.Info> = {}
 
-          if (cfg.lsp === false) {
-            log.info("all LSPs are disabled")
+          if (!lspEnabled) {
+            log.info("LSP disabled (Settings.lspEnabled=false)")
           } else {
             for (const server of Object.values(LSPServer)) {
               if (typeof server !== "object" || server === null || !("id" in server)) continue
@@ -178,28 +177,6 @@ export namespace LSP {
             }
 
             filterExperimentalServers(servers)
-
-            for (const [name, item] of Object.entries(cfg.lsp ?? {})) {
-              const existing = servers[name]
-              if (item.disabled) {
-                log.info(`LSP server ${name} is disabled`)
-                delete servers[name]
-                continue
-              }
-              servers[name] = {
-                ...existing,
-                id: name,
-                root: existing?.root ?? (async () => Instance.directory),
-                extensions: item.extensions ?? existing?.extensions ?? [],
-                spawn: async (root) => ({
-                  process: lspspawn(item.command[0], item.command.slice(1), {
-                    cwd: root,
-                    env: { ...process.env, ...item.env },
-                  }),
-                  initialization: item.initialization,
-                }),
-              }
-            }
 
             log.info("enabled LSP servers", {
               serverIds: Object.values(servers)
@@ -507,7 +484,7 @@ export namespace LSP {
     }),
   )
 
-  export const defaultLayer = layer.pipe(Layer.provide(Config.defaultLayer))
+  export const defaultLayer = layer.pipe(Layer.provide(Settings.defaultLayer))
 
   const { runPromise } = makeRuntime(Service, defaultLayer)
 
