@@ -6,6 +6,7 @@ import { writeMockConfigInstall } from "../shared/mock-npm-install"
 import { withConfigDepsLock } from "../shared/config-deps-lock"
 import { Instance } from "../../src/project/instance"
 import { localToolImportSpec, ToolRegistry } from "../../src/tool/registry"
+import { Settings } from "../../src/settings"
 import { Npm } from "../../src/npm"
 
 afterEach(async () => {
@@ -495,5 +496,33 @@ describe("tool.registry", () => {
         expect(ids).not.toContain("boom")
       },
     })
+  })
+
+  test("excludes lsp tool when Settings.lspEnabled=false", async () => {
+    await using tmp = await tmpdir()
+    await Settings.setLspEnabled(false)
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const ids = await ToolRegistry.ids()
+        expect(ids).not.toContain("lsp")
+      },
+    })
+  })
+
+  test("includes lsp tool when Settings.lspEnabled=true", async () => {
+    await using tmp = await tmpdir()
+    await Settings.setLspEnabled(true)
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const ids = await ToolRegistry.ids()
+          expect(ids).toContain("lsp")
+        },
+      })
+    } finally {
+      await Settings.setLspEnabled(false)
+    }
   })
 })

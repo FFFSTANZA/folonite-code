@@ -23,6 +23,7 @@ import { ProviderID, type ModelID } from "../provider/schema"
 import { WebSearchTool } from "./websearch"
 import { CodeSearchTool } from "./codesearch"
 import { Flag } from "@/flag/flag"
+import { Settings } from "@/settings"
 import { Log } from "@/util/log"
 import { LspTool } from "./lsp"
 import { Truncate } from "./truncate"
@@ -92,6 +93,7 @@ export namespace ToolRegistry {
     | Session.Service
     | Provider.Service
     | LSP.Service
+    | Settings.Service
     | Instruction.Service
     | AppFileSystem.Service
     | Bus.Service
@@ -108,6 +110,7 @@ export namespace ToolRegistry {
       const agents = yield* Agent.Service
       const skill = yield* Skill.Service
       const truncate = yield* Truncate.Service
+      const settings = yield* Settings.Service
 
       const invalid = yield* InvalidTool
       const task = yield* TaskTool
@@ -130,6 +133,7 @@ export namespace ToolRegistry {
 
       const state = yield* InstanceState.make<State>(
         Effect.fn("ToolRegistry.state")(function* (ctx) {
+          const lspEnabled = yield* settings.lspEnabled()
           const custom: Tool.Def[] = []
 
           function fromPlugin(id: string, def: ToolDefinition): Tool.Def {
@@ -262,7 +266,7 @@ export namespace ToolRegistry {
               tool.code,
               tool.skill,
               tool.patch,
-              ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [tool.lsp] : []),
+              ...(lspEnabled ? [tool.lsp] : []),
               ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [tool.plan] : []),
             ],
             task: tool.task,
@@ -376,6 +380,7 @@ export namespace ToolRegistry {
       Layer.provide(Session.defaultLayer),
       Layer.provide(Provider.defaultLayer),
       Layer.provide(LSP.defaultLayer),
+      Layer.provide(Settings.defaultLayer),
       Layer.provide(Instruction.defaultLayer),
       Layer.provide(AppFileSystem.defaultLayer),
       Layer.provide(Bus.layer),
