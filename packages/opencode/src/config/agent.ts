@@ -108,7 +108,7 @@ const normalize = (agent: AgentInput): AgentInfo => {
   const permission: ConfigPermission.Info = {}
   for (const [tool, enabled] of Object.entries(tools ?? {})) {
     const action = enabled ? "allow" : "deny"
-    if (tool === "write" || tool === "edit" || tool === "patch" || tool === "multiedit") {
+    if (tool === "write" || tool === "edit" || tool === "patch") {
       permission.edit = action
       continue
     }
