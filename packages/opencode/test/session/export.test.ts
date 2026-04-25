@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 import path from "path"
 import { Instance } from "../../src/project/instance"
 import { Session as SessionNs } from "../../src/session"
+import { MessageV2 } from "../../src/session/message-v2"
+import { MessageID } from "../../src/session/schema"
 import { Log } from "../../src/util/log"
 import { AppRuntime } from "../../src/effect/app-runtime"
 import { Export, getRuntimeNamespace } from "../../src/session/export"
@@ -108,5 +110,72 @@ describe("Export.session", () => {
       { id: "ses_a", time: { created: 100 } },
     ]
     expect([...items].sort(cmp).map((s) => s.id)).toEqual(["ses_a", "ses_b"])
+  })
+
+  test("includes runtime_context with platform, locale, timezone, and best-effort instruction_sources", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const root = await SessionNs.create({ title: "x" })
+        try {
+          const result = await AppRuntime.runPromise(Export.session(root.id))
+
+          expect(result.runtime_context.platform).toBe(process.platform)
+          expect(result.runtime_context.app_version).toBeTruthy()
+          expect(typeof result.runtime_context.timezone).toBe("string")
+          expect(typeof result.runtime_context.locale).toBe("string")
+          expect(Array.isArray(result.runtime_context.instruction_sources)).toBe(true)
+          expect(result.runtime_context.model_refs).toEqual({})
+          // Sort invariant: stable kind then path/url (both keys, not just primary).
+          const sources = result.runtime_context.instruction_sources
+          const sortedCopy = [...sources].sort((a, b) => {
+            if (a.kind !== b.kind) return a.kind.localeCompare(b.kind)
+            return (a.path ?? a.url ?? "").localeCompare(b.path ?? b.url ?? "")
+          })
+          expect(sources).toEqual(sortedCopy)
+        } finally {
+          await SessionNs.remove(root.id)
+        }
+      },
+    })
+  })
+
+  test("collectModelRefs marks unknown providers as unresolved with a reason", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const root = await SessionNs.create({ title: "modelRefsFixture" })
+        try {
+          const userMessage: MessageV2.WithParts = {
+            info: {
+              id: MessageID.ascending(),
+              sessionID: root.id,
+              role: "user",
+              time: { created: Date.now() },
+              agent: "user",
+              model: { providerID: "nonexistent-provider", modelID: "fake-model-7b" },
+              tools: {},
+            } as MessageV2.User,
+            parts: [],
+          }
+          const fakeTree: Export.Tree = {
+            info: root,
+            had_cloud_share: false,
+            diffs: [],
+            messages: [userMessage],
+            children: [],
+          }
+          const refs = await AppRuntime.runPromise(Export.collectModelRefs(fakeTree))
+          const entry = refs["nonexistent-provider/fake-model-7b"]
+          expect(entry).toBeDefined()
+          expect(entry.resolved).toBe(false)
+          if (!entry.resolved) {
+            expect(entry.unresolved_reason).toBeTruthy()
+          }
+        } finally {
+          await SessionNs.remove(root.id)
+        }
+      },
+    })
   })
 })

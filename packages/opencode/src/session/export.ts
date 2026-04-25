@@ -1,12 +1,45 @@
+import os from "node:os"
+import path from "node:path"
+import fs from "node:fs/promises"
+import crypto from "node:crypto"
 import { Effect } from "effect"
 import { Runtime } from "@opencode-ai/shared/runtime"
 import { Session } from "."
 import type { SessionID } from "./schema"
 import type { MessageV2 } from "./message-v2"
 import type { Snapshot as SnapshotMod } from "../snapshot"
+import { Installation } from "../installation"
+import { Provider } from "../provider/provider"
+import { ProviderID, ModelID } from "../provider/schema"
+import { Instance } from "../project/instance"
+import { Global } from "../global"
 
 export function getRuntimeNamespace(): "pawwork" | "opencode" {
   return Runtime.isPawWork() ? "pawwork" : "opencode"
+}
+
+async function hashFile(p: string) {
+  try {
+    const buf = await fs.readFile(p)
+    return "sha256:" + crypto.createHash("sha256").update(buf).digest("hex")
+  } catch {
+    return undefined
+  }
+}
+
+function extractReasonFromCause(cause: unknown): string {
+  // Cause shape in Effect 4.x: { reasons: Array<{ _tag, error?, defect?, ... }> }
+  // We only need a reason string for diagnostics — best-effort extraction without depending
+  // on a stable Cause API surface (Cause.failureOption was removed in this version).
+  const reasons = (cause as { reasons?: unknown[] } | undefined)?.reasons ?? []
+  for (const r of reasons as Array<{ _tag?: string; error?: unknown; defect?: unknown }>) {
+    const payload = r.error ?? r.defect
+    if (typeof payload === "string") return payload
+    const p = payload as { _tag?: string; message?: string } | undefined
+    if (p?.message) return p.message
+    if (p?._tag) return p._tag
+  }
+  return "unknown"
 }
 
 export namespace Export {
@@ -18,13 +51,33 @@ export namespace Export {
     children: Tree[]
   }
 
+  export type ModelRefEntry =
+    | { providerID: string; modelID: string; resolved: true }
+    | { providerID: string; modelID: string; resolved: false; unresolved_reason: string }
+
+  export type InstructionSource = {
+    kind: string
+    path?: string
+    url?: string
+    hash?: string
+    hash_unavailable?: true
+  }
+
   export type Snapshot = {
     schema_version: 1
     format: "pawwork-session-export"
     exported_at: number
     root_session_id: SessionID
     runtime_context: {
+      app_version: string
+      build_channel?: string
       runtime_namespace: "pawwork" | "opencode"
+      platform: NodeJS.Platform
+      os_version: string
+      locale: string
+      timezone: string
+      instruction_sources: InstructionSource[]
+      model_refs: Record<string, ModelRefEntry>
       stats: {
         session_count: number
         message_count: number
@@ -49,9 +102,6 @@ export namespace Export {
     return current
   })
 
-  // Builds a single node and returns it alongside its sorted child infos.
-  // Non-recursive on purpose: BFS in `exportTree` links parents → children iteratively,
-  // sidestepping TypeScript's collapse of recursive Effect generator return types.
   const buildNode = Effect.fn("Export.buildNode")(function* (svc: Session.Interface, info: Session.Info) {
     const messages = yield* svc.messages({ sessionID: info.id })
     const diffs = yield* svc.diff(info.id)
@@ -65,7 +115,6 @@ export namespace Export {
       info: infoWithoutShare as Omit<Session.Info, "share">,
       had_cloud_share: !!(share as { url?: string } | undefined)?.url,
       diffs,
-      // Task 4 wraps each part with redactPart(p, ctx); kept untouched here.
       messages,
       children: [],
     }
@@ -102,19 +151,95 @@ export namespace Export {
     return { session_count, message_count, part_count, omitted_attachment_count }
   }
 
+  const collectInstructionSources = Effect.fn("Export.instructionSources")(function* () {
+    const sources: InstructionSource[] = []
+    let worktree: string | undefined
+    try {
+      worktree = Instance.worktree
+    } catch {
+      worktree = undefined
+    }
+    const candidates: Array<{ kind: string; file: string }> = [
+      { kind: "global", file: path.join(Global.Path.config, "AGENTS.md") },
+      ...(worktree ? [{ kind: "project", file: path.join(worktree, "AGENTS.md") }] : []),
+      // Bundled pawwork prompt — present in the repo at packages/opencode/src/session/prompt/pawwork.txt.
+      // hashFile silently returns undefined and the entry is skipped if the file is missing.
+      { kind: "bundled", file: path.join(__dirname, "prompt", "pawwork.txt") },
+    ]
+    for (const c of candidates) {
+      const hash = yield* Effect.promise(() => hashFile(c.file))
+      if (hash) sources.push({ kind: c.kind, path: c.file, hash })
+    }
+    return sources.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind.localeCompare(b.kind)
+      return (a.path ?? a.url ?? "").localeCompare(b.path ?? b.url ?? "")
+    })
+  })
+
+  // Exported so it can be unit-tested with synthesized Tree fixtures.
+  export const collectModelRefs = Effect.fn("Export.modelRefs")(function* (tree: Tree) {
+    const provider = yield* Provider.Service
+    const seen = new Map<string, { providerID: string; modelID: string }>()
+    function walk(node: Tree) {
+      for (const m of node.messages) {
+        if (m.info.role !== "user") continue
+        const ref = m.info.model
+        const key = `${ref.providerID}/${ref.modelID}`
+        if (!seen.has(key)) seen.set(key, { providerID: ref.providerID, modelID: ref.modelID })
+      }
+      for (const c of node.children) walk(c)
+    }
+    walk(tree)
+    const refs: Record<string, ModelRefEntry> = {}
+    for (const [key, ref] of [...seen.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      const entry = yield* Effect.matchCause(
+        provider.getModel(ProviderID.make(ref.providerID), ModelID.make(ref.modelID)),
+        {
+          onSuccess: (): ModelRefEntry => ({
+            providerID: ref.providerID,
+            modelID: ref.modelID,
+            resolved: true,
+          }),
+          onFailure: (cause): ModelRefEntry => {
+            // The provider throws ModelNotFoundError inside Effect.gen → arrives as a defect.
+            // matchCause handles both typed failures and defects; reach into cause.reasons to extract.
+            const reason = extractReasonFromCause(cause)
+            return {
+              providerID: ref.providerID,
+              modelID: ref.modelID,
+              resolved: false,
+              unresolved_reason: reason,
+            }
+          },
+        },
+      )
+      refs[key] = entry
+    }
+    return refs
+  })
+
   export const session = Effect.fn("Export.session")(function* (anyID: SessionID) {
     const svc = yield* Session.Service
     const root = yield* climbToRoot(svc, anyID)
-    // ctx is allocated once. Task 4 fills the redact path; Task 2 keeps it 0.
     const ctx = { count: { omitted: 0 } }
     const tree = yield* exportTree(svc, root)
+    const instruction_sources = yield* collectInstructionSources()
+    const model_refs = yield* collectModelRefs(tree)
     return {
       schema_version: 1 as const,
       format: "pawwork-session-export" as const,
       exported_at: Date.now(),
       root_session_id: root.id,
       runtime_context: {
+        app_version: Installation.VERSION,
+        ...(Installation.CHANNEL ? { build_channel: Installation.CHANNEL } : {}),
         runtime_namespace: getRuntimeNamespace(),
+        platform: process.platform,
+        os_version: os.release(),
+        locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        instruction_sources,
+        model_refs,
         stats: countStats(tree, ctx.count.omitted),
       },
       diagnostics: {},
