@@ -42,6 +42,7 @@ import { PromptProvider } from "@/context/prompt"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider } from "@/context/settings"
 import { TerminalProvider } from "@/context/terminal"
+import { AboutModal, type AboutInfo } from "@/components/about-modal"
 import DirectoryLayout from "@/pages/directory-layout"
 import Layout from "@/pages/layout"
 import { ErrorPage } from "./pages/error"
@@ -79,6 +80,8 @@ declare global {
     }
     api?: {
       setDesktopContext?: (context: DesktopContext) => Promise<void>
+      getAboutInfo?: () => Promise<AboutInfo>
+      onAboutOpen?: (handler: () => void) => () => void
     }
   }
 }
