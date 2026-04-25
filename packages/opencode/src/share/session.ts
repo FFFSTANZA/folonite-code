@@ -27,6 +27,9 @@ export namespace SessionShare {
       const gate = yield* ShareRuntime.CloudShareGate
       const scope = yield* Scope.Scope
 
+      // Local closure mirrors ShareRuntime.ensureEnabled — kept here so the captured `gate`
+      // reference doesn't leak the CloudShareGate requirement into share/unshare/create's R type.
+      // If you change the failure semantics here, mirror the change in runtime.ts.
       const ensureEnabled = Effect.suspend(() =>
         gate.isEnabled() ? Effect.void : Effect.fail(ShareRuntime.cloudShareDisabled()),
       )

@@ -12,6 +12,7 @@ import { SessionRevert } from "../../session/revert"
 import { SessionShare } from "@/share/session"
 import { Export } from "@/session/export"
 import { ShareRuntime } from "@/share/runtime"
+import { NotFoundError } from "@/storage/db"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "../../session/todo"
@@ -485,8 +486,8 @@ export const SessionRoutes = lazy(() =>
           const result = await AppRuntime.runPromise(Export.session(sessionID))
           return c.json(result)
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          if (msg.toLowerCase().includes("not found")) {
+          // Session.get throws NotFoundError; matches the typed pattern used in middleware.ts.
+          if (err instanceof NotFoundError) {
             return c.json({ error: "session_not_found", sessionID }, 404)
           }
           throw err

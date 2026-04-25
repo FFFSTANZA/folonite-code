@@ -238,6 +238,35 @@ describe("ShareNext", () => {
     ),
   )
 
+  it.live("create fails closed and issues no HTTP when CloudShareGate is disabled", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const session = yield* Session.Service.use((svc) => svc.create({ title: "test" }))
+        // The HttpClient die() ensures any actual HTTP attempt would fail loudly with a defect;
+        // the gate must short-circuit before that point.
+        const client = none
+        const disabledGate = Layer.succeed(ShareRuntime.CloudShareGate, { isEnabled: () => false })
+
+        const exit = yield* ShareNext.Service.use((svc) => Effect.exit(svc.create(session.id))).pipe(
+          Effect.provide(
+            ShareNext.layer.pipe(
+              Layer.provide(Bus.layer),
+              Layer.provide(Account.layer.pipe(Layer.provide(AccountRepo.layer), Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))),
+              Layer.provide(Config.defaultLayer),
+              Layer.provide(Layer.succeed(HttpClient.HttpClient, client)),
+              Layer.provide(Provider.defaultLayer),
+              Layer.provide(Session.defaultLayer),
+              Layer.provide(disabledGate),
+            ),
+          ),
+        )
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(share(session.id)).toBeUndefined()
+      }),
+    ),
+  )
+
   it.live("ShareNext coalesces rapid diff events into one delayed sync with latest data", () =>
     provideTmpdirInstance(
       () => {

@@ -290,7 +290,11 @@ export namespace ShareNext {
       })
 
       const create = Effect.fn("ShareNext.create")(function* (sessionID: SessionID) {
-        if (disabled || !gate.isEnabled()) return { id: "", url: "", secret: "" }
+        // OPENCODE_DISABLE_SHARE keeps a benign empty stub for opencode users who opt out;
+        // the gate (PawWork runtime) raises a typed failure so direct callers can't mistake the
+        // disabled return for a successful share with a blank URL.
+        if (disabled) return { id: "", url: "", secret: "" }
+        if (!gate.isEnabled()) return yield* Effect.fail(ShareRuntime.cloudShareDisabled())
         log.info("creating share", { sessionID })
         const req = yield* request()
         const result = yield* HttpClientRequest.post(`${req.baseUrl}${req.api.create}`).pipe(
@@ -322,7 +326,9 @@ export namespace ShareNext {
       })
 
       const remove = Effect.fn("ShareNext.remove")(function* (sessionID: SessionID) {
-        if (disabled || !gate.isEnabled()) return
+        // See ShareNext.create — opencode opt-out is silent; PawWork gate raises a typed failure.
+        if (disabled) return
+        if (!gate.isEnabled()) return yield* Effect.fail(ShareRuntime.cloudShareDisabled())
         log.info("removing share", { sessionID })
         const share = yield* get(sessionID)
         if (!share) return

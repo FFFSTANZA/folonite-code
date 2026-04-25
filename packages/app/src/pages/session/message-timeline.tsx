@@ -24,6 +24,7 @@ import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useLanguage } from "@/context/language"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { usePlatform } from "@/context/platform"
+import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -238,6 +239,11 @@ export function MessageTimeline(props: {
   const language = useLanguage()
   const { params, sessionKey } = useSessionKey()
   const platform = usePlatform()
+  const server = useServer()
+  // Export hits the embedded sidecar via main-process IPC. When the user has switched the
+  // active server to a remote HTTP/SSH target, the sidecar holds different data than the UI;
+  // hide the action rather than ship a misleading export.
+  const exportAvailable = createMemo(() => !!platform.exportSession && server.current?.type === "sidecar")
 
   const rendered = createMemo(() => props.renderedUserMessages.map((message) => message.id))
   const sessionID = createMemo(() => params.id)
@@ -853,7 +859,7 @@ export function MessageTimeline(props: {
                                 >
                                   <DropdownMenu.ItemLabel>{language.t("common.rename")}</DropdownMenu.ItemLabel>
                                 </DropdownMenu.Item>
-                                <Show when={platform.exportSession}>
+                                <Show when={exportAvailable()}>
                                   <DropdownMenu.Item
                                     onSelect={() => {
                                       setTitle("menuOpen", false)

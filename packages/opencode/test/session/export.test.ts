@@ -245,6 +245,53 @@ describe("redactPart", () => {
     expect(ctx.count.omitted).toBe(1)
   })
 
+  test("sanitizeSnapshot redacts node.diffs file/patch on every tree node", () => {
+    const fakeSnapshot: Export.Snapshot = {
+      schema_version: 1,
+      format: "pawwork-session-export",
+      exported_at: 0,
+      root_session_id: SessionID.make("ses_x"),
+      runtime_context: {
+        app_version: "test",
+        runtime_namespace: "pawwork",
+        platform: "darwin",
+        os_version: "0",
+        locale: "en-US",
+        timezone: "UTC",
+        instruction_sources: [],
+        model_refs: {},
+        stats: { session_count: 0, message_count: 0, part_count: 0, omitted_attachment_count: 0 },
+      },
+      diagnostics: {},
+      session: {
+        info: { id: SessionID.make("ses_x"), title: "t", directory: "/dir" } as never,
+        had_cloud_share: false,
+        diffs: [
+          { file: "/Users/secret/code.ts", patch: "@@ -1 +1 @@\n-secret\n+leak", additions: 1, deletions: 1 },
+        ],
+        messages: [],
+        children: [
+          {
+            info: { id: SessionID.make("ses_y"), title: "child", directory: "/dir" } as never,
+            had_cloud_share: false,
+            diffs: [
+              { file: "/Users/secret/child.ts", patch: "child secret", additions: 0, deletions: 0 },
+            ],
+            messages: [],
+            children: [],
+          },
+        ],
+      },
+    }
+
+    const sanitized = Export.sanitizeSnapshot(fakeSnapshot)
+    // Root and child diffs both scrubbed.
+    expect(sanitized.session.diffs[0].file).toBe("[redacted:tree-diff-file:0]")
+    expect(sanitized.session.diffs[0].patch).toBe("[redacted:tree-diff-patch:0]")
+    expect(sanitized.session.children[0].diffs[0].file).toBe("[redacted:tree-diff-file:0]")
+    expect(sanitized.session.children[0].diffs[0].patch).toBe("[redacted:tree-diff-patch:0]")
+  })
+
   test("sanitizeSnapshot redacts instruction_sources paths in runtime_context", () => {
     const fakeSnapshot: Export.Snapshot = {
       schema_version: 1,

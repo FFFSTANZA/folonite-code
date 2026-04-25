@@ -2,6 +2,9 @@ import os from "node:os"
 import path from "node:path"
 import fs from "node:fs/promises"
 import crypto from "node:crypto"
+import { fileURLToPath } from "node:url"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 import { Effect } from "effect"
 import { Runtime } from "@opencode-ai/shared/runtime"
 import { Session } from "."
@@ -571,9 +574,12 @@ export namespace Export {
     // Sanitize replaces sensitive strings with redaction markers but preserves structural shape;
     // the inferred type narrows summary.diffs in ways the strict MessageV2 schema rejects, so cast
     // at this boundary instead of weakening every helper signature in the pipeline.
+    // Tree.diffs carries raw file paths + source patches; redact via the existing diff() helper.
+    const sanitizedDiffs = (diff("tree-diff", node.diffs) ?? []) as Tree["diffs"]
     return {
       ...node,
       info: out.info as Omit<Session.Info, "share">,
+      diffs: sanitizedDiffs,
       messages: out.messages as MessageV2.WithParts[],
       children: node.children.map(sanitizeTree),
     }
