@@ -27,6 +27,46 @@ async function hashFile(p: string) {
   }
 }
 
+function redactDataUrl(url: string): { mime: string; size_bytes: number; sha256: string } | null {
+  const match = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(url)
+  if (!match) return null
+  const [, mime, isBase64, payload] = match
+  const buf = isBase64 ? Buffer.from(payload, "base64") : Buffer.from(payload, "utf8")
+  return {
+    mime,
+    size_bytes: buf.byteLength,
+    sha256: "sha256:" + crypto.createHash("sha256").update(buf).digest("hex"),
+  }
+}
+
+export function redactPart(
+  part: MessageV2.Part,
+  ctx: { count: { omitted: number } },
+): MessageV2.Part {
+  if (part.type === "file") {
+    const r = redactDataUrl(part.url)
+    if (!r) return part
+    ctx.count.omitted++
+    return {
+      ...part,
+      url: "",
+      metadata: { ...(part.metadata ?? {}), redacted_binary: r },
+    }
+  }
+  if (part.type === "tool" && part.state.status === "completed" && part.state.attachments) {
+    let mutated = false
+    const attachments = part.state.attachments.map((a) => {
+      const r = redactDataUrl(a.url)
+      if (!r) return a
+      mutated = true
+      ctx.count.omitted++
+      return { ...a, url: "", metadata: { ...(a.metadata ?? {}), redacted_binary: r } }
+    })
+    return mutated ? { ...part, state: { ...part.state, attachments } } : part
+  }
+  return part
+}
+
 function extractReasonFromCause(cause: unknown): string {
   // Cause shape in Effect 4.x: { reasons: Array<{ _tag, error?, defect?, ... }> }
   // We only need a reason string for diagnostics — best-effort extraction without depending
@@ -102,7 +142,11 @@ export namespace Export {
     return current
   })
 
-  const buildNode = Effect.fn("Export.buildNode")(function* (svc: Session.Interface, info: Session.Info) {
+  const buildNode = Effect.fn("Export.buildNode")(function* (
+    svc: Session.Interface,
+    info: Session.Info,
+    ctx: { count: { omitted: number } },
+  ) {
     const messages = yield* svc.messages({ sessionID: info.id })
     const diffs = yield* svc.diff(info.id)
     const children = yield* svc.children(info.id)
@@ -111,25 +155,30 @@ export namespace Export {
       return a.id.localeCompare(b.id)
     })
     const { share, ...infoWithoutShare } = info as Session.Info & { share?: unknown }
+    const redactedMessages = messages.map((m) => ({ ...m, parts: m.parts.map((p) => redactPart(p, ctx)) }))
     const node: Tree = {
       info: infoWithoutShare as Omit<Session.Info, "share">,
       had_cloud_share: !!(share as { url?: string } | undefined)?.url,
       diffs,
-      messages,
+      messages: redactedMessages,
       children: [],
     }
     const data: NodeData = { node, childInfos: sorted }
     return data
   })
 
-  const exportTree = Effect.fn("Export.exportTree")(function* (svc: Session.Interface, root: Session.Info) {
-    const rootData = yield* buildNode(svc, root)
+  const exportTree = Effect.fn("Export.exportTree")(function* (
+    svc: Session.Interface,
+    root: Session.Info,
+    ctx: { count: { omitted: number } },
+  ) {
+    const rootData = yield* buildNode(svc, root, ctx)
     const queue: NodeData[] = [rootData]
     let head = 0
     while (head < queue.length) {
       const cur = queue[head++]
       for (const childInfo of cur.childInfos) {
-        const childData = yield* buildNode(svc, childInfo)
+        const childData = yield* buildNode(svc, childInfo, ctx)
         cur.node.children.push(childData.node)
         queue.push(childData)
       }
@@ -222,7 +271,7 @@ export namespace Export {
     const svc = yield* Session.Service
     const root = yield* climbToRoot(svc, anyID)
     const ctx = { count: { omitted: 0 } }
-    const tree = yield* exportTree(svc, root)
+    const tree = yield* exportTree(svc, root, ctx)
     const instruction_sources = yield* collectInstructionSources()
     const model_refs = yield* collectModelRefs(tree)
     return {

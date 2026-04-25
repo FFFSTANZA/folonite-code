@@ -3,10 +3,10 @@ import path from "path"
 import { Instance } from "../../src/project/instance"
 import { Session as SessionNs } from "../../src/session"
 import { MessageV2 } from "../../src/session/message-v2"
-import { MessageID } from "../../src/session/schema"
+import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { Log } from "../../src/util/log"
 import { AppRuntime } from "../../src/effect/app-runtime"
-import { Export, getRuntimeNamespace } from "../../src/session/export"
+import { Export, getRuntimeNamespace, redactPart } from "../../src/session/export"
 
 const projectRoot = path.join(__dirname, "../..")
 void Log.init({ print: false })
@@ -177,5 +177,86 @@ describe("Export.session", () => {
         }
       },
     })
+  })
+})
+
+describe("redactPart", () => {
+  test("replaces data: url in a file part with empty string and adds redacted_binary metadata", () => {
+    const ctx = { count: { omitted: 0 } }
+    const part: MessageV2.FilePart = {
+      id: PartID.make("prt_test"),
+      messageID: MessageID.make("msg_test"),
+      sessionID: SessionID.make("ses_test"),
+      type: "file",
+      url: "data:image/png;base64,iVBORw0KGgo=",
+      mime: "image/png",
+      filename: "x.png",
+    }
+
+    const out = redactPart(part, ctx)
+    if (out.type !== "file") throw new Error("type narrowing")
+    expect(out.url).toBe("")
+    expect(out.metadata?.redacted_binary).toMatchObject({
+      mime: "image/png",
+      size_bytes: expect.any(Number),
+      sha256: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+    })
+    expect(ctx.count.omitted).toBe(1)
+  })
+
+  test("leaves non-data: url untouched", () => {
+    const ctx = { count: { omitted: 0 } }
+    const part: MessageV2.FilePart = {
+      id: PartID.make("prt_test"),
+      messageID: MessageID.make("msg_test"),
+      sessionID: SessionID.make("ses_test"),
+      type: "file",
+      url: "https://example.com/x.png",
+      mime: "image/png",
+    }
+
+    const out = redactPart(part, ctx)
+    if (out.type !== "file") throw new Error("type narrowing")
+    expect(out.url).toBe("https://example.com/x.png")
+    expect(out.metadata?.redacted_binary).toBeUndefined()
+    expect(ctx.count.omitted).toBe(0)
+  })
+
+  test("redacts data: url inside completed tool attachments", () => {
+    const ctx = { count: { omitted: 0 } }
+    const part: MessageV2.ToolPart = {
+      id: PartID.make("prt_tool_fixture"),
+      messageID: MessageID.make("msg_fixture"),
+      sessionID: SessionID.make("ses_fixture"),
+      type: "tool",
+      callID: "call_1",
+      tool: "read",
+      state: {
+        status: "completed",
+        input: {},
+        output: "",
+        title: "fixture",
+        metadata: {},
+        time: { start: 0, end: 1 },
+        attachments: [
+          {
+            id: PartID.make("att_fixture"),
+            messageID: MessageID.make("msg_fixture"),
+            sessionID: SessionID.make("ses_fixture"),
+            type: "file",
+            url: "data:image/jpeg;base64,/9j/4AAQ",
+            mime: "image/jpeg",
+            filename: "fixture.bin",
+          },
+        ],
+      },
+    }
+
+    const out = redactPart(part, ctx)
+    if (out.type !== "tool" || out.state.status !== "completed") throw new Error("type narrowing")
+    const attachments = out.state.attachments ?? []
+    expect(attachments[0].url).toBe("")
+    expect(attachments[0].metadata?.redacted_binary).toBeDefined()
+    expect(ctx.count.omitted).toBe(1)
   })
 })
