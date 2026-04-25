@@ -72,6 +72,7 @@ export namespace LSPServer {
     global?: boolean
     root: RootFunction
     spawn(root: string): Promise<Handle | undefined>
+    packages?: string[]
   }
 
   export const Deno: Info = {
@@ -104,6 +105,7 @@ export namespace LSPServer {
 
   export const Typescript: Info = {
     id: "typescript",
+    packages: ["typescript-language-server"],
     root: NearestRoot(JavascriptPackageRoot(), ["deno.json", "deno.jsonc"]),
     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
     async spawn(root) {
@@ -132,6 +134,7 @@ export namespace LSPServer {
   export const Vue: Info = {
     id: "vue",
     extensions: [".vue"],
+    packages: ["@vue/language-server"],
     root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       let binary = which("vue-language-server")
@@ -290,6 +293,7 @@ export namespace LSPServer {
 
   export const Biome: Info = {
     id: "biome",
+    packages: ["biome"],
     root: NearestRoot([
       "biome.json",
       "biome.jsonc",
@@ -494,6 +498,7 @@ export namespace LSPServer {
   export const Pyright: Info = {
     id: "pyright",
     extensions: [".py", ".pyi"],
+    packages: ["pyright"],
     root: NearestRoot(["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile", "pyrightconfig.json"]),
     async spawn(root) {
       let binary = which("pyright-langserver")
@@ -1011,6 +1016,7 @@ export namespace LSPServer {
   export const Svelte: Info = {
     id: "svelte",
     extensions: [".svelte"],
+    packages: ["svelte-language-server"],
     root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       let binary = which("svelteserver")
@@ -1038,6 +1044,7 @@ export namespace LSPServer {
   export const Astro: Info = {
     id: "astro",
     extensions: [".astro"],
+    packages: ["@astrojs/language-server"],
     root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       const tsserver = Module.resolve("typescript/lib/tsserver.js", Instance.directory)
@@ -1296,6 +1303,7 @@ export namespace LSPServer {
   export const YamlLS: Info = {
     id: "yaml-ls",
     extensions: [".yaml", ".yml"],
+    packages: ["yaml-language-server"],
     root: NearestRoot(JavascriptPackageRoot()),
     async spawn(root) {
       let binary = which("yaml-language-server")
@@ -1463,6 +1471,7 @@ export namespace LSPServer {
   export const PHPIntelephense: Info = {
     id: "php intelephense",
     extensions: [".php"],
+    packages: ["intelephense"],
     root: NearestRoot(["composer.json", "composer.lock", ".php-version"]),
     async spawn(root) {
       let binary = which("intelephense")
@@ -1547,6 +1556,7 @@ export namespace LSPServer {
   export const BashLS: Info = {
     id: "bash",
     extensions: [".sh", ".bash", ".zsh", ".ksh"],
+    packages: ["bash-language-server"],
     root: async () => Instance.directory,
     async spawn(root) {
       let binary = which("bash-language-server")
@@ -1742,6 +1752,7 @@ export namespace LSPServer {
   export const DockerfileLS: Info = {
     id: "dockerfile",
     extensions: [".dockerfile", "Dockerfile"],
+    packages: ["dockerfile-language-server-nodejs"],
     root: async () => Instance.directory,
     async spawn(root) {
       let binary = which("docker-langserver")
@@ -1963,3 +1974,9 @@ export namespace LSPServer {
     },
   }
 }
+
+export const LSP_SERVER_PACKAGES: Set<string> = new Set(
+  Object.values(LSPServer)
+    .filter((s): s is LSPServer.Info => typeof s === "object" && s !== null && "id" in s)
+    .flatMap((s) => s.packages ?? []),
+)

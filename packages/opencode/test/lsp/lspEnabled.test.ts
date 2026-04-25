@@ -1,8 +1,9 @@
 import { describe, expect, spyOn, test } from "bun:test"
+import fs from "node:fs"
 import { Effect } from "effect"
 import path from "path"
 import { LSP } from "../../src/lsp"
-import { LSPServer } from "../../src/lsp/server"
+import { LSPServer, LSP_SERVER_PACKAGES } from "../../src/lsp/server"
 import { Settings } from "../../src/settings"
 import { Instance } from "../../src/project/instance"
 import { AppRuntime } from "../../src/effect/app-runtime"
@@ -97,5 +98,21 @@ describe("LSP gate", () => {
       await Instance.disposeAll()
       await Settings.setLspEnabled(false)
     }
+  })
+
+  test("LSP_SERVER_PACKAGES contains TypeScript and Vue language server packages", () => {
+    expect(LSP_SERVER_PACKAGES.has("typescript-language-server")).toBe(true)
+    expect(LSP_SERVER_PACKAGES.has("@vue/language-server")).toBe(true)
+  })
+
+  test("install failures take the .catch branch and skip s.broken poison", () => {
+    const src = fs.readFileSync(
+      path.join(import.meta.dir, "..", "..", "src", "lsp", "index.ts"),
+      "utf8",
+    )
+    expect(src.includes("InstallFailedError")).toBe(true)
+    const catchSection = src.slice(src.indexOf(".catch((err)"))
+    expect(catchSection.includes("isInstallFailure")).toBe(true)
+    expect(catchSection.includes("if (!isInstallFailure)")).toBe(true)
   })
 })

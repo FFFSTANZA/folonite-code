@@ -13,6 +13,7 @@ import { Effect, Layer, Context } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
 import { Settings } from "@/settings"
+import { Npm } from "../npm"
 
 export namespace LSP {
   const log = Log.create({ service: "lsp" })
@@ -219,7 +220,12 @@ export namespace LSP {
                 return value
               })
               .catch((err) => {
-                s.broken.add(key)
+                const isInstallFailure =
+                  err instanceof Npm.InstallFailedError ||
+                  (err && typeof err === "object" && "name" in err && err.name === "NpmInstallFailedError")
+                if (!isInstallFailure) {
+                  s.broken.add(key)
+                }
                 log.error(`Failed to spawn LSP server ${server.id}`, { error: err })
                 return undefined
               })
