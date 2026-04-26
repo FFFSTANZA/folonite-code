@@ -307,6 +307,9 @@ export namespace Ripgrep {
     if (buffer) yield buffer
     const exit = await proc.exited
     input.signal?.throwIfAborted()
+    // ripgrep exits 1 when --files matches nothing (glob filters out everything,
+    // or search root is fully gitignored). Treat as empty result; only ≥2 is fatal.
+    if (exit === 1) return
     if (exit !== 0) {
       const stderr = (await text(proc.stderr)).trim()
       throw new Error(stderr || `ripgrep failed with exit code ${exit}`)

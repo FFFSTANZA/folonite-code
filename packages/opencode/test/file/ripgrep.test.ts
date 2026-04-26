@@ -73,6 +73,46 @@ describe("file.ripgrep", () => {
     expect(result.items).toEqual([])
   })
 
+  test("files returns empty when glob matches nothing (ripgrep exit 1)", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "match.ts"), "const value = 1\n")
+      },
+    })
+
+    const files = await Array.fromAsync(
+      Ripgrep.files({
+        cwd: tmp.path,
+        glob: ["nothing-here-xyz/*"],
+      }),
+    )
+
+    expect(files).toEqual([])
+  })
+
+  test("files returns empty when search root is gitignored (mirrors #243)", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        await fs.mkdir(path.join(dir, "docs", "content-strategy", "posts"), { recursive: true })
+        await Bun.write(
+          path.join(dir, "docs", "content-strategy", "posts", "sample.md"),
+          "# sample\n",
+        )
+        await Bun.write(path.join(dir, ".git", "info", "exclude"), "docs/\n")
+      },
+    })
+
+    const files = await Array.fromAsync(
+      Ripgrep.files({
+        cwd: tmp.path,
+        glob: ["docs/content-strategy/posts/*"],
+      }),
+    )
+
+    expect(files).toEqual([])
+  })
+
   test("files throws when ripgrep exits with an invalid glob error", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
