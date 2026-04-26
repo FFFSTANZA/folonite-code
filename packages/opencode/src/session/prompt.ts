@@ -550,25 +550,25 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     })
 
     const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* (input: {
-      task: MessageV2.SubtaskPart
+      subtask: MessageV2.SubtaskPart
       model: Provider.Model
       lastUser: MessageV2.User
       sessionID: SessionID
       session: Session.Info
       msgs: MessageV2.WithParts[]
     }) {
-      const { task, model, lastUser, sessionID, session, msgs } = input
+      const { subtask, model, lastUser, sessionID, session, msgs } = input
       const ctx = yield* InstanceState.context
       const promptOps = yield* ops()
       const { agent: agentTool } = yield* registry.named()
-      const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
+      const taskModel = subtask.model ? yield* getModel(subtask.model.providerID, subtask.model.modelID, sessionID) : model
       const assistantMessage: MessageV2.Assistant = yield* sessions.updateMessage({
         id: MessageID.ascending(),
         role: "assistant",
         parentID: lastUser.id,
         sessionID,
-        mode: task.agent,
-        agent: task.agent,
+        mode: subtask.agent,
+        agent: subtask.agent,
         variant: lastUser.model.variant,
         path: { cwd: ctx.directory, root: ctx.worktree },
         cost: 0,
@@ -587,19 +587,19 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         state: {
           status: "running",
           input: {
-            prompt: task.prompt,
-            description: task.description,
-            subagent_type: task.agent,
-            command: task.command,
+            prompt: subtask.prompt,
+            description: subtask.description,
+            subagent_type: subtask.agent,
+            command: subtask.command,
           },
           time: { start: Date.now() },
         },
       })
       const taskArgs = {
-        prompt: task.prompt,
-        description: task.description,
-        subagent_type: task.agent,
-        command: task.command,
+        prompt: subtask.prompt,
+        description: subtask.description,
+        subagent_type: subtask.agent,
+        command: subtask.command,
       }
       yield* plugin.trigger(
         "tool.execute.before",
@@ -607,11 +607,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         { args: taskArgs },
       )
 
-      const taskAgent = yield* agents.get(task.agent)
+      const taskAgent = yield* agents.get(subtask.agent)
       if (!taskAgent) {
         const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-        const error = new NamedError.Unknown({ message: `Agent not found: "${task.agent}".${hint}` })
+        const error = new NamedError.Unknown({ message: `Agent not found: "${subtask.agent}".${hint}` })
         yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
         throw error
       }
@@ -620,7 +620,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const taskAbort = new AbortController()
       const result = yield* agentTool
         .execute(taskArgs, {
-          agent: task.agent,
+          agent: subtask.agent,
           messageID: assistantMessage.id,
           sessionID,
           abort: taskAbort.signal,
@@ -648,7 +648,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           Effect.catchCause((cause) => {
             const defect = Cause.squash(cause)
             error = defect instanceof Error ? defect : new Error(String(defect))
-            log.error("subtask execution failed", { error, agent: task.agent, description: task.description })
+            log.error("subtask execution failed", { error, agent: subtask.agent, description: subtask.description })
             return Effect.void
           }),
           Effect.onInterrupt(() =>
@@ -721,7 +721,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         } satisfies MessageV2.ToolPart)
       }
 
-      if (!task.command) return
+      if (!subtask.command) return
 
       const summaryUserMsg: MessageV2.User = {
         id: MessageID.ascending(),
@@ -1475,7 +1475,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           const task = tasks.pop()
 
           if (task?.type === "subtask") {
-            yield* handleSubtask({ task, model, lastUser, sessionID, session, msgs })
+            yield* handleSubtask({ subtask: task, model, lastUser, sessionID, session, msgs })
             continue
           }
 
