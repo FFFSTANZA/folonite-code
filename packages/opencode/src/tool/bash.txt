@@ -13,7 +13,7 @@ Before executing the command, please follow these steps:
    - For example, before running "mkdir foo/bar", first use `ls foo` to check that "foo" exists and is the intended parent directory
 
 2. Command Execution:
-   - Always quote file paths that contain spaces with double quotes (e.g., rm "path with spaces/file.txt")
+   - Always quote file paths that contain spaces with double quotes (e.g., mkdir "/Users/name/path with spaces")
    - Examples of proper quoting:
      - mkdir "/Users/name/My Documents" (correct)
      - mkdir /Users/name/My Documents (incorrect - will fail)
@@ -35,6 +35,7 @@ Usage notes:
     - Edit files: Use Edit (NOT sed/awk)
     - Write files: Use Write (NOT echo >/cat <<EOF)
     - Communication: Output text directly (NOT echo/printf)
+    - File deletion: Use the trash tool, NOT `rm`/`del` (rm permanently deletes; trash is reversible)
   - When issuing multiple commands:
     - If the commands are independent and can run in parallel, make multiple Bash tool calls in a single message. For example, if you need to run "git status" and "git diff", send a single message with two Bash tool calls in parallel.
     - ${chaining}
@@ -83,7 +84,6 @@ Git Safety Protocol:
 
 Important notes:
 - NEVER run additional commands to read or explore code, besides git bash commands
-- NEVER use the TodoWrite or Task tools
 - DO NOT push to the remote repository unless the user explicitly asks you to do so
 - IMPORTANT: Never use git commands with the -i flag (like git rebase -i or git add -i) since they require interactive input which is not supported.
 - If there are no changes to commit (i.e., no untracked files and no modifications), do not create an empty commit
@@ -110,7 +110,6 @@ gh pr create --title "the pr title" --body "$(cat <<'EOF'
 </example>
 
 Important:
-- DO NOT use the TodoWrite or Task tools
 - Return the PR URL when you're done, so the user can see it
 
 # Other common operations

@@ -266,7 +266,6 @@ Individual tools, ordered by value:
 - [ ] `batch.ts` — MEDIUM: parallel execution, per-call error recovery → Effect.all
 - [ ] `task.ts` — MEDIUM: task state management
 - [ ] `ls.ts` — MEDIUM: bounded directory listing over ripgrep-backed traversal
-- [ ] `multiedit.ts` — MEDIUM: sequential edit orchestration over `edit.ts`
 - [ ] `glob.ts` — LOW: simple async generator
 - [ ] `lsp.ts` — LOW: dispatch switch over LSP operations
 - [ ] `question.ts` — LOW: prompt wrapper
