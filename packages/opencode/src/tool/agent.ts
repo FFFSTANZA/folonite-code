@@ -1,5 +1,5 @@
 import * as Tool from "./tool"
-import DESCRIPTION from "./task.txt"
+import DESCRIPTION from "./agent.txt"
 import z from "zod"
 import { Session } from "../session"
 import { SessionID, MessageID } from "../session/schema"
@@ -9,35 +9,35 @@ import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
 import { Effect } from "effect"
 
-export interface TaskPromptOps {
+export interface AgentPromptOps {
   cancel(sessionID: SessionID): void
   resolvePromptParts(template: string): Effect.Effect<SessionPrompt.PromptInput["parts"]>
   prompt(input: SessionPrompt.PromptInput): Effect.Effect<MessageV2.WithParts>
 }
 
-const id = "task"
+const id = "agent"
 
-const parameters = z.object({
-  description: z.string().describe("A short (3-5 words) description of the task"),
-  prompt: z.string().describe("The task for the agent to perform"),
-  subagent_type: z.string().describe("The type of specialized agent to use for this task"),
-  task_id: z
+export const parameters = z.object({
+  description: z.string().describe("A short (3-5 words) description of the subagent dispatch"),
+  prompt: z.string().describe("The task for the subagent to perform"),
+  subagent_type: z.string().describe("The type of specialized subagent to use for this dispatch"),
+  subagent_session_id: z
     .string()
     .describe(
-      "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
+      "Set only when resuming a prior subagent dispatch — pass the prior subagent_session_id and the subagent will continue its previous session instead of starting a fresh one.",
     )
     .optional(),
-  command: z.string().describe("The command that triggered this task").optional(),
+  command: z.string().describe("The command that triggered this dispatch").optional(),
 })
 
-export const TaskTool = Tool.define(
+export const AgentTool = Tool.define(
   id,
   Effect.gen(function* () {
     const agent = yield* Agent.Service
     const config = yield* Config.Service
     const sessions = yield* Session.Service
 
-    const run = Effect.fn("TaskTool.execute")(function* (params: z.infer<typeof parameters>, ctx: Tool.Context) {
+    const run = Effect.fn("AgentTool.execute")(function* (params: z.infer<typeof parameters>, ctx: Tool.Context) {
       const cfg = yield* config.get()
 
       if (!ctx.extra?.bypassAgentCheck) {
@@ -57,12 +57,12 @@ export const TaskTool = Tool.define(
         return yield* Effect.fail(new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`))
       }
 
-      const canTask = next.permission.some((rule) => rule.permission === id)
+      const canAgent = next.permission.some((rule) => rule.permission === id)
       const canTodo = next.permission.some((rule) => rule.permission === "todowrite")
 
-      const taskID = params.task_id
-      const session = taskID
-        ? yield* sessions.get(SessionID.make(taskID)).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+      const agentSessionID = params.subagent_session_id
+      const session = agentSessionID
+        ? yield* sessions.get(SessionID.make(agentSessionID)).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
         : undefined
       const nextSession =
         session ??
@@ -79,7 +79,7 @@ export const TaskTool = Tool.define(
                     action: "deny" as const,
                   },
                 ]),
-            ...(canTask
+            ...(canAgent
               ? []
               : [
                   {
@@ -112,8 +112,8 @@ export const TaskTool = Tool.define(
         },
       })
 
-      const ops = ctx.extra?.promptOps as TaskPromptOps
-      if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
+      const ops = ctx.extra?.promptOps as AgentPromptOps
+      if (!ops) return yield* Effect.fail(new Error("AgentTool requires promptOps in ctx.extra"))
 
       const messageID = MessageID.ascending()
 
@@ -138,7 +138,7 @@ export const TaskTool = Tool.define(
               agent: next.name,
               tools: {
                 ...(canTodo ? {} : { todowrite: false }),
-                ...(canTask ? {} : { task: false }),
+                ...(canAgent ? {} : { agent: false }),
                 ...Object.fromEntries((cfg.experimental?.primary_tools ?? []).map((item) => [item, false])),
               },
               parts,
@@ -151,11 +151,11 @@ export const TaskTool = Tool.define(
                 model,
               },
               output: [
-                `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
+                `subagent_session_id: ${nextSession.id} (pass this to resume the same subagent dispatch)`,
                 "",
-                "<task_result>",
+                "<subagent_result>",
                 result.parts.findLast((item) => item.type === "text")?.text ?? "",
-                "</task_result>",
+                "</subagent_result>",
               ].join("\n"),
             }
           }),

@@ -676,7 +676,7 @@ it.live("failed subtask preserves metadata on error tool state", () =>
       const prompt = yield* SessionPrompt.Service
       const sessions = yield* Session.Service
       const chat = yield* sessions.create({ title: "Pinned" })
-      yield* llm.tool("task", {
+      yield* llm.tool("agent", {
         description: "inspect bug",
         prompt: "look into the cache key path",
         subagent_type: "general",
@@ -759,7 +759,7 @@ it.live(
 )
 
 it.live(
-  "running task tool preserves metadata after tool-call transition",
+  "running agent tool preserves metadata after tool-call transition",
   () =>
     provideTmpdirServer(
       Effect.fnUntraced(function* ({ llm }) {
@@ -769,7 +769,7 @@ it.live(
           title: "Pinned",
           permission: [{ permission: "*", pattern: "*", action: "allow" }],
         })
-        yield* llm.tool("task", {
+        yield* llm.tool("agent", {
           description: "inspect bug",
           prompt: "look into the cache key path",
           subagent_type: "general",
@@ -785,12 +785,12 @@ it.live(
             const msgs = await Effect.runPromise(MessageV2.filterCompactedEffect(chat.id))
             const assistant = msgs.findLast((item) => item.info.role === "assistant" && item.info.agent === "build")
             const tool = assistant?.parts.find(
-              (part): part is MessageV2.ToolPart => part.type === "tool" && part.tool === "task",
+              (part): part is MessageV2.ToolPart => part.type === "tool" && part.tool === "agent",
             )
             if (tool?.state.status === "running" && tool.state.metadata?.sessionId) return tool
             await new Promise((done) => setTimeout(done, 20))
           }
-          throw new Error("timed out waiting for running task metadata")
+          throw new Error("timed out waiting for running agent metadata")
         })
 
         if (tool.state.status !== "running") return
@@ -899,15 +899,15 @@ it.live(
           const ready = defer<void>()
           const aborted = defer<void>()
           const registry = yield* ToolRegistry.Service
-          const { task } = yield* registry.named()
-          const original = task.execute
-          task.execute = (_args, ctx) =>
+          const { agent } = yield* registry.named()
+          const original = agent.execute
+          agent.execute = (_args, ctx) =>
             Effect.callback<never>((_resume) => {
               ready.resolve()
               ctx.abort.addEventListener("abort", () => aborted.resolve(), { once: true })
               return Effect.sync(() => aborted.resolve())
             })
-          yield* Effect.addFinalizer(() => Effect.sync(() => void (task.execute = original)))
+          yield* Effect.addFinalizer(() => Effect.sync(() => void (agent.execute = original)))
 
           const { prompt, chat } = yield* boot()
           const msg = yield* user(chat.id, "hello")

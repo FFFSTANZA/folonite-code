@@ -48,7 +48,7 @@ import { Process } from "@/util/process"
 import { Cause, Deferred, Effect, Exit, Layer, Option, Scope, Context } from "effect"
 import { EffectLogger } from "@/effect"
 import { InstanceState } from "@/effect"
-import { TaskTool, type TaskPromptOps } from "@/tool/task"
+import { AgentTool, type AgentPromptOps } from "@/tool/agent"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
 import { makeRuntime } from "@/effect/run-service"
@@ -139,7 +139,7 @@ export const layer = Layer.effect(
         cancel: (sessionID: SessionID) => run.fork(cancel(sessionID)),
         resolvePromptParts: (template: string) => resolvePromptParts(template),
         prompt: (input: PromptInput) => prompt(input),
-      } satisfies TaskPromptOps
+      } satisfies AgentPromptOps
     })
 
     const cancel = Effect.fn("SessionPrompt.cancel")(function* (sessionID: SessionID) {
@@ -550,25 +550,25 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     })
 
     const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* (input: {
-      task: MessageV2.SubtaskPart
+      subtask: MessageV2.SubtaskPart
       model: Provider.Model
       lastUser: MessageV2.User
       sessionID: SessionID
       session: Session.Info
       msgs: MessageV2.WithParts[]
     }) {
-      const { task, model, lastUser, sessionID, session, msgs } = input
+      const { subtask, model, lastUser, sessionID, session, msgs } = input
       const ctx = yield* InstanceState.context
       const promptOps = yield* ops()
-      const { task: taskTool } = yield* registry.named()
-      const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
+      const { agent: agentTool } = yield* registry.named()
+      const taskModel = subtask.model ? yield* getModel(subtask.model.providerID, subtask.model.modelID, sessionID) : model
       const assistantMessage: MessageV2.Assistant = yield* sessions.updateMessage({
         id: MessageID.ascending(),
         role: "assistant",
         parentID: lastUser.id,
         sessionID,
-        mode: task.agent,
-        agent: task.agent,
+        mode: subtask.agent,
+        agent: subtask.agent,
         variant: lastUser.model.variant,
         path: { cwd: ctx.directory, root: ctx.worktree },
         cost: 0,
@@ -583,44 +583,44 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         sessionID: assistantMessage.sessionID,
         type: "tool",
         callID: ulid(),
-        tool: TaskTool.id,
+        tool: AgentTool.id,
         state: {
           status: "running",
           input: {
-            prompt: task.prompt,
-            description: task.description,
-            subagent_type: task.agent,
-            command: task.command,
+            prompt: subtask.prompt,
+            description: subtask.description,
+            subagent_type: subtask.agent,
+            command: subtask.command,
           },
           time: { start: Date.now() },
         },
       })
       const taskArgs = {
-        prompt: task.prompt,
-        description: task.description,
-        subagent_type: task.agent,
-        command: task.command,
+        prompt: subtask.prompt,
+        description: subtask.description,
+        subagent_type: subtask.agent,
+        command: subtask.command,
       }
       yield* plugin.trigger(
         "tool.execute.before",
-        { tool: TaskTool.id, sessionID, callID: part.id },
+        { tool: AgentTool.id, sessionID, callID: part.id },
         { args: taskArgs },
       )
 
-      const taskAgent = yield* agents.get(task.agent)
+      const taskAgent = yield* agents.get(subtask.agent)
       if (!taskAgent) {
         const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
         const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-        const error = new NamedError.Unknown({ message: `Agent not found: "${task.agent}".${hint}` })
+        const error = new NamedError.Unknown({ message: `Agent not found: "${subtask.agent}".${hint}` })
         yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
         throw error
       }
 
       let error: Error | undefined
       const taskAbort = new AbortController()
-      const result = yield* taskTool
+      const result = yield* agentTool
         .execute(taskArgs, {
-          agent: task.agent,
+          agent: subtask.agent,
           messageID: assistantMessage.id,
           sessionID,
           abort: taskAbort.signal,
@@ -648,7 +648,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           Effect.catchCause((cause) => {
             const defect = Cause.squash(cause)
             error = defect instanceof Error ? defect : new Error(String(defect))
-            log.error("subtask execution failed", { error, agent: task.agent, description: task.description })
+            log.error("subtask execution failed", { error, agent: subtask.agent, description: subtask.description })
             return Effect.void
           }),
           Effect.onInterrupt(() =>
@@ -682,7 +682,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       yield* plugin.trigger(
         "tool.execute.after",
-        { tool: TaskTool.id, sessionID, callID: part.id, args: taskArgs },
+        { tool: AgentTool.id, sessionID, callID: part.id, args: taskArgs },
         result,
       )
 
@@ -721,7 +721,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         } satisfies MessageV2.ToolPart)
       }
 
-      if (!task.command) return
+      if (!subtask.command) return
 
       const summaryUserMsg: MessageV2.User = {
         id: MessageID.ascending(),
@@ -737,7 +737,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         messageID: summaryUserMsg.id,
         sessionID,
         type: "text",
-        text: "Summarize the task tool output above and continue with your task.",
+        text: "Summarize the agent tool output above and continue with your task.",
         synthetic: true,
       } satisfies MessageV2.TextPart)
     })
@@ -1270,7 +1270,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         }
 
         if (part.type === "agent") {
-          const perm = Permission.evaluate("task", part.name, ag.permission)
+          const perm = Permission.evaluate("agent", part.name, ag.permission)
           const hint = perm.action === "deny" ? " . Invoked by user; guaranteed to exist." : ""
           return [
             { ...part, messageID: info.id, sessionID: input.sessionID },
@@ -1280,7 +1280,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               type: "text",
               synthetic: true,
               text:
-                " Use the above message and context to generate a prompt and call the task tool with subagent: " +
+                " Use the above message and context to generate a prompt and call the agent tool with subagent: " +
                 part.name +
                 hint,
             },
@@ -1475,7 +1475,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           const task = tasks.pop()
 
           if (task?.type === "subtask") {
-            yield* handleSubtask({ task, model, lastUser, sessionID, session, msgs })
+            yield* handleSubtask({ subtask: task, model, lastUser, sessionID, session, msgs })
             continue
           }
 

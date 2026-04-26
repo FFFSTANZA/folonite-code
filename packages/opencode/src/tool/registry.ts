@@ -6,7 +6,7 @@ import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
-import { TaskTool } from "./task"
+import { AgentTool } from "./agent"
 import { TodoWriteTool } from "./todo"
 import { TrashTool } from "./trash"
 import { WebFetchTool } from "./webfetch"
@@ -58,20 +58,20 @@ export function localToolImportSpec(input: string) {
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
 
-  type TaskDef = Tool.InferDef<typeof TaskTool>
+  type AgentDef = Tool.InferDef<typeof AgentTool>
   type ReadDef = Tool.InferDef<typeof ReadTool>
 
   type State = {
     custom: Tool.Def[]
     builtin: Tool.Def[]
-    task: TaskDef
+    agent: AgentDef
     read: ReadDef
   }
 
   export interface Interface {
     readonly ids: () => Effect.Effect<string[]>
     readonly all: () => Effect.Effect<Tool.Def[]>
-    readonly named: () => Effect.Effect<{ task: TaskDef; read: ReadDef }>
+    readonly named: () => Effect.Effect<{ agent: AgentDef; read: ReadDef }>
     readonly tools: (model: {
       providerID: ProviderID
       modelID: ModelID
@@ -114,7 +114,7 @@ export namespace ToolRegistry {
       const settings = yield* Settings.Service
 
       const invalid = yield* InvalidTool
-      const task = yield* TaskTool
+      const agent = yield* AgentTool
       const read = yield* ReadTool
       const question = yield* QuestionTool
       const todo = yield* TodoWriteTool
@@ -236,7 +236,7 @@ export namespace ToolRegistry {
             edit: Tool.init(edit),
             write: Tool.init(writetool),
             trash: Tool.init(trashtool),
-            task: Tool.init(task),
+            agent: Tool.init(agent),
             fetch: Tool.init(webfetch),
             todo: Tool.init(todo),
             search: Tool.init(websearch),
@@ -260,7 +260,7 @@ export namespace ToolRegistry {
               tool.edit,
               tool.write,
               tool.trash,
-              tool.task,
+              tool.agent,
               tool.fetch,
               tool.todo,
               tool.search,
@@ -270,7 +270,7 @@ export namespace ToolRegistry {
               ...(lspEnabled ? [tool.lsp] : []),
               ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [tool.plan] : []),
             ],
-            task: tool.task,
+            agent: tool.agent,
             read: tool.read,
           }
         }),
@@ -307,7 +307,7 @@ export namespace ToolRegistry {
       const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info) {
         const items = (yield* agents.list()).filter((item) => item.mode !== "primary")
         const filtered = items.filter(
-          (item) => Permission.evaluate("task", item.name, agent.permission).action !== "deny",
+          (item) => Permission.evaluate("agent", item.name, agent.permission).action !== "deny",
         )
         const list = filtered.toSorted((a, b) => a.name.localeCompare(b.name))
         const description = list
@@ -347,7 +347,7 @@ export namespace ToolRegistry {
               id: tool.id,
               description: [
                 output.description,
-                tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined,
+                tool.id === AgentTool.id ? yield* describeTask(input.agent) : undefined,
                 tool.id === SkillTool.id ? yield* describeSkill(input.agent) : undefined,
               ]
                 .filter(Boolean)
@@ -363,7 +363,7 @@ export namespace ToolRegistry {
 
       const named: Interface["named"] = Effect.fn("ToolRegistry.named")(function* () {
         const s = yield* InstanceState.get(state)
-        return { task: s.task, read: s.read }
+        return { agent: s.agent, read: s.read }
       })
 
       const invalidate: Interface["invalidate"] = Effect.fn("ToolRegistry.invalidate")(function* () {

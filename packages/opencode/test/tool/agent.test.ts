@@ -9,7 +9,7 @@ import { MessageV2 } from "../../src/session/message-v2"
 import type { SessionPrompt } from "../../src/session/prompt"
 import { MessageID, PartID } from "../../src/session/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
-import { TaskTool, type TaskPromptOps } from "../../src/tool/task"
+import { AgentTool, type AgentPromptOps } from "../../src/tool/agent"
 import { Truncate } from "../../src/tool/truncate"
 import { ToolRegistry } from "../../src/tool/registry"
 import { provideTmpdirInstance } from "../fixture/fixture"
@@ -35,7 +35,7 @@ const it = testEffect(
   ),
 )
 
-const seed = Effect.fn("TaskToolTest.seed")(function* (title = "Pinned") {
+const seed = Effect.fn("AgentToolTest.seed")(function* (title = "Pinned") {
   const session = yield* Session.Service
   const chat = yield* session.create({ title })
   const user = yield* session.updateMessage({
@@ -64,7 +64,7 @@ const seed = Effect.fn("TaskToolTest.seed")(function* (title = "Pinned") {
   return { chat, assistant }
 })
 
-function stubOps(opts?: { onPrompt?: (input: SessionPrompt.PromptInput) => void; text?: string }): TaskPromptOps {
+function stubOps(opts?: { onPrompt?: (input: SessionPrompt.PromptInput) => void; text?: string }): AgentPromptOps {
   return {
     cancel() {},
     resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
@@ -106,7 +106,7 @@ function reply(input: Parameters<typeof SessionPrompt.prompt>[0], text: string):
   }
 }
 
-describe("tool.task", () => {
+describe("tool.agent", () => {
   it.live("description sorts subagents by name and is stable across calls", () =>
     provideTmpdirInstance(
       () =>
@@ -116,7 +116,7 @@ describe("tool.task", () => {
           const registry = yield* ToolRegistry.Service
           const get = Effect.fnUntraced(function* () {
             const tools = yield* registry.tools({ ...ref, agent: build })
-            return tools.find((tool) => tool.id === TaskTool.id)?.description ?? ""
+            return tools.find((tool) => tool.id === AgentTool.id)?.description ?? ""
           })
           const first = yield* get()
           const second = yield* get()
@@ -158,7 +158,7 @@ describe("tool.task", () => {
           const build = yield* agent.get("build")
           const registry = yield* ToolRegistry.Service
           const description =
-            (yield* registry.tools({ ...ref, agent: build })).find((tool) => tool.id === TaskTool.id)?.description ?? ""
+            (yield* registry.tools({ ...ref, agent: build })).find((tool) => tool.id === AgentTool.id)?.description ?? ""
 
           expect(description).toContain("- alpha: Alpha agent")
           expect(description).not.toContain("- zebra: Zebra agent")
@@ -166,7 +166,7 @@ describe("tool.task", () => {
       {
         config: {
           permission: {
-            task: {
+            agent: {
               "*": "allow",
               zebra: "deny",
             },
@@ -186,13 +186,13 @@ describe("tool.task", () => {
     ),
   )
 
-  it.live("execute resumes an existing task session from task_id", () =>
+  it.live("execute resumes an existing task session from subagent_session_id", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const sessions = yield* Session.Service
         const { chat, assistant } = yield* seed()
         const child = yield* sessions.create({ parentID: chat.id, title: "Existing child" })
-        const tool = yield* TaskTool
+        const tool = yield* AgentTool
         const def = yield* tool.init()
         let seen: SessionPrompt.PromptInput | undefined
         const promptOps = stubOps({ text: "resumed", onPrompt: (input) => (seen = input) })
@@ -202,7 +202,7 @@ describe("tool.task", () => {
             description: "inspect bug",
             prompt: "look into the cache key path",
             subagent_type: "general",
-            task_id: child.id,
+            subagent_session_id: child.id,
           },
           {
             sessionID: chat.id,
@@ -220,7 +220,7 @@ describe("tool.task", () => {
         expect(kids).toHaveLength(1)
         expect(kids[0]?.id).toBe(child.id)
         expect(result.metadata.sessionId).toBe(child.id)
-        expect(result.output).toContain(`task_id: ${child.id}`)
+        expect(result.output).toContain(`subagent_session_id: ${child.id}`)
         expect(seen?.sessionID).toBe(child.id)
       }),
     ),
@@ -230,7 +230,7 @@ describe("tool.task", () => {
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const { chat, assistant } = yield* seed()
-        const tool = yield* TaskTool
+        const tool = yield* AgentTool
         const def = yield* tool.init()
         const calls: unknown[] = []
         const promptOps = stubOps()
@@ -262,7 +262,7 @@ describe("tool.task", () => {
 
         expect(calls).toHaveLength(1)
         expect(calls[0]).toEqual({
-          permission: "task",
+          permission: "agent",
           patterns: ["general"],
           always: ["*"],
           metadata: {
@@ -274,12 +274,12 @@ describe("tool.task", () => {
     ),
   )
 
-  it.live("execute creates a child when task_id does not exist", () =>
+  it.live("execute creates a child when subagent_session_id does not exist", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const sessions = yield* Session.Service
         const { chat, assistant } = yield* seed()
-        const tool = yield* TaskTool
+        const tool = yield* AgentTool
         const def = yield* tool.init()
         let seen: SessionPrompt.PromptInput | undefined
         const promptOps = stubOps({ text: "created", onPrompt: (input) => (seen = input) })
@@ -289,7 +289,7 @@ describe("tool.task", () => {
             description: "inspect bug",
             prompt: "look into the cache key path",
             subagent_type: "general",
-            task_id: "ses_missing",
+            subagent_session_id: "ses_missing",
           },
           {
             sessionID: chat.id,
@@ -307,7 +307,7 @@ describe("tool.task", () => {
         expect(kids).toHaveLength(1)
         expect(kids[0]?.id).toBe(result.metadata.sessionId)
         expect(result.metadata.sessionId).not.toBe("ses_missing")
-        expect(result.output).toContain(`task_id: ${result.metadata.sessionId}`)
+        expect(result.output).toContain(`subagent_session_id: ${result.metadata.sessionId}`)
         expect(seen?.sessionID).toBe(result.metadata.sessionId)
       }),
     ),
@@ -319,7 +319,7 @@ describe("tool.task", () => {
         Effect.gen(function* () {
           const sessions = yield* Session.Service
           const { chat, assistant } = yield* seed()
-          const tool = yield* TaskTool
+          const tool = yield* AgentTool
           const def = yield* tool.init()
           let seen: SessionPrompt.PromptInput | undefined
           const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
@@ -373,7 +373,7 @@ describe("tool.task", () => {
             reviewer: {
               mode: "subagent",
               permission: {
-                task: "allow",
+                agent: "allow",
               },
             },
           },

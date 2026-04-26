@@ -264,16 +264,8 @@ function getDirectory(path: string | undefined) {
 
 import type { IconProps } from "./icon"
 
-export type ToolInfo = {
-  icon: IconProps["name"]
-  title: string
-  subtitle?: string
-}
-
-function agentTitle(i18n: UiI18n, type?: string) {
-  if (!type) return i18n.t("ui.tool.agent.default")
-  return i18n.t("ui.tool.agent", { type })
-}
+import { agentTitle, buildToolInfo, type ToolInfo } from "./tool-info"
+export { buildToolInfo, type ToolInfo }
 
 const agentTones: Record<string, string> = {
   ask: "var(--icon-agent-ask-base)",
@@ -361,13 +353,14 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         title: i18n.t("ui.tool.codesearch"),
         subtitle: input.query,
       }
-    case "task": {
+    case "task": // agent-rename:legacy-render
+    case "agent": {
       const type =
         typeof input.subagent_type === "string" && input.subagent_type
           ? input.subagent_type[0]!.toUpperCase() + input.subagent_type.slice(1)
           : undefined
       return {
-        icon: "task",
+        icon: "agent",
         title: agentTitle(i18n, type),
         subtitle: input.description,
       }
@@ -420,6 +413,11 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
       }
   }
 }
+
+// Exported wrapper for regression tests (Task 16) — accepts a ToolPart so tests can pass a full
+// part object and get back the derived icon/title/subtitle without mocking the switch internals.
+// Implementation lives in ./tool-info.ts as a pure module so tests can import it without
+// triggering message-part's SolidJS/Kobalte side effects at module load.
 
 function urls(text: string | undefined) {
   if (!text) return []
@@ -1321,16 +1319,16 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   // @ts-expect-error
   const partMetadata = () => part().state?.metadata ?? emptyMetadata
   const taskId = createMemo(() => {
-    if (part().tool !== "task") return
+    if (part().tool !== "task" && part().tool !== "agent") return // agent-rename:legacy-render
     const value = partMetadata().sessionId
     if (typeof value === "string" && value) return value
   })
   const taskHref = createMemo(() => {
-    if (part().tool !== "task") return
+    if (part().tool !== "task" && part().tool !== "agent") return // agent-rename:legacy-render
     return sessionLink(taskId(), useLocation().pathname, data.sessionHref)
   })
   const taskSubtitle = createMemo(() => {
-    if (part().tool !== "task") return undefined
+    if (part().tool !== "task" && part().tool !== "agent") return undefined // agent-rename:legacy-render
     const value = input().description
     if (typeof value === "string" && value) return value
     return taskId()
@@ -1742,86 +1740,87 @@ ToolRegistry.register({
   },
 })
 
-ToolRegistry.register({
-  name: "task",
-  render(props) {
-    const data = useData()
-    const i18n = useI18n()
-    const location = useLocation()
-    const childSessionId = createMemo(() => {
-      const value = props.metadata.sessionId
-      if (typeof value === "string" && value) return value
-      return taskSession(props.input, location.pathname, data.store.session, data.store.agent)
-    })
-    const agent = createMemo(() => taskAgent(props.input.subagent_type, data.store.agent))
-    const title = createMemo(() => agent().name ?? i18n.t("ui.tool.agent.default"))
-    const tone = createMemo(() => agent().color)
-    const subtitle = createMemo(() => {
-      const value = props.input.description
-      if (typeof value === "string" && value) return value
-      return childSessionId()
-    })
-    const running = createMemo(() => props.status === "pending" || props.status === "running")
+// Render function extracted so both "task" (legacy) and "agent" registrations share one reference.
+const renderAgentToolPart: ToolComponent = (props) => {
+  const data = useData()
+  const i18n = useI18n()
+  const location = useLocation()
+  const childSessionId = createMemo(() => {
+    const value = props.metadata.sessionId
+    if (typeof value === "string" && value) return value
+    return taskSession(props.input, location.pathname, data.store.session, data.store.agent)
+  })
+  const agent = createMemo(() => taskAgent(props.input.subagent_type, data.store.agent))
+  const title = createMemo(() => agent().name ?? i18n.t("ui.tool.agent.default"))
+  const tone = createMemo(() => agent().color)
+  const subtitle = createMemo(() => {
+    const value = props.input.description
+    if (typeof value === "string" && value) return value
+    return childSessionId()
+  })
+  const running = createMemo(() => props.status === "pending" || props.status === "running")
 
-    const href = createMemo(() => sessionLink(childSessionId(), location.pathname, data.sessionHref))
-    const clickable = createMemo(() => !!(childSessionId() && (data.navigateToSession || href())))
+  const href = createMemo(() => sessionLink(childSessionId(), location.pathname, data.sessionHref))
+  const clickable = createMemo(() => !!(childSessionId() && (data.navigateToSession || href())))
 
-    const open = () => {
-      const id = childSessionId()
-      if (!id) return
-      if (data.navigateToSession) {
-        data.navigateToSession(id)
-        return
-      }
-      const value = href()
-      if (value) window.location.assign(value)
+  const open = () => {
+    const id = childSessionId()
+    if (!id) return
+    if (data.navigateToSession) {
+      data.navigateToSession(id)
+      return
     }
+    const value = href()
+    if (value) window.location.assign(value)
+  }
 
-    const navigate = (event: MouseEvent) => {
-      if (!data.navigateToSession) return
-      if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-      event.preventDefault()
-      open()
-    }
+  const navigate = (event: MouseEvent) => {
+    if (!data.navigateToSession) return
+    if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    event.preventDefault()
+    open()
+  }
 
-    const trigger = () => (
-      <div data-component="task-tool-card">
-        <div data-slot="basic-tool-tool-info-structured">
-          <div data-slot="basic-tool-tool-info-main">
-            <Show when={running()}>
-              <span data-component="task-tool-spinner" style={{ color: tone() ?? "var(--icon-interactive-base)" }}>
-                <Spinner />
-              </span>
-            </Show>
-            <span data-component="task-tool-title" style={{ color: tone() ?? "var(--text-strong)" }}>
-              {title()}
+  const trigger = () => (
+    <div data-component="task-tool-card">
+      <div data-slot="basic-tool-tool-info-structured">
+        <div data-slot="basic-tool-tool-info-main">
+          <Show when={running()}>
+            <span data-component="task-tool-spinner" style={{ color: tone() ?? "var(--icon-interactive-base)" }}>
+              <Spinner />
             </span>
-            <Show when={subtitle()}>
-              <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>
-            </Show>
-          </div>
+          </Show>
+          <span data-component="task-tool-title" style={{ color: tone() ?? "var(--text-strong)" }}>
+            {title()}
+          </span>
+          <Show when={subtitle()}>
+            <span data-slot="basic-tool-tool-subtitle">{subtitle()}</span>
+          </Show>
         </div>
-        <Show when={clickable()}>
-          <div data-component="task-tool-action">
-            <Icon name="square-arrow-top-right" size="small" />
-          </div>
-        </Show>
       </div>
-    )
+      <Show when={clickable()}>
+        <div data-component="task-tool-action">
+          <Icon name="square-arrow-top-right" size="small" />
+        </div>
+      </Show>
+    </div>
+  )
 
-    return (
-      <BasicTool
-        icon="task"
-        status={props.status}
-        trigger={trigger()}
-        hideDetails
-        triggerHref={href()}
-        clickable={clickable()}
-        onTriggerClick={navigate}
-      />
-    )
-  },
-})
+  return (
+    <BasicTool
+      icon="agent"
+      status={props.status}
+      trigger={trigger()}
+      hideDetails
+      triggerHref={href()}
+      clickable={clickable()}
+      onTriggerClick={navigate}
+    />
+  )
+}
+
+ToolRegistry.register({ name: "task", render: renderAgentToolPart }) // agent-rename:legacy-render
+ToolRegistry.register({ name: "agent", render: renderAgentToolPart })
 
 ToolRegistry.register({
   name: "bash",

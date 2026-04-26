@@ -21,7 +21,7 @@ import { EditTool } from "../../tool/edit"
 import { WriteTool } from "../../tool/write"
 import { CodeSearchTool } from "../../tool/codesearch"
 import { WebSearchTool } from "../../tool/websearch"
-import { TaskTool } from "../../tool/task"
+import { AgentTool } from "../../tool/agent"
 import { SkillTool } from "../../tool/skill"
 import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
@@ -61,6 +61,11 @@ function block(info: Inline, output?: string) {
   UI.println(output)
   UI.empty()
 }
+
+// OR-match helper: accepts both legacy "task" id and new "agent" id so old sessions continue to
+// render after the tool id flip. Keep in sync with agent-rename:legacy-render sweep (Task 18).
+export const isAgentToolPart = (tool: string): boolean =>
+  tool === "task" || tool === "agent" // agent-rename:legacy-render
 
 function fallback(part: ToolPart) {
   const state = part.state
@@ -159,7 +164,7 @@ function websearch(info: ToolProps<typeof WebSearchTool>) {
   })
 }
 
-function task(info: ToolProps<typeof TaskTool>) {
+function agent(info: ToolProps<typeof AgentTool>) {
   const input = info.part.state.input
   const status = info.part.state.status
   const subagent =
@@ -168,7 +173,7 @@ function task(info: ToolProps<typeof TaskTool>) {
   const desc =
     typeof input.description === "string" && input.description.trim().length > 0 ? input.description : undefined
   const icon = status === "error" ? "✗" : status === "running" ? "•" : "✓"
-  const name = desc ?? `${agent} Task`
+  const name = desc ?? `${agent} Agent`
   inline({
     icon,
     title: name,
@@ -417,7 +422,7 @@ export const RunCommand = cmd({
           if (part.tool === "edit") return edit(props<typeof EditTool>(part))
           if (part.tool === "codesearch") return codesearch(props<typeof CodeSearchTool>(part))
           if (part.tool === "websearch") return websearch(props<typeof WebSearchTool>(part))
-          if (part.tool === "task") return task(props<typeof TaskTool>(part))
+          if (isAgentToolPart(part.tool)) return agent(props<typeof AgentTool>(part))
           if (part.tool === "todowrite") return todo(props<typeof TodoWriteTool>(part))
           if (part.tool === "skill") return skill(props<typeof SkillTool>(part))
           return fallback(part)
@@ -463,6 +468,11 @@ export const RunCommand = cmd({
                 tool(part)
                 continue
               }
+              if (isAgentToolPart(part.tool)) {
+                agent(props<typeof AgentTool>(part))
+                UI.error(part.state.error)
+                continue
+              }
               inline({
                 icon: "✗",
                 title: `${part.tool} failed`,
@@ -472,12 +482,12 @@ export const RunCommand = cmd({
 
             if (
               part.type === "tool" &&
-              part.tool === "task" &&
+              isAgentToolPart(part.tool) &&
               part.state.status === "running" &&
               args.format !== "json"
             ) {
               if (toggles.get(part.id) === true) continue
-              task(props<typeof TaskTool>(part))
+              agent(props<typeof AgentTool>(part))
               toggles.set(part.id, true)
             }
 
@@ -562,7 +572,7 @@ export const RunCommand = cmd({
       }
 
       // Validate agent if specified
-      const agent = await (async () => {
+      const agentName = await (async () => {
         if (!args.agent) return undefined
         const name = args.agent
 
@@ -639,7 +649,7 @@ export const RunCommand = cmd({
       if (args.command) {
         await sdk.session.command({
           sessionID,
-          agent,
+          agent: agentName,
           model: args.model,
           command: args.command,
           arguments: message,
@@ -649,7 +659,7 @@ export const RunCommand = cmd({
         const model = args.model ? Provider.parseModel(args.model) : undefined
         await sdk.session.prompt({
           sessionID,
-          agent,
+          agent: agentName,
           model,
           variant: args.variant,
           parts: [...files, { type: "text", text: message }],
