@@ -450,11 +450,12 @@ const rawLayer = Layer.effect(
       let result: Info = {}
       for (const file of globalConfigFiles()) {
         const filepath = path.join(Global.Path.config, file)
-        // Strip deprecated default_agent before parsing.
-        // If the on-disk rewrite failed, use the sanitized text directly so runtime
-        // never sees a stale default_agent value (issue #239).
+        // Strip deprecated default_agent before parsing (issue #239).
+        // When sanitizedText is present we use it directly to avoid a redundant
+        // disk read AND to ensure runtime never sees a stale value even if the
+        // on-disk rewrite failed.
         const migrated = yield* Effect.promise(() => migrateDefaultAgent(filepath))
-        if (migrated.sanitizedText !== undefined && !migrated.rewritten) {
+        if (migrated.sanitizedText !== undefined) {
           result = pipe(result, mergeDeep(yield* loadConfig(migrated.sanitizedText, { path: filepath })))
         } else {
           result = pipe(result, mergeDeep(yield* loadFile(filepath)))

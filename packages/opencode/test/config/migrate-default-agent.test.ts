@@ -132,6 +132,21 @@ test("migrateDefaultAgent: write failure → returns sanitizedText for in-memory
   await fs.rmdir(tmpPath)
 })
 
+test("migrateDefaultAgent: preserves original file mode (0600 stays 0600)", async () => {
+  await using tmp = await tmpdir()
+  const cfgPath = path.join(tmp.path, "pawwork.json")
+  await fs.writeFile(cfgPath, JSON.stringify({ default_agent: "plan", apiKey: "sk-secret" }, null, 2), "utf8")
+  await fs.chmod(cfgPath, 0o600)
+
+  const { logger } = makeMockLogger()
+  const res = await migrateDefaultAgent(cfgPath, { logger })
+
+  expect(res.rewritten).toBe(true)
+  const after = await fs.stat(cfgPath)
+  // mask off non-permission bits and assert exact mode preserved
+  expect(after.mode & 0o777).toBe(0o600)
+})
+
 test("migrateDefaultAgent: subsequent call after failed first still returns sanitizedText", async () => {
   await using tmp = await tmpdir()
   const cfgPath = path.join(tmp.path, "pawwork.json")

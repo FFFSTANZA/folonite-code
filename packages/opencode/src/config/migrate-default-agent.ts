@@ -62,7 +62,11 @@ export async function migrateDefaultAgent(
 
   const tmpPath = filepath + ".migrate.tmp"
   try {
+    // Preserve the original file mode so users who chmod 0600 their config
+    // (e.g. configs containing apiKey) don't get downgraded to umask defaults.
+    const original = await fs.stat(filepath)
     await fs.writeFile(tmpPath, sanitized, "utf8")
+    await fs.chmod(tmpPath, original.mode)
     await fs.rename(tmpPath, filepath)
   } catch (err: unknown) {
     failedPaths.add(filepath)

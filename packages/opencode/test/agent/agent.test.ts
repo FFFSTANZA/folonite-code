@@ -613,7 +613,7 @@ test("defaultAgent respects default_agent config set to custom agent with mode a
   })
 })
 
-test("defaultAgent throws when default_agent points to subagent", async () => {
+test("defaultAgent falls back to build when default_agent points to subagent", async () => {
   await using tmp = await tmpdir({
     config: {
       default_agent: "explore",
@@ -622,12 +622,14 @@ test("defaultAgent throws when default_agent points to subagent", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      await expect(Agent.defaultAgent()).rejects.toThrow('default agent "explore" is a subagent')
+      const agent = await Agent.defaultAgent()
+      // gentle fallback per issue #239 — invalid default_agent silently degrades
+      expect(agent).toBe("build")
     },
   })
 })
 
-test("defaultAgent throws when default_agent points to hidden agent", async () => {
+test("defaultAgent falls back to build when default_agent points to hidden agent", async () => {
   await using tmp = await tmpdir({
     config: {
       default_agent: "compaction",
@@ -636,12 +638,13 @@ test("defaultAgent throws when default_agent points to hidden agent", async () =
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      await expect(Agent.defaultAgent()).rejects.toThrow('default agent "compaction" is hidden')
+      const agent = await Agent.defaultAgent()
+      expect(agent).toBe("build")
     },
   })
 })
 
-test("defaultAgent throws when default_agent points to non-existent agent", async () => {
+test("defaultAgent falls back to build when default_agent points to non-existent agent", async () => {
   await using tmp = await tmpdir({
     config: {
       default_agent: "does_not_exist",
@@ -650,7 +653,10 @@ test("defaultAgent throws when default_agent points to non-existent agent", asyn
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      await expect(Agent.defaultAgent()).rejects.toThrow('default agent "does_not_exist" not found')
+      const agent = await Agent.defaultAgent()
+      // covers the post-#239 case where a project/managed config still references
+      // a now-removed agent like "plan"
+      expect(agent).toBe("build")
     },
   })
 })
