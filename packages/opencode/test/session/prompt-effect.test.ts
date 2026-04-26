@@ -899,15 +899,15 @@ it.live(
           const ready = defer<void>()
           const aborted = defer<void>()
           const registry = yield* ToolRegistry.Service
-          const { task } = yield* registry.named()
-          const original = task.execute
-          task.execute = (_args, ctx) =>
+          const { agent } = yield* registry.named()
+          const original = agent.execute
+          agent.execute = (_args, ctx) =>
             Effect.callback<never>((_resume) => {
               ready.resolve()
               ctx.abort.addEventListener("abort", () => aborted.resolve(), { once: true })
               return Effect.sync(() => aborted.resolve())
             })
-          yield* Effect.addFinalizer(() => Effect.sync(() => void (task.execute = original)))
+          yield* Effect.addFinalizer(() => Effect.sync(() => void (agent.execute = original)))
 
           const { prompt, chat } = yield* boot()
           const msg = yield* user(chat.id, "hello")

@@ -64,14 +64,14 @@ export namespace ToolRegistry {
   type State = {
     custom: Tool.Def[]
     builtin: Tool.Def[]
-    task: AgentDef
+    agent: AgentDef
     read: ReadDef
   }
 
   export interface Interface {
     readonly ids: () => Effect.Effect<string[]>
     readonly all: () => Effect.Effect<Tool.Def[]>
-    readonly named: () => Effect.Effect<{ task: AgentDef; read: ReadDef }>
+    readonly named: () => Effect.Effect<{ agent: AgentDef; read: ReadDef }>
     readonly tools: (model: {
       providerID: ProviderID
       modelID: ModelID
@@ -114,7 +114,7 @@ export namespace ToolRegistry {
       const settings = yield* Settings.Service
 
       const invalid = yield* InvalidTool
-      const task = yield* AgentTool
+      const agent = yield* AgentTool
       const read = yield* ReadTool
       const question = yield* QuestionTool
       const todo = yield* TodoWriteTool
@@ -236,7 +236,7 @@ export namespace ToolRegistry {
             edit: Tool.init(edit),
             write: Tool.init(writetool),
             trash: Tool.init(trashtool),
-            task: Tool.init(task),
+            agent: Tool.init(agent),
             fetch: Tool.init(webfetch),
             todo: Tool.init(todo),
             search: Tool.init(websearch),
@@ -260,7 +260,7 @@ export namespace ToolRegistry {
               tool.edit,
               tool.write,
               tool.trash,
-              tool.task,
+              tool.agent,
               tool.fetch,
               tool.todo,
               tool.search,
@@ -270,7 +270,7 @@ export namespace ToolRegistry {
               ...(lspEnabled ? [tool.lsp] : []),
               ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [tool.plan] : []),
             ],
-            task: tool.task,
+            agent: tool.agent,
             read: tool.read,
           }
         }),
@@ -363,7 +363,7 @@ export namespace ToolRegistry {
 
       const named: Interface["named"] = Effect.fn("ToolRegistry.named")(function* () {
         const s = yield* InstanceState.get(state)
-        return { task: s.task, read: s.read }
+        return { agent: s.agent, read: s.read }
       })
 
       const invalidate: Interface["invalidate"] = Effect.fn("ToolRegistry.invalidate")(function* () {

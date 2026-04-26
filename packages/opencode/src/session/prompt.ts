@@ -560,7 +560,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const { task, model, lastUser, sessionID, session, msgs } = input
       const ctx = yield* InstanceState.context
       const promptOps = yield* ops()
-      const { task: taskTool } = yield* registry.named()
+      const { agent: agentTool } = yield* registry.named()
       const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
       const assistantMessage: MessageV2.Assistant = yield* sessions.updateMessage({
         id: MessageID.ascending(),
@@ -618,7 +618,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       let error: Error | undefined
       const taskAbort = new AbortController()
-      const result = yield* taskTool
+      const result = yield* agentTool
         .execute(taskArgs, {
           agent: task.agent,
           messageID: assistantMessage.id,
