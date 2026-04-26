@@ -73,6 +73,23 @@ describe("file.ripgrep", () => {
     expect(result.items).toEqual([])
   })
 
+  test("files returns empty when glob matches nothing (ripgrep exit 1)", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "match.ts"), "const value = 1\n")
+      },
+    })
+
+    const files = await Array.fromAsync(
+      Ripgrep.files({
+        cwd: tmp.path,
+        glob: ["nothing-here-xyz/*"],
+      }),
+    )
+
+    expect(files).toEqual([])
+  })
+
   test("files throws when ripgrep exits with an invalid glob error", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
