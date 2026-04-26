@@ -387,7 +387,13 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
       onKeyDown={nav}
       header={
         <>
-          <div data-slot="question-header-title">{summary()}</div>
+          <div data-slot="question-header-title">
+            <span data-slot="question-header-seq">{summary()}</span>
+            <span data-slot="question-header-separator" aria-hidden="true">·</span>
+            <span data-slot="question-header-mode">
+              {multi() ? language.t("ui.question.multiHint") : language.t("ui.question.singleHint")}
+            </span>
+          </div>
           <div data-slot="question-progress">
             <For each={questions()}>
               {(_, i) => (
@@ -430,9 +436,6 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
       }
     >
       <div data-slot="question-text">{question()?.question}</div>
-      <Show when={multi()} fallback={<div data-slot="question-hint">{language.t("ui.question.singleHint")}</div>}>
-        <div data-slot="question-hint">{language.t("ui.question.multiHint")}</div>
-      </Show>
       <div data-slot="question-options">
         <For each={options()}>
           {(opt, i) => (
