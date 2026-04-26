@@ -39,7 +39,7 @@ const ObjectShape = Schema.StructWithRest(
     grep: Schema.optional(Rule),
     list: Schema.optional(Rule),
     bash: Schema.optional(Rule),
-    task: Schema.optional(Rule),
+    agent: Schema.optional(Rule),
     external_directory: Schema.optional(Rule),
     todowrite: Schema.optional(Action),
     question: Schema.optional(Action),
