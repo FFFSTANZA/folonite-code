@@ -1,5 +1,5 @@
-import type { AgentPart as MessageAgentPart, FilePart, Part, TextPart } from "@opencode-ai/sdk/v2"
-import type { AgentPart, FileAttachmentPart, ImageAttachmentPart, Prompt } from "@/context/prompt"
+import type { FilePart, Part, TextPart } from "@opencode-ai/sdk/v2"
+import type { FileAttachmentPart, ImageAttachmentPart, Prompt } from "@/context/prompt"
 
 type Inline =
   | {
@@ -112,18 +112,11 @@ export function extractPromptFromParts(parts: Part[], opts?: { directory?: strin
       }
     }
 
-    if (part.type === "agent") {
-      const agentPart = part as MessageAgentPart
-      const source = agentPart.source
-      if (!source) continue
-      inline.push({
-        type: "agent",
-        start: source.start,
-        end: source.end,
-        value: source.value,
-        name: agentPart.name,
-      })
-    }
+    // PawWork issue #239: AgentPart records from history are intentionally NOT
+    // converted to inline agent pills. The original `@<name>` substring is
+    // already in the surrounding text part, so it restores as plain text.
+    // This single point also defuses buildRequestParts (no AgentPartInput
+    // submitted) and renderEditor (no pill).
   }
 
   inline.sort((a, b) => {
@@ -160,19 +153,6 @@ export function extractPromptFromParts(parts: Part[], opts?: { directory?: strin
     position += content.length
   }
 
-  const pushAgent = (item: Extract<Inline, { type: "agent" }>) => {
-    const content = item.value
-    const mention: AgentPart = {
-      type: "agent",
-      name: item.name,
-      content,
-      start: position,
-      end: position + content.length,
-    }
-    result.push(mention)
-    position += content.length
-  }
-
   for (const item of inline) {
     if (item.start < 0 || item.end < item.start) continue
 
@@ -187,7 +167,6 @@ export function extractPromptFromParts(parts: Part[], opts?: { directory?: strin
     pushText(text.slice(cursor, start))
 
     if (item.type === "file") pushFile(item)
-    if (item.type === "agent") pushAgent(item)
 
     cursor = end
   }

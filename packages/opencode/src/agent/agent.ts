@@ -15,14 +15,12 @@ import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
-import { Global } from "@/global"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
 import { Effect, Context, Layer } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
-import { Runtime } from "@opencode-ai/shared/runtime"
 
 export namespace Agent {
   export const Info = z
@@ -115,7 +113,6 @@ export namespace Agent {
         })
 
           const user = Permission.fromConfig(cfg.permission ?? {})
-          const projectPlansDir = Runtime.isPawWork() ? ".pawwork" : ".opencode"
 
           const agents: Record<string, Info> = {
             build: {
@@ -133,30 +130,8 @@ export namespace Agent {
               mode: "primary",
               native: true,
             },
-            plan: {
-              name: "plan",
-              description: "Plan mode. Disallows all edit tools.",
-              options: {},
-              permission: Permission.merge(
-                defaults,
-                Permission.fromConfig({
-                  question: "allow",
-                  plan_exit: "allow",
-                  external_directory: {
-                    [path.join(Global.Path.data, "plans", "*")]: "allow",
-                  },
-                  edit: {
-                    "*": "deny",
-                    [path.join(projectPlansDir, "plans", "*.md")]: "allow",
-                    [path.relative(Instance.worktree, path.join(Global.Path.data, path.join("plans", "*.md")))]:
-                      "allow",
-                  },
-                }),
-                user,
-              ),
-              mode: "primary",
-              native: true,
-            },
+            // PawWork: visible Plan mode permanently removed (issue #239); resolve sync
+            // conflicts in this region to HEAD. Plan capability migrated to plan tool per #127.
             general: {
               name: "general",
               description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
@@ -310,11 +285,14 @@ export namespace Agent {
           const defaultAgent = Effect.fnUntraced(function* () {
             const c = yield* config.get()
             if (c.default_agent) {
+              // Gentle fallback (issue #239): if the configured default_agent is missing,
+              // a subagent, or hidden, ignore it and fall through. This covers configs
+              // outside the loadGlobal migration path (project, env, managed) that may
+              // still reference an agent removed by an upgrade (e.g. "plan").
               const agent = agents[c.default_agent]
-              if (!agent) throw new Error(`default agent "${c.default_agent}" not found`)
-              if (agent.mode === "subagent") throw new Error(`default agent "${c.default_agent}" is a subagent`)
-              if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
-              return agent.name
+              if (agent && agent.mode !== "subagent" && agent.hidden !== true) {
+                return agent.name
+              }
             }
             const visible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
             if (!visible) throw new Error("no primary visible agent found")
