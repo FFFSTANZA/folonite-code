@@ -436,6 +436,17 @@ test("webfetch is allowed by default", async () => {
   })
 })
 
+test("websearch is allowed by default", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const build = await Agent.get("build")
+      expect(evalPerm(build, "websearch")).toBe("allow")
+    },
+  })
+})
+
 test("legacy tools config converts to permissions", async () => {
   await using tmp = await tmpdir({
     config: {

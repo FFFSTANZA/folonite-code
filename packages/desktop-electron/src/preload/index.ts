@@ -83,6 +83,10 @@ const api: ElectronAPI = {
   installUpdate: () => ipcRenderer.invoke("install-update"),
   setBackgroundColor: (color: string) => ipcRenderer.invoke("set-background-color", color),
   setLspEnabled: (value: boolean) => ipcRenderer.invoke("lsp-set-enabled", value),
+  setWebSearchEnabled: (value: boolean) => ipcRenderer.invoke("websearch-set-enabled", value),
+  webSearchStatus: () => ipcRenderer.invoke("websearch-status"),
+  saveExaApiKey: (key: string) => ipcRenderer.invoke("websearch-save-exa-key", key),
+  removeExaApiKey: () => ipcRenderer.invoke("websearch-remove-exa-key"),
   getAboutInfo: () => ipcRenderer.invoke("about:get-info"),
   onAboutOpen: (handler: () => void) => {
     const wrapped = () => handler()

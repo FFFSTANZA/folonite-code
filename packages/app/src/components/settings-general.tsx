@@ -1,6 +1,7 @@
 import { Component, Show, createMemo, createResource, onMount, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Button } from "@opencode-ai/ui/button"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Select } from "@opencode-ai/ui/select"
 import { Switch } from "@opencode-ai/ui/switch"
@@ -24,6 +25,7 @@ import {
 import { decode64 } from "@/utils/base64"
 import { playSoundById, SOUND_OPTIONS } from "@/utils/sound"
 import { Link } from "./link"
+import { DialogConnectWebSearch } from "./dialog-connect-websearch"
 import { SettingsList } from "./settings-list"
 
 let demoSoundState = {
@@ -71,6 +73,7 @@ export const SettingsGeneral: Component = () => {
   const platform = usePlatform()
   const params = useParams()
   const settings = useSettings()
+  const dialog = useDialog()
 
   onMount(() => {
     void theme.loadThemes()
@@ -148,26 +151,25 @@ export const SettingsGeneral: Component = () => {
           return
         }
 
-        const actions =
-          platform.update
-            ? [
-                {
-                  label: language.t("toast.update.action.installRestart"),
-                  onClick: async () => {
-                    await platform.update!()
-                  },
+        const actions = platform.update
+          ? [
+              {
+                label: language.t("toast.update.action.installRestart"),
+                onClick: async () => {
+                  await platform.update!()
                 },
-                {
-                  label: language.t("toast.update.action.notYet"),
-                  onClick: "dismiss" as const,
-                },
-              ]
-            : [
-                {
-                  label: language.t("toast.update.action.notYet"),
-                  onClick: "dismiss" as const,
-                },
-              ]
+              },
+              {
+                label: language.t("toast.update.action.notYet"),
+                onClick: "dismiss" as const,
+              },
+            ]
+          : [
+              {
+                label: language.t("toast.update.action.notYet"),
+                onClick: "dismiss" as const,
+              },
+            ]
 
         showToast({
           persistent: true,
@@ -183,6 +185,19 @@ export const SettingsGeneral: Component = () => {
       })
       .finally(() => setStore("checking", false))
   }
+
+  const [webSearchStatusResource] = createResource(() => window.api?.webSearchStatus?.())
+  const webSearchStatus = createMemo(() => webSearchStatusResource.latest)
+  // Chip label for the current web search auth state.
+  const webSearchChipText = createMemo(() => {
+    const s = webSearchStatus()
+    if (!s) return language.t("settings.general.webSearch.chip.loading")
+    if (s.source === "saved" && s.needsAttention) return language.t("settings.general.webSearch.chip.invalid")
+    if (s.source === "saved") return language.t("settings.general.webSearch.chip.personal")
+    if (s.source === "env") return language.t("settings.general.webSearch.chip.env")
+    if (s.quotaExceeded) return language.t("settings.general.webSearch.chip.exhausted")
+    return language.t("settings.general.webSearch.chip.free")
+  })
 
   const themeOptions = createMemo<ThemeOption[]>(() => theme.ids().map((id) => ({ id, name: theme.name(id) })))
 
@@ -260,6 +275,49 @@ export const SettingsGeneral: Component = () => {
         >
           <div data-action="settings-auto-accept-permissions">
             <Switch checked={accepting()} disabled={!dir()} onChange={toggleAccept} />
+          </div>
+        </SettingsRow>
+
+        <SettingsRow
+          title={
+            <div class="flex items-center gap-2">
+              <span>{language.t("settings.general.webSearch.title")}</span>
+              <span class="text-11-regular text-text-weaker rounded px-1.5 py-0.5 bg-surface-weak-base">
+                {webSearchChipText()}
+              </span>
+            </div>
+          }
+          description={
+            <>
+              <span>{language.t("settings.general.webSearch.description")}</span>
+              {webSearchStatus()?.source === "saved" && webSearchStatus()?.needsAttention && (
+                <span class="block pt-1 text-11-regular text-text-weaker">
+                  {language.t("settings.general.webSearch.secondary.failed")}
+                </span>
+              )}
+              {webSearchStatus()?.source === "anonymous" && webSearchStatus()?.quotaExceeded && (
+                <span class="block pt-1 text-11-regular text-text-weaker">
+                  {language.t("settings.general.webSearch.secondary.exhausted")}
+                </span>
+              )}
+            </>
+          }
+        >
+          <div class="flex items-center gap-2">
+            <Button
+              data-action="settings-web-search-manage"
+              size="small"
+              variant="ghost"
+              onClick={() => dialog.show(() => <DialogConnectWebSearch />)}
+            >
+              {language.t("settings.general.webSearch.action.manage")}
+            </Button>
+            <div data-action="settings-web-search-enabled">
+              <Switch
+                checked={settings.general.webSearchEnabled()}
+                onChange={(checked) => settings.general.setWebSearchEnabled(checked)}
+              />
+            </div>
           </div>
         </SettingsRow>
 

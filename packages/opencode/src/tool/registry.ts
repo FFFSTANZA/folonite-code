@@ -27,6 +27,7 @@ import { Settings } from "@/settings"
 import { Log } from "@/util/log"
 import { LspTool } from "./lsp"
 import { Truncate } from "./truncate"
+import { WebSearchAuth } from "./websearch-auth"
 import { ApplyPatchTool } from "./apply_patch"
 import { Permission } from "../permission"
 import { Glob } from "../util/glob"
@@ -95,6 +96,7 @@ export namespace ToolRegistry {
     | Provider.Service
     | LSP.Service
     | Settings.Service
+    | WebSearchAuth.Service
     | Instruction.Service
     | AppFileSystem.Service
     | Bus.Service
@@ -135,6 +137,7 @@ export namespace ToolRegistry {
       const state = yield* InstanceState.make<State>(
         Effect.fn("ToolRegistry.state")(function* (ctx) {
           const lspEnabled = yield* settings.lspEnabled()
+          const webSearchEnabled = yield* settings.webSearchEnabled()
           const custom: Tool.Def[] = []
 
           function fromPlugin(id: string, def: ToolDefinition): Tool.Def {
@@ -263,7 +266,7 @@ export namespace ToolRegistry {
               tool.agent,
               tool.fetch,
               tool.todo,
-              tool.search,
+              ...(webSearchEnabled ? [tool.search] : []),
               tool.code,
               tool.skill,
               tool.patch,
@@ -320,8 +323,10 @@ export namespace ToolRegistry {
       })
 
       const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
+        const webSearchEnabled = yield* settings.webSearchEnabled()
         const filtered = (yield* all()).filter((tool) => {
-          if (tool.id === CodeSearchTool.id || tool.id === WebSearchTool.id) {
+          if (tool.id === WebSearchTool.id) return webSearchEnabled
+          if (tool.id === CodeSearchTool.id) {
             return input.providerID === ProviderID.opencode || Flag.OPENCODE_ENABLE_EXA
           }
 
@@ -386,6 +391,7 @@ export namespace ToolRegistry {
       Layer.provide(Provider.defaultLayer),
       Layer.provide(LSP.defaultLayer),
       Layer.provide(Settings.defaultLayer),
+      Layer.provide(WebSearchAuth.defaultLayer),
       Layer.provide(Instruction.defaultLayer),
       Layer.provide(AppFileSystem.defaultLayer),
       Layer.provide(Bus.layer),

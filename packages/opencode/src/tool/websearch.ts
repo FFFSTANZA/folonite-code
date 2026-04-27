@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import * as Tool from "./tool"
 import * as McpExa from "./mcp-exa"
+import { WebSearchAuth } from "./websearch-auth"
 import DESCRIPTION from "./websearch.txt"
 
 const Parameters = z.object({
@@ -28,6 +29,7 @@ export const WebSearchTool = Tool.define(
   "websearch",
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
+    const auth = yield* WebSearchAuth.Service
 
     return {
       get description() {
@@ -49,6 +51,7 @@ export const WebSearchTool = Tool.define(
             },
           })
 
+          const credential = yield* auth.credential()
           const result = yield* McpExa.call(
             http,
             "web_search_exa",
@@ -61,6 +64,15 @@ export const WebSearchTool = Tool.define(
               contextMaxCharacters: params.contextMaxCharacters,
             },
             "25 seconds",
+            credential,
+          ).pipe(
+            Effect.catchIf(McpExa.isMcpExaError, (error) =>
+              Effect.gen(function* () {
+                yield* auth.markNeedsAttention(error.failure)
+                yield* ctx.metadata({ metadata: { webSearch: { failure: error.failure } } })
+                return yield* Effect.fail(new Error(McpExa.messageForFailure(error.failure), { cause: error }))
+              }),
+            ),
           )
 
           return {

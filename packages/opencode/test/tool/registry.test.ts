@@ -5,6 +5,7 @@ import { tmpdir } from "../fixture/fixture"
 import { writeMockConfigInstall } from "../shared/mock-npm-install"
 import { withConfigDepsLock } from "../shared/config-deps-lock"
 import { Instance } from "../../src/project/instance"
+import { ModelID, ProviderID } from "../../src/provider/schema"
 import { localToolImportSpec, ToolRegistry } from "../../src/tool/registry"
 import { Settings } from "../../src/settings"
 import { Npm } from "../../src/npm"
@@ -549,6 +550,72 @@ describe("tool.registry", () => {
       })
     } finally {
       await Settings.setLspEnabled(false)
+    }
+  })
+
+  test("exposes websearch for non-opencode providers by default while codesearch stays gated", async () => {
+    await using tmp = await tmpdir()
+    const previous = await Settings.webSearchEnabled()
+    try {
+      await Settings.setWebSearchEnabled(true)
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tools = await ToolRegistry.tools({
+            providerID: ProviderID.make("openai"),
+            modelID: ModelID.make("gpt-5"),
+            agent: { name: "build", mode: "primary", permission: [], options: {} },
+          })
+          const ids = tools.map((tool) => tool.id)
+
+          expect(ids).toContain("websearch")
+          expect(ids).toContain("webfetch")
+          expect(ids).not.toContain("codesearch")
+        },
+      })
+    } finally {
+      await Settings.setWebSearchEnabled(previous)
+    }
+  })
+
+  test("invalidate flips websearch visibility without affecting webfetch", async () => {
+    await using tmp = await tmpdir()
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          await Settings.setWebSearchEnabled(true)
+          await ToolRegistry.invalidate()
+
+          const visibleIds = await ToolRegistry.ids()
+          expect(visibleIds).toContain("websearch")
+
+          const visible = await ToolRegistry.tools({
+            providerID: ProviderID.make("openai"),
+            modelID: ModelID.make("gpt-5"),
+            agent: { name: "build", mode: "primary", permission: [], options: {} },
+          })
+          expect(visible.map((tool) => tool.id)).toContain("websearch")
+
+          await Settings.setWebSearchEnabled(false)
+          await ToolRegistry.invalidate()
+
+          const hiddenRegistryIds = await ToolRegistry.ids()
+          expect(hiddenRegistryIds).not.toContain("websearch")
+
+          const hidden = await ToolRegistry.tools({
+            providerID: ProviderID.make("openai"),
+            modelID: ModelID.make("gpt-5"),
+            agent: { name: "build", mode: "primary", permission: [], options: {} },
+          })
+          const hiddenIds = hidden.map((tool) => tool.id)
+          expect(hiddenIds).not.toContain("websearch")
+          expect(hiddenIds).toContain("webfetch")
+        },
+      })
+    } finally {
+      await Settings.setWebSearchEnabled(true)
     }
   })
 })
