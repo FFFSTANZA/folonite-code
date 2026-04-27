@@ -136,10 +136,10 @@ export namespace SessionDiagnostics {
     return { value, serialized, hash: hash(serialized) }
   }
 
-  export function targetSummary(tool: string, input: unknown) {
+  export function targetSummary(tool: string, input: unknown): { summary: string; isFallback: boolean } {
     const target = findTarget(input)
-    if (!target) return `${tool}:input:${normalizeInput(input).hash}`
-    return `${target.kind}:${hash(target.value.trim())}`
+    if (!target) return { summary: `${tool}:input:${normalizeInput(input).hash}`, isFallback: true }
+    return { summary: `${target.kind}:${hash(target.value.trim())}`, isFallback: false }
   }
 
   export function errorFingerprint(error: unknown) {
@@ -173,7 +173,8 @@ export namespace SessionDiagnostics {
     providerID: string
   }) {
     const normalized = normalizeInput(input.input)
-    const summary = targetSummary(input.tool, input.input)
+    const summaryResult = targetSummary(input.tool, input.input)
+    const summary = summaryResult.summary
     const targetHash = hash(summary)
     const inputKey = `input:${input.parentID}:${input.tool}:${normalized.hash}`
     const inputRepeatCount =
@@ -209,6 +210,7 @@ export namespace SessionDiagnostics {
             inputRepeatCount,
             targetSummary: summary,
             targetHash,
+            targetHashIsFallback: summaryResult.isFallback,
             targetRepeatCount,
             newTarget: targetRepeatCount === 1,
             reminders,
@@ -370,8 +372,8 @@ export namespace SessionDiagnostics {
     for (const key of ["url", "href"]) {
       if (typeof record[key] === "string") return { kind: "url", value: record[key] }
     }
-    for (const key of ["query", "search", "pattern", "path", "command", "cmd"]) {
-      if (typeof record[key] === "string") return { kind: key, value: record[key] }
+    for (const key of ["query", "search", "pattern", "path", "filePath", "filepath", "command", "cmd"]) {
+      if (typeof record[key] === "string") return { kind: key === "filePath" || key === "filepath" ? "path" : key, value: record[key] }
     }
     return undefined
   }

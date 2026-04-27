@@ -189,10 +189,10 @@ describe("SessionDiagnostics metadata helpers", () => {
   test("summarizes known targets without storing readable values", () => {
     const summary = SessionDiagnostics.targetSummary("webfetch", {
       url: "https://example.com/private?token=secret-token&query=visible",
-    })
+    }).summary
     const command = SessionDiagnostics.targetSummary("bash", {
-      command: "curl -H 'Authorization: Bearer short-token' https://internal.example",
-    })
+      command: "curl -H 'Authorization: Bearer <token>' https://internal.example",
+    }).summary
 
     expect(summary).toMatch(/^url:[a-f0-9]{16}$/)
     expect(summary).not.toContain("example.com")
@@ -204,11 +204,23 @@ describe("SessionDiagnostics metadata helpers", () => {
     expect(command).not.toContain("internal")
   })
 
+  test("normalizes filePath / filepath into the same path hash across file tools (target accumulation is still tool-scoped)", () => {
+    const a = SessionDiagnostics.targetSummary("read", { filePath: "/tmp/a.txt" })
+    const b = SessionDiagnostics.targetSummary("edit", { filePath: "/tmp/a.txt", oldString: "x", newString: "y" })
+    const c = SessionDiagnostics.targetSummary("write", { filepath: "/tmp/a.txt", content: "..." })
+    expect(a.isFallback).toBe(false)
+    expect(b.isFallback).toBe(false)
+    expect(c.isFallback).toBe(false)
+    expect(a.summary).toMatch(/^path:[a-f0-9]{16}$/)
+    expect(a.summary).toBe(b.summary)
+    expect(a.summary).toBe(c.summary)
+  })
+
   test("summarizes unknown inputs without storing readable payloads", () => {
     const summary = SessionDiagnostics.targetSummary("custom", {
       prompt: "sensitive internal request",
       token: "secret-token",
-    })
+    }).summary
 
     expect(summary).toMatch(/^custom:input:[a-f0-9]{16}$/)
     expect(summary).not.toContain("sensitive")
@@ -254,6 +266,35 @@ describe("SessionDiagnostics.truncateForRenderer", () => {
   test("survives BigInt via String fallback", () => {
     expect(() => SessionDiagnostics.truncateForRenderer({ big: 10n })).not.toThrow()
     expect(typeof SessionDiagnostics.truncateForRenderer({ big: 10n })).toBe("string")
+  })
+})
+
+describe("SessionDiagnostics targetHashIsFallback", () => {
+  test("is false on webfetch with a recognized URL", () => {
+    const observed = SessionDiagnostics.observeToolCall({
+      records: [],
+      sessionID,
+      parentID,
+      tool: "webfetch",
+      input: { url: "https://example.com/a" },
+      agent: "build",
+      modelID,
+      providerID,
+    })
+    expect(observed.record.metadata.diagnostics?.loop?.targetHashIsFallback).toBe(false)
+  })
+  test("is true on a tool whose input has no findTarget hit", () => {
+    const observed = SessionDiagnostics.observeToolCall({
+      records: [],
+      sessionID,
+      parentID,
+      tool: "mystery",
+      input: { foo: "bar" },
+      agent: "build",
+      modelID,
+      providerID,
+    })
+    expect(observed.record.metadata.diagnostics?.loop?.targetHashIsFallback).toBe(true)
   })
 })
 
