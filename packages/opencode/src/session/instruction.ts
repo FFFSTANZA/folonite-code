@@ -33,8 +33,12 @@ function globalInstructionFiles() {
     files.push(path.join(dir, "AGENTS.md"))
   }
   files.push(path.join(Global.Path.config, "AGENTS.md"))
-  if (!Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT) {
-    files.push(path.join(os.homedir(), ".claude", "CLAUDE.md"))
+  // PawWork product baseline never falls back to global ~/.claude/CLAUDE.md (issue #230,
+  // acceptance #5). The flag still gates the fallback for plain opencode CLI users so
+  // their Claude Code interop is unchanged. Read Global.Path.home so OPENCODE_TEST_HOME
+  // can stub the home directory deterministically; os.homedir() is locked at process start.
+  if (!Runtime.isPawWork() && !Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT) {
+    files.push(path.join(Global.Path.home, ".claude", "CLAUDE.md"))
   }
   return files
 }
