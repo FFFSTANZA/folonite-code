@@ -1,10 +1,9 @@
-import { Effect, Option, Schema, Scope } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { createReadStream } from "fs"
 import * as path from "path"
 import { createInterface } from "readline"
 import * as Tool from "./tool"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
-import { LSP } from "../lsp"
 import DESCRIPTION from "./read.txt"
 import { Instance } from "../project/instance"
 import { assertExternalDirectoryEffect } from "./external-directory"
@@ -16,6 +15,8 @@ const MAX_LINE_LENGTH = 2000
 const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
 const MAX_BYTES = 50 * 1024
 const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB`
 const SAMPLE_BYTES = 4096
 
 // `offset` and `limit` were originally `z.coerce.number()` — the runtime
@@ -38,8 +39,6 @@ export const ReadTool = Tool.define(
   Effect.gen(function* () {
     const fs = yield* AppFileSystem.Service
     const instruction = yield* Instruction.Service
-    const lsp = yield* LSP.Service
-    const scope = yield* Scope.Scope
 
     const miss = Effect.fn("ReadTool.miss")(function* (filepath: string) {
       const dir = path.dirname(filepath)
@@ -82,10 +81,6 @@ export const ReadTool = Tool.define(
       ).pipe(Effect.map((items: string[]) => items.sort((a, b) => a.localeCompare(b))))
     })
 
-    const warm = Effect.fn("ReadTool.warm")(function* (filepath: string) {
-      yield* lsp.touchFile(filepath).pipe(Effect.ignore, Effect.forkIn(scope))
-    })
-
     const readSample = Effect.fn("ReadTool.readSample")(function* (
       filepath: string,
       fileSize: number,
@@ -101,7 +96,7 @@ export const ReadTool = Tool.define(
       )
     })
 
-    const isBinaryFile = (filepath: string, bytes: Uint8Array) => {
+    const isBinaryByExt = (filepath: string) => {
       const ext = path.extname(filepath).toLowerCase()
       switch (ext) {
         case ".zip":
@@ -134,9 +129,18 @@ export const ReadTool = Tool.define(
         case ".pyo":
           return true
       }
+      return false
+    }
 
+    // .bin and .dat are generic enough that they may carry renamed image/PDF
+    // attachments; allow the MIME sniffer to override the extension verdict.
+    const shouldSniffBeforeBinaryExt = (filepath: string) => {
+      const ext = path.extname(filepath).toLowerCase()
+      return ext === ".bin" || ext === ".dat"
+    }
+
+    const isBinaryByContent = (bytes: Uint8Array) => {
       if (bytes.length === 0) return false
-
       let nonPrintableCount = 0
       for (let i = 0; i < bytes.length; i++) {
         if (bytes[i] === 0) return true
@@ -144,7 +148,6 @@ export const ReadTool = Tool.define(
           nonPrintableCount++
         }
       }
-
       return nonPrintableCount / bytes.length > 0.3
     }
 
@@ -218,10 +221,24 @@ export const ReadTool = Tool.define(
       }
 
       const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
-      const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
 
+      // Reject obvious binary extensions before we even sample, except for the
+      // generic .bin / .dat that may carry renamed image/PDF attachments — those
+      // get sniffed by content first.
+      if (isBinaryByExt(filepath) && !shouldSniffBeforeBinaryExt(filepath)) {
+        return yield* Effect.fail(
+          new Error(`Cannot read binary file (extension: ${path.extname(filepath).toLowerCase()}): ${filepath}`),
+        )
+      }
+
+      const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
       const mime = sniffAttachmentMime(sample, AppFileSystem.mimeType(filepath))
       if (isImageAttachment(mime) || isPdfAttachment(mime)) {
+        if (Number(stat.size) > MAX_ATTACHMENT_BYTES) {
+          return yield* Effect.fail(
+            new Error(`Cannot read attachment larger than ${MAX_ATTACHMENT_BYTES_LABEL}: ${filepath}`),
+          )
+        }
         const bytes = yield* fs.readFile(filepath)
         const msg = isPdfAttachment(mime) ? "PDF read successfully" : "Image read successfully"
         return {
@@ -242,8 +259,8 @@ export const ReadTool = Tool.define(
         }
       }
 
-      if (isBinaryFile(filepath, sample)) {
-        return yield* Effect.fail(new Error(`Cannot read binary file: ${filepath}`))
+      if (isBinaryByContent(sample)) {
+        return yield* Effect.fail(new Error(`Cannot read binary file (content inspection): ${filepath}`))
       }
 
       const file = yield* Effect.promise(() =>
@@ -269,8 +286,6 @@ export const ReadTool = Tool.define(
         output += `\n\n(End of file - total ${file.count} lines)`
       }
       output += "\n</content>"
-
-      yield* warm(filepath)
 
       if (loaded.length > 0) {
         output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
