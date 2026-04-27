@@ -392,6 +392,60 @@ describe("SessionDiagnostics.truncateForRenderer", () => {
   })
 })
 
+describe("SessionDiagnostics targetRepeatCount cross-tool semantics", () => {
+  test("cross-tool same target keeps newTarget=true (exploration, not loop)", () => {
+    const url = "https://example.com/a"
+    const first = SessionDiagnostics.observeToolCall({
+      records: [],
+      sessionID,
+      parentID,
+      tool: "webfetch",
+      input: { url },
+      agent: "build",
+      modelID,
+      providerID,
+    })
+    const second = SessionDiagnostics.observeToolCall({
+      records: [first.record],
+      sessionID,
+      parentID,
+      tool: "fetch",
+      input: { url },
+      agent: "build",
+      modelID,
+      providerID,
+    })
+    expect(second.record.metadata.diagnostics?.loop?.newTarget).toBe(true)
+    expect(second.record.metadata.diagnostics?.loop?.targetRepeatCount).toBe(1)
+  })
+
+  test("same-tool same-target accumulates targetRepeatCount", () => {
+    const url = "https://example.com/a"
+    const first = SessionDiagnostics.observeToolCall({
+      records: [],
+      sessionID,
+      parentID,
+      tool: "webfetch",
+      input: { url },
+      agent: "build",
+      modelID,
+      providerID,
+    })
+    const second = SessionDiagnostics.observeToolCall({
+      records: [first.record],
+      sessionID,
+      parentID,
+      tool: "webfetch",
+      input: { url },
+      agent: "build",
+      modelID,
+      providerID,
+    })
+    expect(second.record.metadata.diagnostics?.loop?.targetRepeatCount).toBe(2)
+    expect(second.record.metadata.diagnostics?.loop?.newTarget).toBe(false)
+  })
+})
+
 describe("SessionDiagnostics targetHashIsFallback", () => {
   test("is false on webfetch with a recognized URL", () => {
     const observed = SessionDiagnostics.observeToolCall({

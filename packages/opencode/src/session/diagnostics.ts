@@ -179,7 +179,10 @@ export namespace SessionDiagnostics {
     const inputRepeatCount =
       input.records.filter((record) => record.parentID === input.parentID && record.tool === input.tool && record.inputHash === normalized.hash).length + 1
     const targetRepeatCount =
-      input.records.filter((record) => record.parentID === input.parentID && record.targetHash === targetHash).length + 1
+      input.records.filter(
+        (record) =>
+          record.parentID === input.parentID && record.tool === input.tool && record.targetHash === targetHash,
+      ).length + 1
 
     const record: ToolCallRecord = {
       sessionID: input.sessionID,
