@@ -1,4 +1,3 @@
-import os from "os"
 import path from "path"
 import { Effect, Layer, Context } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
@@ -16,11 +15,24 @@ import type { MessageID } from "./schema"
 
 const log = Log.create({ service: "instruction" })
 
-const FILES = [
-  "AGENTS.md",
-  ...(Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT ? [] : ["CLAUDE.md"]),
-  "CONTEXT.md", // deprecated
-]
+// PawWork keeps project-level CLAUDE.md as compatibility (issue #230, acceptance #6),
+// even if a parent process inherits OPENCODE_DISABLE_CLAUDE_CODE_PROMPT. The flag only
+// suppresses Claude Code interop in plain opencode CLI mode. Exported so the gate can
+// be unit tested without mutating module-scope flags.
+export function projectFiles(deps: { isPawWork: boolean; disableClaudeCodePrompt: boolean }): string[] {
+  return [
+    "AGENTS.md",
+    ...(deps.isPawWork || !deps.disableClaudeCodePrompt ? ["CLAUDE.md"] : []),
+    "CONTEXT.md", // deprecated
+  ]
+}
+
+function FILES() {
+  return projectFiles({
+    isPawWork: Runtime.isPawWork(),
+    disableClaudeCodePrompt: Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT,
+  })
+}
 
 function configDir() {
   return Runtime.isPawWork() ? Flag.PAWWORK_CONFIG_DIR : Flag.OPENCODE_CONFIG_DIR
@@ -33,8 +45,12 @@ function globalInstructionFiles() {
     files.push(path.join(dir, "AGENTS.md"))
   }
   files.push(path.join(Global.Path.config, "AGENTS.md"))
-  if (!Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT) {
-    files.push(path.join(os.homedir(), ".claude", "CLAUDE.md"))
+  // PawWork product baseline never falls back to global ~/.claude/CLAUDE.md (issue #230,
+  // acceptance #5). The flag still gates the fallback for plain opencode CLI users so
+  // their Claude Code interop is unchanged. Read Global.Path.home so OPENCODE_TEST_HOME
+  // can stub the home directory deterministically; os.homedir() is locked at process start.
+  if (!Runtime.isPawWork() && !Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT) {
+    files.push(path.join(Global.Path.home, ".claude", "CLAUDE.md"))
   }
   return files
 }
@@ -56,10 +72,16 @@ function extract(messages: MessageV2.WithParts[]) {
   return paths
 }
 
+export type InstructionSource =
+  | { status: "loaded"; path: string }
+  | { status: "considered"; path: string; reason: string }
+  | { status: "ignored"; path: string; reason: string }
+
 export interface Interface {
   readonly clear: (messageID: MessageID) => Effect.Effect<void>
   readonly systemPaths: () => Effect.Effect<Set<string>, AppFileSystem.Error>
   readonly system: () => Effect.Effect<string[], AppFileSystem.Error>
+  readonly sources: () => Effect.Effect<InstructionSource[], AppFileSystem.Error>
   readonly find: (dir: string) => Effect.Effect<string | undefined, AppFileSystem.Error>
   readonly resolve: (
     messages: MessageV2.WithParts[],
@@ -131,7 +153,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
 
         // The first project-level match wins so we don't stack AGENTS.md/CLAUDE.md from every ancestor.
         if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
-          for (const file of FILES) {
+          for (const file of FILES()) {
             const matches = yield* fs.findUp(file, Instance.directory, Instance.worktree)
             if (matches.length > 0) {
               matches.forEach((item) => paths.add(path.resolve(item)))
@@ -150,7 +172,10 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         if (config.instructions) {
           for (const raw of config.instructions) {
             if (raw.startsWith("https://") || raw.startsWith("http://")) continue
-            const instruction = raw.startsWith("~/") ? path.join(os.homedir(), raw.slice(2)) : raw
+            // Route through Global.Path.home so systemPaths() and sources() agree on
+            // ~/ resolution; otherwise diagnostics could point at one path while the
+            // prompt reads from another.
+            const instruction = raw.startsWith("~/") ? path.join(Global.Path.home, raw.slice(2)) : raw
             const matches = yield* (
               path.isAbsolute(instruction)
                 ? fs.glob(path.basename(instruction), {
@@ -183,8 +208,143 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         ]
       })
 
+      const sources = Effect.fn("Instruction.sources")(function* () {
+        const result: InstructionSource[] = []
+        const loadedPaths = new Set<string>()
+
+        // Mark a file as loaded only after read() returns non-empty content; system()
+        // already drops empty/unreadable files so a "loaded" entry that the prompt
+        // doesn't see would mislead diagnostics.
+        const recordFileEntry = Effect.fnUntraced(function* (resolved: string) {
+          const content = yield* read(resolved)
+          if (content) {
+            result.push({ status: "loaded", path: resolved })
+            loadedPaths.add(resolved)
+            return true as const
+          }
+          result.push({ status: "considered", path: resolved, reason: "file is empty or unreadable" })
+          return false as const
+        })
+
+        // Project-level walk: emit the full priority chain, not just the winner. First
+        // file whose content reads back non-empty is loaded; later existing matches are
+        // considered with a priority-skipped reason. Absent files are not reported here
+        // because FILES holds basenames, not paths — the directory walk is the search.
+        if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+          let projectLoaded = false
+          for (const file of FILES()) {
+            const matches = yield* fs.findUp(file, Instance.directory, Instance.worktree)
+            if (matches.length === 0) continue
+            for (const match of matches) {
+              const resolved = path.resolve(match)
+              if (loadedPaths.has(resolved)) continue
+              if (!projectLoaded) {
+                const ok = yield* recordFileEntry(resolved)
+                if (ok) projectLoaded = true
+              } else {
+                result.push({
+                  status: "considered",
+                  path: resolved,
+                  reason: "skipped because a higher-priority project instruction file was loaded",
+                })
+              }
+            }
+          }
+        }
+
+        // Global instruction file chain: report the full priority chain so debug output
+        // can show why a candidate was skipped (priority) or absent.
+        let globalLoaded = false
+        for (const file of globalInstructionFiles()) {
+          const resolved = path.resolve(file)
+          if (loadedPaths.has(resolved)) continue
+          const exists = yield* fs.existsSafe(file)
+          if (!exists) {
+            result.push({ status: "considered", path: resolved, reason: "absent" })
+            continue
+          }
+          if (globalLoaded) {
+            result.push({
+              status: "considered",
+              path: resolved,
+              reason: "skipped because a higher-priority global instruction file was loaded",
+            })
+            continue
+          }
+          const ok = yield* recordFileEntry(resolved)
+          if (ok) globalLoaded = true
+        }
+
+        // Local file entries from config.instructions: glob-resolve them the same way
+        // systemPaths() does so the diagnostic includes file-based config contributions,
+        // not just URLs. Empty/unreadable matches are downgraded to considered so
+        // diagnostics agree with what system() actually loads.
+        const config = yield* cfg.get()
+        const localInstructions = (config.instructions ?? []).filter(
+          (item) => !item.startsWith("https://") && !item.startsWith("http://"),
+        )
+        for (const raw of localInstructions) {
+          const instruction = raw.startsWith("~/") ? path.join(Global.Path.home, raw.slice(2)) : raw
+          const matches = yield* (
+            path.isAbsolute(instruction)
+              ? fs.glob(path.basename(instruction), {
+                  cwd: path.dirname(instruction),
+                  absolute: true,
+                  include: "file",
+                })
+              : relative(instruction)
+          ).pipe(Effect.catch(() => Effect.succeed([] as string[])))
+          if (matches.length === 0) {
+            result.push({
+              status: "considered",
+              path: raw,
+              reason: "config.instructions entry resolved to no files",
+            })
+            continue
+          }
+          for (const match of matches) {
+            const resolved = path.resolve(match)
+            if (loadedPaths.has(resolved)) continue
+            yield* recordFileEntry(resolved)
+          }
+        }
+
+        // Remote instruction URLs from config.instructions: fetch concurrently to match
+        // system()'s 4-way concurrency, so a handful of dead URLs don't stack 5s timeouts
+        // and make sources() noticeably slower than the prompt build.
+        const urls = (config.instructions ?? []).filter(
+          (item) => item.startsWith("https://") || item.startsWith("http://"),
+        )
+        const bodies = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
+        for (const [index, url] of urls.entries()) {
+          const body = bodies[index]
+          if (body) {
+            result.push({ status: "loaded", path: url })
+          } else {
+            result.push({ status: "considered", path: url, reason: "fetch failed or returned empty body" })
+          }
+        }
+
+        // Explicitly ignored ~/.claude/CLAUDE.md: show reason so users understand why
+        // an existing file is not contributing. Covers both PawWork mode (issue #230,
+        // acceptance #5) and the legacy OPENCODE_DISABLE_CLAUDE_CODE_PROMPT opt-out.
+        const claudeFallback = path.resolve(path.join(Global.Path.home, ".claude", "CLAUDE.md"))
+        const ignoreReason = Runtime.isPawWork()
+          ? "PawWork product baseline disables global Claude Code fallback (issue #230)"
+          : Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+            ? "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT environment variable is set"
+            : null
+        if (ignoreReason && !loadedPaths.has(claudeFallback)) {
+          if (yield* fs.existsSafe(claudeFallback)) {
+            result.push({ status: "ignored", path: claudeFallback, reason: ignoreReason })
+          }
+        }
+
+        return result
+      })
+
       const find = Effect.fn("Instruction.find")(function* (dir: string) {
-        for (const file of FILES) {
+        for (const file of FILES()) {
           const filepath = path.resolve(path.join(dir, file))
           if (yield* fs.existsSafe(filepath)) return filepath
         }
@@ -234,7 +394,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         return results
       })
 
-      return Service.of({ clear, systemPaths, system, find, resolve })
+      return Service.of({ clear, systemPaths, system, sources, find, resolve })
     }),
   )
 
