@@ -9,10 +9,11 @@ import { createTwoFilesPatch, diffLines } from "diff"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { trimDiff } from "./edit"
 import { LSP } from "../lsp"
-import { AppFileSystem } from "../filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import DESCRIPTION from "./apply_patch.txt"
 import { File } from "../file"
 import { Format } from "../format"
+import * as Bom from "@/util/bom"
 
 export const Parameters = Schema.Struct({
   patchText: Schema.String.annotate({ description: "The full patch text that describes all changes to be made" }),
@@ -26,7 +27,10 @@ export const ApplyPatchTool = Tool.define(
     const format = yield* Format.Service
     const bus = yield* Bus.Service
 
-    const run = Effect.fn("ApplyPatchTool.execute")(function* (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) {
+    const run = Effect.fn("ApplyPatchTool.execute")(function* (
+      params: Schema.Schema.Type<typeof Parameters>,
+      ctx: Tool.Context,
+    ) {
       if (!params.patchText) {
         return yield* Effect.fail(new Error("patchText is required"))
       }
@@ -58,6 +62,7 @@ export const ApplyPatchTool = Tool.define(
         diff: string
         additions: number
         deletions: number
+        bom: boolean
       }> = []
 
       let totalDiff = ""
@@ -71,11 +76,12 @@ export const ApplyPatchTool = Tool.define(
             const oldContent = ""
             const newContent =
               hunk.contents.length === 0 || hunk.contents.endsWith("\n") ? hunk.contents : `${hunk.contents}\n`
-            const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, newContent))
+            const next = Bom.split(newContent)
+            const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, next.text))
 
             let additions = 0
             let deletions = 0
-            for (const change of diffLines(oldContent, newContent)) {
+            for (const change of diffLines(oldContent, next.text)) {
               if (change.added) additions += change.count || 0
               if (change.removed) deletions += change.count || 0
             }
@@ -83,11 +89,12 @@ export const ApplyPatchTool = Tool.define(
             fileChanges.push({
               filePath,
               oldContent,
-              newContent,
+              newContent: next.text,
               type: "add",
               diff,
               additions,
               deletions,
+              bom: next.bom,
             })
 
             totalDiff += diff + "\n"
@@ -103,13 +110,16 @@ export const ApplyPatchTool = Tool.define(
               )
             }
 
-            const oldContent = yield* afs.readFileString(filePath)
+            const source = yield* Bom.readFile(afs, filePath)
+            const oldContent = source.text
             let newContent = oldContent
+            let bom = source.bom
 
             // Apply the update chunks to get new content
             try {
               const fileUpdate = Patch.deriveNewContentsFromChunks(filePath, hunk.chunks)
               newContent = fileUpdate.content
+              bom = fileUpdate.bom
             } catch (error) {
               return yield* Effect.fail(new Error(`apply_patch verification failed: ${error}`))
             }
@@ -135,6 +145,7 @@ export const ApplyPatchTool = Tool.define(
               diff,
               additions,
               deletions,
+              bom,
             })
 
             totalDiff += diff + "\n"
@@ -142,7 +153,7 @@ export const ApplyPatchTool = Tool.define(
           }
 
           case "delete": {
-            const contentToDelete = yield* afs.readFileString(filePath).pipe(
+            const source = yield* Bom.readFile(afs, filePath).pipe(
               Effect.catch((error) =>
                 Effect.fail(
                   new Error(
@@ -151,6 +162,7 @@ export const ApplyPatchTool = Tool.define(
                 ),
               ),
             )
+            const contentToDelete = source.text
             const deleteDiff = trimDiff(createTwoFilesPatch(filePath, filePath, contentToDelete, ""))
 
             const deletions = contentToDelete.split("\n").length
@@ -163,6 +175,7 @@ export const ApplyPatchTool = Tool.define(
               diff: deleteDiff,
               additions: 0,
               deletions,
+              bom: source.bom,
             })
 
             totalDiff += deleteDiff + "\n"
@@ -182,8 +195,19 @@ export const ApplyPatchTool = Tool.define(
         movePath: change.movePath,
       }))
 
-      // Check permissions if needed
-      const relativePaths = fileChanges.map((c) => path.relative(Instance.worktree, c.filePath).replaceAll("\\", "/"))
+      // Check permissions — include `movePath` so a `move` hunk can't relocate
+      // a file into a destination the current edit policy would have denied
+      // (the `permission` rules apply to `patterns`, so leaving movePath out
+      // would let an attacker craft `move src/regular.ts -> .opencode/secret`
+      // and have the user only see `src/regular.ts` in the approval prompt).
+      const relativePaths = [
+        ...new Set(
+          fileChanges.flatMap((c) => [
+            path.relative(Instance.worktree, c.filePath).replaceAll("\\", "/"),
+            ...(c.movePath ? [path.relative(Instance.worktree, c.movePath).replaceAll("\\", "/")] : []),
+          ]),
+        ),
+      ]
       yield* ctx.ask({
         permission: "edit",
         patterns: relativePaths,
@@ -204,12 +228,12 @@ export const ApplyPatchTool = Tool.define(
           case "add":
             // Create parent directories (recursive: true is safe on existing/root dirs)
 
-            yield* afs.writeWithDirs(change.filePath, change.newContent)
+            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
             updates.push({ file: change.filePath, event: "add" })
             break
 
           case "update":
-            yield* afs.writeWithDirs(change.filePath, change.newContent)
+            yield* afs.writeWithDirs(change.filePath, Bom.join(change.newContent, change.bom))
             updates.push({ file: change.filePath, event: "change" })
             break
 
@@ -217,7 +241,7 @@ export const ApplyPatchTool = Tool.define(
             if (change.movePath) {
               // Create parent directories (recursive: true is safe on existing/root dirs)
 
-              yield* afs.writeWithDirs(change.movePath!, change.newContent)
+              yield* afs.writeWithDirs(change.movePath!, Bom.join(change.newContent, change.bom))
               yield* afs.remove(change.filePath)
               updates.push({ file: change.filePath, event: "unlink" })
               updates.push({ file: change.movePath, event: "add" })
@@ -231,8 +255,40 @@ export const ApplyPatchTool = Tool.define(
         }
 
         if (edited) {
-          yield* format.file(edited)
+          if (yield* format.file(edited)) {
+            // Mirror the recompute-after-format pattern in edit.ts/write.ts:
+            // formatters can rewrite the file after we've already built the
+            // diff/additions/deletions, so re-read the bytes and refresh this
+            // change's metadata. Without this, the patch metadata (and the
+            // aggregated `totalDiff` returned to the caller) describes content
+            // that no longer matches what's on disk.
+            const synced = yield* Bom.syncFile(afs, edited, change.bom)
+            change.newContent = synced
+            change.diff = trimDiff(createTwoFilesPatch(edited, edited, change.oldContent, synced))
+            let additions = 0
+            let deletions = 0
+            for (const piece of diffLines(change.oldContent, synced)) {
+              if (piece.added) additions += piece.count || 0
+              if (piece.removed) deletions += piece.count || 0
+            }
+            change.additions = additions
+            change.deletions = deletions
+          }
           yield* bus.publish(File.Event.Edited, { file: edited })
+        }
+      }
+
+      // Rebuild the aggregated diff and per-file metadata so the caller-visible
+      // `totalDiff` / `files` reflect any post-format mutations applied above.
+      totalDiff = ""
+      for (let i = 0; i < fileChanges.length; i++) {
+        const c = fileChanges[i]!
+        totalDiff += c.diff + (c.diff.endsWith("\n") ? "" : "\n")
+        const f = files[i]
+        if (f) {
+          f.patch = c.diff
+          f.additions = c.additions
+          f.deletions = c.deletions
         }
       }
 
@@ -285,7 +341,8 @@ export const ApplyPatchTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters: Parameters,
-      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) => run(params, ctx).pipe(Effect.orDie),
+      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
+        run(params, ctx).pipe(Effect.orDie),
     }
   }),
 )

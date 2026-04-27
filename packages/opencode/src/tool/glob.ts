@@ -2,7 +2,7 @@ import path from "path"
 import { Effect, Option, Schema } from "effect"
 import * as Stream from "effect/Stream"
 import { InstanceState } from "@/effect"
-import { AppFileSystem } from "@/filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Ripgrep } from "../file/ripgrep"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import DESCRIPTION from "./glob.txt"
@@ -54,7 +54,7 @@ export const GlobTool = Tool.define(
                 const info = yield* fs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
                 const mtime =
                   info?.mtime.pipe(
-                    Option.map((d) => d.getTime()),
+                    Option.map((date) => date.getTime()),
                     Option.getOrElse(() => 0),
                   ) ?? 0
                 return { path: full, mtime }

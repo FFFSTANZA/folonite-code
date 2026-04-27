@@ -88,9 +88,27 @@ export const EditTool = Tool.define(
             Effect.gen(function* () {
               if (params.oldString === "") {
                 const existed = yield* afs.existsSafe(filePath)
+                // Reject directory targets up front instead of failing inside
+                // Bom.readFile / writeWithDirs with an opaque internal error.
+                if (existed) {
+                  const stat = yield* afs.stat(filePath).pipe(
+                    Effect.catchIf(
+                      (err) => "reason" in err && err.reason._tag === "NotFound",
+                      () => Effect.succeed(undefined),
+                    ),
+                  )
+                  if (stat?.type === "Directory") {
+                    return yield* Effect.fail(new Error(`Path is a directory, not a file: ${filePath}`))
+                  }
+                }
                 const source = existed ? yield* Bom.readFile(afs, filePath) : { bom: false, text: "" }
                 const next = Bom.split(params.newString)
-                const desiredBom = source.bom || next.bom
+                // Only preserve the existing file's BOM. Letting `next.bom` add
+                // a new one would mutate file bytes the diff preview cannot
+                // show, silently breaking shebangs and first-token parsing on
+                // BOM-less scripts.
+                const desiredBom = source.bom
+                const bomChanged = source.bom !== next.bom
                 contentOld = source.text
                 contentNew = next.text
                 diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
@@ -101,12 +119,16 @@ export const EditTool = Tool.define(
                   metadata: {
                     filepath: filePath,
                     diff,
+                    ...(bomChanged && { bomDiscarded: true }),
                   },
                 })
                 yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-                yield* format.file(filePath)
-                {
+                if (yield* format.file(filePath)) {
                   contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
+                  // Recompute the diff so the metadata/snapshot reflects the
+                  // post-format on-disk content (formatters can rewrite the
+                  // file after the diff was originally built).
+                  diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
                 }
                 yield* bus.publish(File.Event.Edited, { file: filePath })
                 yield* bus.publish(FileWatcher.Event.Updated, {
@@ -116,7 +138,12 @@ export const EditTool = Tool.define(
                 return
               }
 
-              const info = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+              const info = yield* afs.stat(filePath).pipe(
+                Effect.catchIf(
+                  (err) => "reason" in err && err.reason._tag === "NotFound",
+                  () => Effect.succeed(undefined),
+                ),
+              )
               if (!info) throw new Error(`File ${filePath} not found`)
               if (info.type === "Directory") throw new Error(`Path is a directory, not a file: ${filePath}`)
               const source = yield* Bom.readFile(afs, filePath)
@@ -127,7 +154,11 @@ export const EditTool = Tool.define(
               const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
               const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
-              const desiredBom = source.bom || next.bom
+              // Same reasoning as the create-path: never let the replacement
+              // text introduce a new BOM, since the diff preview cannot
+              // surface that byte-level change.
+              const desiredBom = source.bom
+              const bomChanged = source.bom !== next.bom
               contentNew = next.text
 
               diff = trimDiff(
@@ -145,12 +176,12 @@ export const EditTool = Tool.define(
                 metadata: {
                   filepath: filePath,
                   diff,
+                  ...(bomChanged && { bomDiscarded: true }),
                 },
               })
 
               yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-              yield* format.file(filePath)
-                {
+              if (yield* format.file(filePath)) {
                 contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
               }
               yield* bus.publish(File.Event.Edited, { file: filePath })

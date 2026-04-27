@@ -4,7 +4,8 @@ import { BusEvent } from "@/bus/bus-event"
 import { InstanceState } from "@/effect/instance-state"
 import { SessionID, MessageID } from "@/session/schema"
 import { Log } from "@opencode-ai/core/util/log"
-import z from "zod"
+import { zod } from "@/util/effect-zod"
+import { withStatics } from "@/util/schema"
 import { QuestionID } from "./schema"
 
 export namespace Question {
@@ -12,101 +13,134 @@ export namespace Question {
 
   // Schemas
 
-  export const Option = z
-    .object({
-      label: z
-        .string()
-        .trim()
-        .min(1, "Option label cannot be empty.")
-        .max(50, "Option label is too long (max 50 chars). Keep labels to 1–5 words; put detail in description.")
-        .describe("Display text (1–5 words, max 50 chars)"),
-      description: z
-        .string()
-        .trim()
-        .min(1, "Option description cannot be empty.")
-        .max(50, "Option description is too long (max 50 chars). Keep it to one line; longer trade-off context belongs in the question or in normal streamed output before the tool call.")
-        .describe("One-line explanation of choice (max 50 chars)"),
-    })
-    .meta({ ref: "QuestionOption" })
-  export type Option = z.infer<typeof Option>
+  // PawWork-specific length/trim guards: keep label/description/header/question
+  // bounded so chips and prompts render well, and so models can't smuggle empty
+  // strings through whitespace padding. The hint wording is contracted with
+  // tests so the LLM-facing error guidance stays stable across refactors.
+  const TrimmedString = (max: number, opts: { emptyMsg: string; tooLongMsg: string }) =>
+    Schema.Trim.pipe(
+      Schema.check(Schema.isMinLength(1, { message: opts.emptyMsg })),
+      Schema.check(Schema.isMaxLength(max, { message: opts.tooLongMsg })),
+    )
 
-  export const Info = z
-    .object({
-      question: z
-        .string()
-        .trim()
-        .min(1, "Question cannot be empty.")
-        .max(200, "Question is too long (max 200 chars). Stream longer framing or trade-off context as normal assistant output before invoking this tool, then keep the question short.")
-        .describe("Short question (max 200 chars). Stream longer framing as normal output first."),
-      header: z
-        .string()
-        .trim()
-        .min(1, "Header cannot be empty.")
-        .max(30, "Header is too long (max 30 chars). Use a chip-sized label like 'Auth method' or 'Approach'.")
-        .describe("Very short label (max 30 chars)"),
-      options: z
-        .array(Option)
-        .min(2, "Each question needs at least 2 options.")
-        .max(4, "Each question allows at most 4 options. Keep choices distinct and mutually exclusive.")
-        .describe("Available choices (2–4)"),
-      multiple: z.boolean().optional().describe("Allow selecting multiple choices"),
-      custom: z.boolean().optional().describe("Allow typing a custom answer (default: true)"),
-    })
-    .meta({ ref: "QuestionInfo" })
-  export type Info = z.infer<typeof Info>
+  export class Option extends Schema.Class<Option>("QuestionOption")({
+    label: TrimmedString(50, {
+      emptyMsg: "Option label cannot be empty.",
+      tooLongMsg:
+        "Option label is too long (max 50 chars). Keep labels to 1–5 words; put detail in description.",
+    }).annotate({ description: "Display text (1–5 words, max 50 chars)" }),
+    description: TrimmedString(50, {
+      emptyMsg: "Option description cannot be empty.",
+      tooLongMsg:
+        "Option description is too long (max 50 chars). Keep it to one line; longer trade-off context belongs in the question or in normal streamed output before the tool call.",
+    }).annotate({ description: "One-line explanation of choice (max 50 chars)" }),
+  }) {
+    static readonly zod = zod(this)
+  }
+
+  const base = {
+    question: TrimmedString(200, {
+      emptyMsg: "Question cannot be empty.",
+      tooLongMsg:
+        "Question is too long (max 200 chars). Stream longer framing or trade-off context as normal assistant output before invoking this tool, then keep the question short.",
+    }).annotate({
+      description: "Short question (max 200 chars). Stream longer framing as normal output first.",
+    }),
+    header: TrimmedString(30, {
+      emptyMsg: "Header cannot be empty.",
+      tooLongMsg:
+        "Header is too long (max 30 chars). Use a chip-sized label like 'Auth method' or 'Approach'.",
+    }).annotate({ description: "Very short label (max 30 chars)" }),
+    options: Schema.mutable(Schema.Array(Option))
+      .check(Schema.isMinLength(2, { message: "Each question needs at least 2 options." }))
+      .check(
+        Schema.isMaxLength(4, {
+          message: "Each question allows at most 4 options. Keep choices distinct and mutually exclusive.",
+        }),
+      )
+      .annotate({ description: "Available choices (2–4)" }),
+    multiple: Schema.optional(Schema.Boolean).annotate({
+      description: "Allow selecting multiple choices",
+    }),
+  }
+
+  export class Info extends Schema.Class<Info>("QuestionInfo")({
+    ...base,
+    custom: Schema.optional(Schema.Boolean).annotate({
+      description: "Allow typing a custom answer (default: true)",
+    }),
+  }) {
+    static readonly zod = zod(this)
+  }
 
   // Prompt is the LLM-facing schema. Identical to Info — we expose `custom` so the
   // tool description's "Set false only when the options are exhaustive" instruction
-  // is reachable from a real tool call. The omit({}) round-trip preserves the
-  // separate ref so docs render two distinct schemas (one internal, one tool input).
-  export const Prompt = Info.omit({}).meta({ ref: "QuestionPrompt" })
-  export type Prompt = z.infer<typeof Prompt>
+  // is reachable from a real tool call.
+  export class Prompt extends Schema.Class<Prompt>("QuestionPrompt")({
+    ...base,
+    custom: Schema.optional(Schema.Boolean).annotate({
+      description: "Allow typing a custom answer (default: true)",
+    }),
+  }) {
+    static readonly zod = zod(this)
+  }
 
-  export const Request = z
-    .object({
-      id: QuestionID.zod,
-      sessionID: SessionID.zod,
-      questions: z
-        .array(Info)
-        .min(1, "Provide at least one question.")
-        .max(4, "Ask at most 4 questions per invocation. If you have more, split into multiple tool calls or stream context first."),
-      tool: z
-        .object({
-          messageID: MessageID.zod,
-          callID: z.string(),
-        })
-        .optional(),
-    })
-    .meta({ ref: "QuestionRequest" })
-  export type Request = z.infer<typeof Request>
+  export class Tool extends Schema.Class<Tool>("QuestionTool")({
+    messageID: MessageID,
+    callID: Schema.String,
+  }) {
+    static readonly zod = zod(this)
+  }
 
-  export const Answer = z.array(z.string()).meta({ ref: "QuestionAnswer" })
-  export type Answer = z.infer<typeof Answer>
+  export class Request extends Schema.Class<Request>("QuestionRequest")({
+    id: QuestionID,
+    sessionID: SessionID,
+    questions: Schema.mutable(Schema.Array(Info))
+      .check(Schema.isMinLength(1, { message: "Provide at least one question." }))
+      .check(
+        Schema.isMaxLength(4, {
+          message:
+            "Ask at most 4 questions per invocation. If you have more, split into multiple tool calls or stream context first.",
+        }),
+      )
+      .annotate({ description: "Questions to ask" }),
+    tool: Schema.optional(Tool),
+  }) {
+    static readonly zod = zod(this)
+  }
 
-  export const Reply = z.object({
-    answers: z
-      .array(Answer)
-      .describe("User answers in order of questions (each answer is an array of selected labels)"),
-  })
-  export type Reply = z.infer<typeof Reply>
+  export const Answer = Schema.Array(Schema.String)
+    .annotate({ identifier: "QuestionAnswer" })
+    .pipe(withStatics((s) => ({ zod: zod(s) })))
+  export type Answer = Schema.Schema.Type<typeof Answer>
+
+  export class Reply extends Schema.Class<Reply>("QuestionReply")({
+    answers: Schema.Array(Answer).annotate({
+      description: "User answers in order of questions (each answer is an array of selected labels)",
+    }),
+  }) {
+    static readonly zod = zod(this)
+  }
+
+  class Replied extends Schema.Class<Replied>("QuestionReplied")({
+    sessionID: SessionID,
+    requestID: QuestionID,
+    answers: Schema.Array(Answer),
+  }) {
+    static readonly zod = zod(this)
+  }
+
+  class Rejected extends Schema.Class<Rejected>("QuestionRejected")({
+    sessionID: SessionID,
+    requestID: QuestionID,
+  }) {
+    static readonly zod = zod(this)
+  }
 
   export const Event = {
-    Asked: BusEvent.define("question.asked", Request),
-    Replied: BusEvent.define(
-      "question.replied",
-      z.object({
-        sessionID: SessionID.zod,
-        requestID: QuestionID.zod,
-        answers: z.array(Answer),
-      }),
-    ),
-    Rejected: BusEvent.define(
-      "question.rejected",
-      z.object({
-        sessionID: SessionID.zod,
-        requestID: QuestionID.zod,
-      }),
-    ),
+    Asked: BusEvent.define("question.asked", Request.zod),
+    Replied: BusEvent.define("question.replied", Replied.zod),
+    Rejected: BusEvent.define("question.rejected", Rejected.zod),
   }
 
   export class RejectedError extends Schema.TaggedErrorClass<RejectedError>()("QuestionRejectedError", {}) {
@@ -117,7 +151,7 @@ export namespace Question {
 
   interface PendingEntry {
     info: Request
-    deferred: Deferred.Deferred<Answer[], RejectedError>
+    deferred: Deferred.Deferred<ReadonlyArray<Answer>, RejectedError>
   }
 
   interface State {
@@ -129,12 +163,12 @@ export namespace Question {
   export interface Interface {
     readonly ask: (input: {
       sessionID: SessionID
-      questions: Info[]
-      tool?: { messageID: MessageID; callID: string }
-    }) => Effect.Effect<Answer[], RejectedError>
-    readonly reply: (input: { requestID: QuestionID; answers: Answer[] }) => Effect.Effect<void>
+      questions: ReadonlyArray<Info>
+      tool?: Tool
+    }) => Effect.Effect<ReadonlyArray<Answer>, RejectedError>
+    readonly reply: (input: { requestID: QuestionID; answers: ReadonlyArray<Answer> }) => Effect.Effect<void>
     readonly reject: (requestID: QuestionID) => Effect.Effect<void>
-    readonly list: () => Effect.Effect<Request[]>
+    readonly list: () => Effect.Effect<ReadonlyArray<Request>>
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/Question") {}
@@ -164,22 +198,48 @@ export namespace Question {
 
       const ask = Effect.fn("Question.ask")(function* (input: {
         sessionID: SessionID
-        questions: Info[]
-        tool?: { messageID: MessageID; callID: string }
+        questions: ReadonlyArray<Info>
+        tool?: Tool
       }) {
+        // Replies are mapped back by label string, so duplicate labels within
+        // a question would make answers ambiguous. Reject before publishing.
+        // Compare trimmed labels because the schema's `TrimmedString` will
+        // canonicalise " Yes " → "Yes" later — without trimming here, the
+        // raw-label dup check would let two visually-distinct options collide
+        // after decode and silently break reply()'s label→answer mapping.
+        for (const q of input.questions) {
+          const labels = q.options.map((o) => o.label.trim())
+          if (new Set(labels).size !== labels.length) {
+            return yield* Effect.die(
+              new Error(
+                `Question "${q.question}" has duplicate option labels (${labels.join(", ")}). Labels must be unique within a question.`,
+              ),
+            )
+          }
+        }
+
         const pending = (yield* InstanceState.get(state)).pending
         const id = QuestionID.ascending()
         log.info("asking", { id, questions: input.questions.length })
 
-        const deferred = yield* Deferred.make<Answer[], RejectedError>()
-        const info: Request = {
+        const deferred = yield* Deferred.make<ReadonlyArray<Answer>, RejectedError>()
+        const decoded = Schema.decodeUnknownSync(Request)({
           id,
           sessionID: input.sessionID,
           questions: input.questions,
           tool: input.tool,
-        }
+        })
+        // Snapshot once so the pending entry is decoupled from `input.questions`
+        // (the Request schema marks `questions`/`options` as mutable arrays, and
+        // bus subscribers + `list()` callers all hand out the same reference
+        // otherwise). Without this, anyone holding a published `info` could
+        // mutate `options.label` and silently break the reply() validation that
+        // checks against the original prompt.
+        const info = structuredClone(decoded)
         pending.set(id, { info, deferred })
-        yield* bus.publish(Event.Asked, info)
+        // Publish a fresh clone so subscribers can't reach back through the
+        // event payload to mutate the pending entry either.
+        yield* bus.publish(Event.Asked, structuredClone(info))
 
         return yield* Effect.ensuring(
           Deferred.await(deferred),
@@ -189,21 +249,98 @@ export namespace Question {
         )
       })
 
-      const reply = Effect.fn("Question.reply")(function* (input: { requestID: QuestionID; answers: Answer[] }) {
+      const reply = Effect.fn("Question.reply")(function* (input: {
+        requestID: QuestionID
+        answers: ReadonlyArray<Answer>
+      }) {
         const pending = (yield* InstanceState.get(state)).pending
         const existing = pending.get(input.requestID)
         if (!existing) {
           log.warn("reply for unknown request", { requestID: input.requestID })
           return
         }
+
+        // Validate the reply matches the pending question shape so a buggy
+        // client cannot resolve the deferred with malformed answers (wrong
+        // count, multi-select on single-select, or labels that were never
+        // offered). Falling back to Deferred.fail keeps callers responsive.
+        const questions = existing.info.questions
+        if (input.answers.length !== questions.length) {
+          log.warn("reply has wrong answer count", {
+            requestID: input.requestID,
+            expected: questions.length,
+            got: input.answers.length,
+          })
+          pending.delete(input.requestID)
+          yield* Deferred.fail(existing.deferred, new RejectedError())
+          return
+        }
+        // Trim every answer string so " " / "\t" can't masquerade as a real
+        // selection. The trimmed copy is what we validate AND what we resolve
+        // the deferred with — otherwise membership/multi-select checks would
+        // pass on the trimmed value but callers would still see the padded
+        // original.
+        const trimmedAnswers = input.answers.map((answer) => answer.map((label) => label.trim()))
+        for (let i = 0; i < questions.length; i++) {
+          const q = questions[i]!
+          const rawAnswer = trimmedAnswers[i]!
+          // Drop entries that became empty after trimming so [" "] and [""]
+          // are treated as "no choice was made" instead of resolving with a
+          // bogus blank selection.
+          const answer = rawAnswer.filter((label) => label.length > 0)
+          trimmedAnswers[i] = answer
+          // An empty answer array means "no choice was made" — that path
+          // belongs to reject(), not reply(). Allowing it here would resolve
+          // the deferred with `[]` so callers see a "successful" reply with
+          // no selection, indistinguishable from a real answer that happens
+          // to be empty.
+          if (answer.length === 0) {
+            log.warn("empty or whitespace-only answer for question", {
+              requestID: input.requestID,
+              index: i,
+            })
+            pending.delete(input.requestID)
+            yield* Deferred.fail(existing.deferred, new RejectedError())
+            return
+          }
+          if (!q.multiple && answer.length > 1) {
+            log.warn("multiple answers to single-select question", {
+              requestID: input.requestID,
+              index: i,
+              answer,
+            })
+            pending.delete(input.requestID)
+            yield* Deferred.fail(existing.deferred, new RejectedError())
+            return
+          }
+          const validLabels = new Set(q.options.map((o) => o.label))
+          // `custom` defaults to true; only enforce label membership when the
+          // question explicitly disallows custom answers.
+          if (q.custom === false) {
+            for (const label of answer) {
+              if (!validLabels.has(label)) {
+                log.warn("answer label not in question options", {
+                  requestID: input.requestID,
+                  index: i,
+                  label,
+                  validLabels: [...validLabels],
+                })
+                pending.delete(input.requestID)
+                yield* Deferred.fail(existing.deferred, new RejectedError())
+                return
+              }
+            }
+          }
+        }
+
         pending.delete(input.requestID)
-        log.info("replied", { requestID: input.requestID, answers: input.answers })
+        log.info("replied", { requestID: input.requestID, answers: trimmedAnswers })
         yield* bus.publish(Event.Replied, {
           sessionID: existing.info.sessionID,
           requestID: existing.info.id,
-          answers: input.answers,
+          answers: trimmedAnswers.map((a) => [...a]),
         })
-        yield* Deferred.succeed(existing.deferred, input.answers)
+        yield* Deferred.succeed(existing.deferred, trimmedAnswers)
       })
 
       const reject = Effect.fn("Question.reject")(function* (requestID: QuestionID) {
@@ -224,7 +361,9 @@ export namespace Question {
 
       const list = Effect.fn("Question.list")(function* () {
         const pending = (yield* InstanceState.get(state)).pending
-        return Array.from(pending.values(), (x) => x.info)
+        // Hand callers a clone so they can't mutate the stored snapshot
+        // (questions/options are typed as mutable arrays).
+        return Array.from(pending.values(), (x) => structuredClone(x.info))
       })
 
       return Service.of({ ask, reply, reject, list })

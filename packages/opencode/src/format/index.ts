@@ -27,7 +27,7 @@ export namespace Format {
   export interface Interface {
     readonly init: () => Effect.Effect<void>
     readonly status: () => Effect.Effect<Status[]>
-    readonly file: (filepath: string) => Effect.Effect<void>
+    readonly file: (filepath: string) => Effect.Effect<boolean>
   }
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/Format") {}
@@ -106,16 +106,21 @@ export namespace Format {
                 }
               }),
             )
-            return checks.filter((x) => x.cmd).map((x) => ({ item: x.item, cmd: x.cmd! }))
+            return checks
+              .filter((x): x is { item: Formatter.Info; cmd: string[] } => Array.isArray(x.cmd))
+              .map((x) => ({ item: x.item, cmd: x.cmd }))
           }
 
           function formatFile(filepath: string) {
             return Effect.gen(function* () {
               log.info("formatting", { file: filepath })
               const ext = path.extname(filepath)
+              const formatters = yield* Effect.promise(() => getFormatter(ext))
 
-              for (const { item, cmd } of yield* Effect.promise(() => getFormatter(ext))) {
-                if (cmd === false) continue
+              if (!formatters.length) return false
+
+              let ran = false
+              for (const { item, cmd } of formatters) {
                 log.info("running", { command: cmd })
                 const replaced = cmd.map((x) => x.replace("$FILE", filepath))
                 const dir = yield* InstanceState.directory
@@ -147,8 +152,11 @@ export namespace Format {
                     command: cmd,
                     ...item.environment,
                   })
+                  continue
                 }
+                ran = true
               }
+              return ran
             })
           }
 
@@ -182,7 +190,7 @@ export namespace Format {
 
       const file = Effect.fn("Format.file")(function* (filepath: string) {
         const { formatFile } = yield* InstanceState.get(state)
-        yield* formatFile(filepath)
+        return yield* formatFile(filepath)
       })
 
       return Service.of({ init, status, file })

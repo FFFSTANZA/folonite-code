@@ -33,7 +33,8 @@ import { Permission } from "../permission"
 import { Glob } from "../util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Schema } from "effect"
+import { ZodOverride } from "@/util/effect-zod"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -46,7 +47,7 @@ import { Question } from "../question"
 import { Todo } from "../session/todo"
 import { LSP } from "../lsp"
 import { Instruction } from "../session/instruction"
-import { AppFileSystem } from "../filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Bus } from "../bus"
 import { Agent } from "../agent/agent"
 import { Skill } from "../skill"
@@ -141,10 +142,17 @@ export namespace ToolRegistry {
           const custom: Tool.Def[] = []
 
           function fromPlugin(id: string, def: ToolDefinition): Tool.Def {
+            // Plugin tools define their args as a raw Zod shape. Wrap the derived
+            // Zod object in `Schema.declare` so it slots into the Schema-typed
+            // framework, and annotate with `ZodOverride` so the walker emits the
+            // original Zod for LLM JSON Schema generation.
+            const zodParams = z.object(def.args)
+            const parameters = Schema.declare<unknown>((u): u is unknown => zodParams.safeParse(u).success).annotate({
+              [ZodOverride]: zodParams,
+            })
             return {
               id,
-              // @ts-expect-error - Plugin tools register Zod params; PawWork plugin loader keeps Zod
-              parameters: z.object(def.args),
+              parameters,
               description: def.description,
               execute: (args, toolCtx) =>
                 Effect.gen(function* () {
@@ -247,7 +255,6 @@ export namespace ToolRegistry {
             code: Tool.init(codesearch),
             skill: Tool.init(skilltool),
             patch: Tool.init(patchtool),
-            // @ts-expect-error - QuestionTool uses Zod params; PawWork question/index keeps Zod
             question: Tool.init(question),
             lsp: Tool.init(lsptool),
             plan: Tool.init(plan),

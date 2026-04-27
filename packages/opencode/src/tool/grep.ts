@@ -1,9 +1,8 @@
-import z from "zod"
-import { Effect, Fiber, Option } from "effect"
+import { Effect, Fiber, Option, Schema } from "effect"
 import * as Stream from "effect/Stream"
 import * as Tool from "./tool"
 import { InstanceState } from "@/effect"
-import { AppFileSystem } from "@/filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Ripgrep } from "../file/ripgrep"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
@@ -20,21 +19,26 @@ function ripgrepEnv() {
   } satisfies NodeJS.ProcessEnv
 }
 
+export const Parameters = Schema.Struct({
+  pattern: Schema.String.annotate({ description: "The regex pattern to search for in file contents" }),
+  path: Schema.optional(Schema.String).annotate({
+    description: "The directory to search in. Defaults to the current working directory.",
+  }),
+  include: Schema.optional(Schema.String).annotate({
+    description: 'File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")',
+  }),
+})
+
 export const GrepTool = Tool.define(
   "grep",
-  // @ts-expect-error - Zod params accepted at runtime; PawWork keeps grep on Zod for its Ripgrep adapter
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner
     const fs = yield* AppFileSystem.Service
 
     return {
       description: DESCRIPTION,
-      parameters: z.object({
-        pattern: z.string().describe("The regex pattern to search for in file contents"),
-        path: z.string().optional().describe("The directory to search in. Defaults to the current working directory."),
-        include: z.string().optional().describe('File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")'),
-      }),
-      execute: (params: { pattern: string; path?: string; include?: string }, ctx: Tool.Context) =>
+      parameters: Parameters,
+      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
           const empty = {
             title: params.pattern,

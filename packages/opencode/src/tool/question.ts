@@ -1,31 +1,33 @@
-import z from "zod"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import * as Tool from "./tool"
 import { Question } from "../question"
 import DESCRIPTION from "./question.txt"
 
-const parameters = z.object({
-  questions: z
-    .array(Question.Prompt)
-    .min(1, "Provide at least one question.")
-    .max(4, "Ask at most 4 questions per invocation. If you have more, split into multiple tool calls or stream context first.")
-    .describe("Questions to ask (1–4)"),
+export const Parameters = Schema.Struct({
+  questions: Schema.mutable(Schema.Array(Question.Prompt))
+    .check(Schema.isMinLength(1, { message: "Provide at least one question." }))
+    .check(
+      Schema.isMaxLength(4, {
+        message:
+          "Ask at most 4 questions per invocation. If you have more, split into multiple tool calls or stream context first.",
+      }),
+    )
+    .annotate({ description: "Questions to ask (1–4)" }),
 })
 
 type Metadata = {
   answers: ReadonlyArray<Question.Answer>
 }
 
-// @ts-expect-error - Zod params accepted at runtime; Question.Prompt stays Zod-typed for PawWork's question namespace
-export const QuestionTool = Tool.define<typeof parameters, Metadata, Question.Service>(
+export const QuestionTool = Tool.define<typeof Parameters, Metadata, Question.Service>(
   "question",
   Effect.gen(function* () {
     const question = yield* Question.Service
 
     return {
       description: DESCRIPTION,
-      parameters,
-      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context<Metadata>) =>
+      parameters: Parameters,
+      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<Metadata>) =>
         Effect.gen(function* () {
           const answers = yield* question.ask({
             sessionID: ctx.sessionID,
