@@ -142,13 +142,22 @@ export namespace SessionDiagnostics {
     return { summary: `${target.kind}:${hash(target.value.trim())}`, isFallback: false }
   }
 
+  // Coerce `unknown` to a single trimmed first line — used by errorFingerprint and the loop
+  // renderer's stop-message extraction. Returns "" for nullish/empty.
+  export function firstLine(value: unknown): string {
+    if (value === undefined || value === null) return ""
+    const message = typeof value === "string" ? value : value instanceof Error ? value.message : String(value)
+    return (
+      message
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .find(Boolean) ?? ""
+    )
+  }
+
   export function errorFingerprint(error: unknown) {
-    const message = typeof error === "string" ? error : error instanceof Error ? error.message : String(error)
-    const line = message
-      .split(/\r?\n/)
-      .map((item) => item.trim())
-      .find(Boolean)
-    const normalized = (line ?? "")
+    const line = firstLine(error)
+    const normalized = line
       .toLowerCase()
       .replace(/https?:\/\/\S+/g, "<url>")
       .replace(/['"`][^'"`]*['"`]/g, "<quoted>")
@@ -413,6 +422,12 @@ export namespace SessionDiagnostics {
     const inputKey = `input:${tool}:${inputHash}`
     const targetKey = targetHash ? `target:${tool}:${targetHash}` : null
 
+    // Iteration order is intentional: target is checked first because the spec treats
+    // same_target as the more general signal (the model is hitting the same goal in
+    // different ways). When same_input and same_target both reach threshold, we fire on
+    // the target sigKey only; the input sigKey's blockEmitted stays false. This is fine
+    // in practice because same_input ⊆ same_target (same input always has same target),
+    // so the model can't evade by varying targets without also changing input.
     for (const sigKey of [targetKey, inputKey] as const) {
       if (!sigKey) continue
       const s = state.signatures[sigKey]
@@ -489,6 +504,11 @@ export namespace SessionDiagnostics {
     const lines: string[] = ["<system-reminder>"]
     const sawInput = pending.some((r) => r.key.startsWith("input:"))
     const sawTarget = pending.some((r) => r.key.startsWith("target:"))
+    // Backward-compat: v0 reminders persisted with `error:` (or other) prefixes. Without this
+    // fallback they get silently consumed (status flipped to "injected") with no model-facing
+    // text, which loses the warning entirely. Emit the legacy generic copy so old sessions still
+    // surface a reminder during migration.
+    const sawLegacy = pending.some((r) => !r.key.startsWith("input:") && !r.key.startsWith("target:"))
     if (sawInput) {
       lines.push(
         "Detected that you have repeated the same tool input 3 times. Do not call the same input again. Reuse the existing result, change strategy, or summarize the current blocker.",
@@ -497,6 +517,11 @@ export namespace SessionDiagnostics {
     if (sawTarget) {
       lines.push(
         "Detected that you have failed against the same target multiple times even though the errors differ. Do not keep retrying. Change approach, identify why the target is unreachable, or summarize the current blocker.",
+      )
+    }
+    if (sawLegacy && !sawInput && !sawTarget) {
+      lines.push(
+        "Detected that you have hit the same class of tool error multiple times. Do not keep retrying blindly. Identify the failure layer, change strategy, or summarize the current blocker.",
       )
     }
     lines.push("</system-reminder>")

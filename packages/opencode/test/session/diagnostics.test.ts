@@ -548,6 +548,59 @@ describe("SessionDiagnostics.consumeReminders", () => {
     expect(again.parts).toHaveLength(0)
   })
 
+  test("emits legacy copy as fallback for v0 error: prefix reminders", () => {
+    const part: MessageV2.ToolPart = {
+      id: PartID.make("prt_legacy"),
+      messageID: MessageID.make("msg_assistant_legacy"),
+      sessionID,
+      type: "tool",
+      tool: "github",
+      callID: "call_legacy",
+      state: {
+        status: "error",
+        input: { x: 1 },
+        error: "504",
+        metadata: {
+          diagnostics: {
+            loop: {
+              reminders: [
+                {
+                  key: "error:msg_user:github:abc",
+                  type: "error_repeat",
+                  status: "pending",
+                  count: 3,
+                  createdAt: 1,
+                },
+              ],
+            },
+          },
+        },
+        time: { start: 1, end: 2 },
+      },
+    }
+    const messages: MessageV2.WithParts[] = [
+      {
+        info: {
+          id: MessageID.make("msg_assistant_legacy"),
+          role: "assistant",
+          sessionID,
+          mode: "build",
+          agent: "build",
+          path: { cwd: "/tmp", root: "/tmp" },
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          modelID,
+          providerID,
+          parentID,
+          time: { created: 1 },
+        },
+        parts: [part],
+      },
+    ]
+    const result = SessionDiagnostics.consumeReminders({ messages, parentID, now: 10 })
+    expect(result.text).toContain("class of tool error")
+  })
+
   test("target reminder text describes same-target failures, not same-error class", () => {
     const part: MessageV2.ToolPart = {
       id: PartID.make("prt_target"),
