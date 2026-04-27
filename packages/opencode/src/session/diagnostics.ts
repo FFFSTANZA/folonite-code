@@ -5,7 +5,7 @@ import type { MessageID, SessionID } from "./schema"
 export namespace SessionDiagnostics {
   const NON_SEMANTIC_KEYS = new Set(["requestid", "request_id", "traceid", "trace_id", "nonce"])
 
-  export type ReminderType = "input_repeat" | "error_repeat"
+  export type ReminderType = "input_repeat" | "target_repeat" | "error_repeat"
   export type ReminderStatus = "pending" | "injected"
 
   export type Reminder = {
@@ -176,26 +176,10 @@ export namespace SessionDiagnostics {
     const summaryResult = targetSummary(input.tool, input.input)
     const summary = summaryResult.summary
     const targetHash = hash(summary)
-    const inputKey = `input:${input.parentID}:${input.tool}:${normalized.hash}`
     const inputRepeatCount =
       input.records.filter((record) => record.parentID === input.parentID && record.tool === input.tool && record.inputHash === normalized.hash).length + 1
     const targetRepeatCount =
       input.records.filter((record) => record.parentID === input.parentID && record.targetHash === targetHash).length + 1
-    const hasReminder = input.records.some((record) =>
-      record.metadata.diagnostics?.loop?.reminders?.some((reminder) => reminder.key === inputKey),
-    )
-    const reminders =
-      inputRepeatCount === 3 && !hasReminder
-        ? [
-            {
-              key: inputKey,
-              type: "input_repeat" as const,
-              status: "pending" as const,
-              count: inputRepeatCount,
-              createdAt: Date.now(),
-            },
-          ]
-        : []
 
     const record: ToolCallRecord = {
       sessionID: input.sessionID,
@@ -213,7 +197,7 @@ export namespace SessionDiagnostics {
             targetHashIsFallback: summaryResult.isFallback,
             targetRepeatCount,
             newTarget: targetRepeatCount === 1,
-            reminders,
+            reminders: [],
             modelID: input.modelID,
             providerID: input.providerID,
             agent: input.agent,
@@ -234,42 +218,127 @@ export namespace SessionDiagnostics {
     sessionID: SessionID
     parentID: MessageID
     tool: string
+    inputHash?: string
+    targetHash?: string
+    originalInput?: unknown
     error: unknown
   }) {
     const fingerprint = errorFingerprint(input.error)
-    const key = `error:${input.parentID}:${input.tool}:${fingerprint}`
-    const errorRepeatCount =
-      input.records.filter(
-        (record) =>
-          record.parentID === input.parentID && record.tool === input.tool && record.errorFingerprint === fingerprint,
-      ).length + 1
-    const hasReminder = input.records.some((record) =>
-      record.metadata.diagnostics?.loop?.reminders?.some((reminder) => reminder.key === key),
-    )
-    const reminders =
-      errorRepeatCount === 3 && !hasReminder
-        ? [
-            {
-              key,
-              type: "error_repeat" as const,
-              status: "pending" as const,
-              count: errorRepeatCount,
-              createdAt: Date.now(),
+
+    let effectiveInputHash = input.inputHash
+    if (!effectiveInputHash && input.originalInput !== undefined) {
+      effectiveInputHash = normalizeInput(input.originalInput).hash
+    }
+
+    // Recover targetHash symmetrically. If caller skipped both hashes (no inflight metadata)
+    // but did provide originalInput, recompute target the same way observeToolCall would —
+    // respecting `isFallback` so generic tools without a recognized target field still skip
+    // target tracking. Without this, target_repeat / gate escalation silently degrades to
+    // input-only tracking on the recovery path.
+    let effectiveTargetHash = input.targetHash
+    if (!effectiveTargetHash && input.originalInput !== undefined) {
+      const target = targetSummary(input.tool, input.originalInput)
+      if (!target.isFallback) effectiveTargetHash = hash(target.summary)
+    }
+
+    const lastInput = input.originalInput
+    const lastError =
+      typeof input.error === "string"
+        ? input.error
+        : input.error instanceof Error
+          ? input.error.message
+          : String(input.error)
+
+    if (!effectiveInputHash) {
+      const record: ToolErrorRecord = {
+        sessionID: input.sessionID,
+        parentID: input.parentID,
+        tool: input.tool,
+        inputHash: "",
+        errorFingerprint: fingerprint,
+        lastInput,
+        lastError,
+        metadata: {
+          diagnostics: {
+            loop: {
+              errorFingerprint: fingerprint,
+              reminders: [],
+              loopLastInput: lastInput,
+              loopLastError: lastError,
             },
-          ]
-        : []
+          },
+        },
+      }
+      return { record }
+    }
+
+    const real = input.records.filter(
+      (r) =>
+        r.parentID === input.parentID &&
+        r.tool === input.tool &&
+        r.metadata.diagnostics?.loop?.loopAction !== "block" &&
+        r.metadata.diagnostics?.loop?.loopAction !== "stop",
+    )
+
+    const candidates: Array<{
+      sigKey: string
+      kind: SignatureKind
+      matcher: (r: ToolErrorRecord) => boolean
+    }> = []
+    candidates.push({
+      sigKey: `input:${input.tool}:${effectiveInputHash}`,
+      kind: "input",
+      matcher: (r) => r.inputHash === effectiveInputHash,
+    })
+    if (effectiveTargetHash) {
+      const targetHash = effectiveTargetHash
+      candidates.push({
+        sigKey: `target:${input.tool}:${targetHash}`,
+        kind: "target",
+        matcher: (r) => r.targetHash === targetHash,
+      })
+    }
+
+    const newReminders: Reminder[] = []
+    const recoverFiredFor: string[] = []
+    for (const { sigKey, kind, matcher } of candidates) {
+      const completedFailures = real.filter(matcher).length + 1
+      const alreadyFired = real.some((r) =>
+        (r.metadata.diagnostics?.loop?.loopRecoverFiredFor ?? []).includes(sigKey),
+      )
+      if (completedFailures >= 3 && !alreadyFired) {
+        newReminders.push({
+          key: sigKey,
+          type: kind === "target" ? "target_repeat" : "input_repeat",
+          status: "pending",
+          count: completedFailures,
+          createdAt: Date.now(),
+        })
+        recoverFiredFor.push(sigKey)
+      }
+    }
+
+    const errorRepeatCount =
+      real.filter((r) => r.errorFingerprint === fingerprint).length + 1
+
     const record: ToolErrorRecord = {
       sessionID: input.sessionID,
       parentID: input.parentID,
       tool: input.tool,
-      inputHash: "",
+      inputHash: effectiveInputHash,
+      targetHash: effectiveTargetHash,
       errorFingerprint: fingerprint,
+      lastInput,
+      lastError,
       metadata: {
         diagnostics: {
           loop: {
             errorFingerprint: fingerprint,
             errorRepeatCount,
-            reminders,
+            reminders: newReminders,
+            loopRecoverFiredFor: recoverFiredFor.length ? recoverFiredFor : undefined,
+            loopLastInput: lastInput,
+            loopLastError: lastError,
           },
         },
       },
@@ -369,11 +438,18 @@ export namespace SessionDiagnostics {
   function findTarget(input: unknown): { kind: string; value: string } | undefined {
     if (!input || typeof input !== "object") return undefined
     const record = input as Record<string, unknown>
+    // Blank/whitespace strings would hash to a stable target across unrelated tool calls and
+    // poison same_target accumulation. Treat them as "no target" so loop detection skips
+    // target tracking instead of locking onto an empty signature.
     for (const key of ["url", "href"]) {
-      if (typeof record[key] === "string") return { kind: "url", value: record[key] }
+      const raw = record[key]
+      if (typeof raw === "string" && raw.trim().length > 0) return { kind: "url", value: raw }
     }
     for (const key of ["query", "search", "pattern", "path", "filePath", "filepath", "command", "cmd"]) {
-      if (typeof record[key] === "string") return { kind: key === "filePath" || key === "filepath" ? "path" : key, value: record[key] }
+      const raw = record[key]
+      if (typeof raw === "string" && raw.trim().length > 0) {
+        return { kind: key === "filePath" || key === "filepath" ? "path" : key, value: raw }
+      }
     }
     return undefined
   }

@@ -40,11 +40,10 @@ describe("SessionDiagnostics.normalizeInput", () => {
 })
 
 describe("SessionDiagnostics.observeToolCall", () => {
-  test("creates one pending reminder on the third repeated input in one user block", () => {
+  test("does not create reminders on repeated calls (firing moved to observeToolError)", () => {
     let records: SessionDiagnostics.ToolCallRecord[] = []
     const input = { url: "https://example.com/article" }
-
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const observed = SessionDiagnostics.observeToolCall({
         records,
         sessionID,
@@ -57,29 +56,9 @@ describe("SessionDiagnostics.observeToolCall", () => {
       })
       records = [...records, observed.record]
     }
-
-    const third = loop(records[2]!.metadata)
-    expect(third.inputRepeatCount).toBe(3)
-    expect(third.reminders).toHaveLength(1)
-    expect(third.reminders?.[0]).toMatchObject({
-      type: "input_repeat",
-      status: "pending",
-      count: 3,
-    })
-
-    const fourth = SessionDiagnostics.observeToolCall({
-      records,
-      sessionID,
-      parentID,
-      tool: "webfetch",
-      input,
-      agent: "build",
-      modelID,
-      providerID,
-    })
-
-    expect(loop(fourth.record.metadata).inputRepeatCount).toBe(4)
-    expect(loop(fourth.record.metadata).reminders ?? []).toHaveLength(0)
+    for (const record of records) {
+      expect(record.metadata.diagnostics?.loop?.reminders ?? []).toHaveLength(0)
+    }
   })
 
   test("does not count the same input across different user blocks", () => {
@@ -144,31 +123,163 @@ describe("SessionDiagnostics.observeToolCall", () => {
 })
 
 describe("SessionDiagnostics.observeToolError", () => {
-  test("normalizes equivalent error messages into one error reminder", () => {
-    let records: SessionDiagnostics.ToolErrorRecord[] = []
-
+  test("normalizes equivalent error messages so same_input fires once across error variants", () => {
+    const input = { url: "https://example.com/a" }
+    const records: SessionDiagnostics.ToolErrorRecord[] = []
     for (const error of [
-      "GitHub inline review failed: position 12 is outside diff",
-      "GitHub inline review failed: position 18 is outside diff",
-      "GitHub inline review failed: position 44 is outside diff",
+      new Error("Request failed: 504 (id 12345)"),
+      new Error("Request failed: 504 (id 67890)"),
+      new Error("Request failed: 504 (id abcdef)"),
     ]) {
       const observed = SessionDiagnostics.observeToolError({
         records,
         sessionID,
         parentID,
-        tool: "github",
+        tool: "webfetch",
+        inputHash: SessionDiagnostics.normalizeInput(input).hash,
+        targetHash: SessionDiagnostics.hash("url:" + SessionDiagnostics.hash("https://example.com/a")),
+        originalInput: input,
         error,
       })
-      records = [...records, observed.record]
+      records.push(observed.record)
     }
+    const fired = records.flatMap((r) => r.metadata.diagnostics?.loop?.loopRecoverFiredFor ?? [])
+    expect(fired.filter((k) => k.startsWith("input:"))).toHaveLength(1)
+  })
+})
 
-    const third = loop(records[2]!.metadata)
-    expect(third.errorRepeatCount).toBe(3)
-    expect(third.reminders?.[0]).toMatchObject({
-      type: "error_repeat",
-      status: "pending",
-      count: 3,
+const targetHashFor = (url: string) => SessionDiagnostics.hash("url:" + SessionDiagnostics.hash(url))
+const inputHashFor = (input: unknown) => SessionDiagnostics.normalizeInput(input).hash
+
+describe("SessionDiagnostics.observeToolError v1 firing", () => {
+  test("fires recover for both same_input and same_target on the third failure", () => {
+    const input = { url: "https://example.com/a" }
+    const records: SessionDiagnostics.ToolErrorRecord[] = []
+    for (let i = 0; i < 3; i++) {
+      const observed = SessionDiagnostics.observeToolError({
+        records,
+        sessionID,
+        parentID,
+        tool: "webfetch",
+        inputHash: inputHashFor(input),
+        targetHash: targetHashFor("https://example.com/a"),
+        originalInput: input,
+        error: new Error("404"),
+      })
+      records.push(observed.record)
+    }
+    const fired = records.flatMap((r) => r.metadata.diagnostics?.loop?.loopRecoverFiredFor ?? [])
+    expect(fired.filter((k) => k.startsWith("input:"))).toHaveLength(1)
+    expect(fired.filter((k) => k.startsWith("target:"))).toHaveLength(1)
+  })
+
+  test("persists raw lastInput and string lastError on every record", () => {
+    const input = { url: "https://example.com/a" }
+    const observed = SessionDiagnostics.observeToolError({
+      records: [],
+      sessionID,
+      parentID,
+      tool: "webfetch",
+      inputHash: inputHashFor(input),
+      targetHash: targetHashFor("https://example.com/a"),
+      originalInput: input,
+      error: new Error("404 Not Found"),
     })
+    expect(observed.record.lastInput).toEqual(input)
+    expect(typeof observed.record.lastError).toBe("string")
+    expect(observed.record.lastError as string).toContain("404")
+  })
+
+  test("does not fire same_target when targetHash absent", () => {
+    const records: SessionDiagnostics.ToolErrorRecord[] = []
+    for (let i = 0; i < 3; i++) {
+      const observed = SessionDiagnostics.observeToolError({
+        records,
+        sessionID,
+        parentID,
+        tool: "mystery",
+        inputHash: SessionDiagnostics.hash("x"),
+        targetHash: undefined,
+        originalInput: { foo: "bar" },
+        error: new Error("boom"),
+      })
+      records.push(observed.record)
+    }
+    const fired = records.flatMap((r) => r.metadata.diagnostics?.loop?.loopRecoverFiredFor ?? [])
+    expect(fired.some((k) => k.startsWith("target:"))).toBe(false)
+    expect(fired.filter((k) => k.startsWith("input:"))).toHaveLength(1)
+  })
+
+  test("labels input vs target reminders correctly via Reminder.type", () => {
+    const input = { url: "https://example.com/a" }
+    const records: SessionDiagnostics.ToolErrorRecord[] = []
+    for (let i = 0; i < 3; i++) {
+      const observed = SessionDiagnostics.observeToolError({
+        records,
+        sessionID,
+        parentID,
+        tool: "webfetch",
+        inputHash: inputHashFor(input),
+        targetHash: targetHashFor("https://example.com/a"),
+        originalInput: input,
+        error: new Error("404"),
+      })
+      records.push(observed.record)
+    }
+    const allReminders = records.flatMap((r) => r.metadata.diagnostics?.loop?.reminders ?? [])
+    const inputReminder = allReminders.find((r) => r.key.startsWith("input:"))
+    const targetReminder = allReminders.find((r) => r.key.startsWith("target:"))
+    expect(inputReminder?.type).toBe("input_repeat")
+    expect(targetReminder?.type).toBe("target_repeat")
+  })
+
+  test("recomputes inputHash from originalInput when in-flight metadata missing", () => {
+    const original = { url: "https://example.com/a" }
+    const records: SessionDiagnostics.ToolErrorRecord[] = []
+    for (let i = 0; i < 3; i++) {
+      const observed = SessionDiagnostics.observeToolError({
+        records,
+        sessionID,
+        parentID,
+        tool: "webfetch",
+        inputHash: undefined,
+        targetHash: undefined,
+        originalInput: original,
+        error: new Error("404"),
+      })
+      records.push(observed.record)
+    }
+    const fired = records.flatMap((r) => r.metadata.diagnostics?.loop?.loopRecoverFiredFor ?? [])
+    expect(fired.filter((k) => k.startsWith("input:"))).toHaveLength(1)
+  })
+
+  test("recomputes targetHash from originalInput when in-flight metadata missing", () => {
+    // Both hashes missing → recovery path. originalInput has a recognized url field, so
+    // target tracking must NOT silently degrade to input-only on the recovery path.
+    const original = { url: "https://example.com/a", q: "x" }
+    const records: SessionDiagnostics.ToolErrorRecord[] = []
+    for (let i = 0; i < 3; i++) {
+      // Vary a non-target field so input hashes differ but target stays stable; this is the
+      // exact scenario that's silently broken when targetHash recovery is missing.
+      const varied = { ...original, q: `q-${i}` }
+      const observed = SessionDiagnostics.observeToolError({
+        records,
+        sessionID,
+        parentID,
+        tool: "webfetch",
+        inputHash: undefined,
+        targetHash: undefined,
+        originalInput: varied,
+        error: new Error("404"),
+      })
+      records.push(observed.record)
+    }
+    const fired = records.flatMap((r) => r.metadata.diagnostics?.loop?.loopRecoverFiredFor ?? [])
+    expect(fired.filter((k) => k.startsWith("target:"))).toHaveLength(1)
+    // And the persisted record carries the recovered targetHash for future iterations.
+    const last = records[records.length - 1]
+    expect(typeof last?.targetHash).toBe("string")
+    expect(last?.targetHash).not.toBe("")
   })
 })
 
@@ -225,6 +336,18 @@ describe("SessionDiagnostics metadata helpers", () => {
     expect(summary).toMatch(/^custom:input:[a-f0-9]{16}$/)
     expect(summary).not.toContain("sensitive")
     expect(summary).not.toContain("secret-token")
+  })
+
+  test("blank/whitespace target fields fall back instead of poisoning a stable hash", () => {
+    // Empty string and whitespace-only would otherwise hash to a stable "url:..." token and
+    // make malformed inputs accumulate as same_target. Should be treated as "no target" and
+    // fall through to the generic input fallback.
+    const blankUrl = SessionDiagnostics.targetSummary("webfetch", { url: "" })
+    const wsPath = SessionDiagnostics.targetSummary("read", { filePath: "   " })
+    expect(blankUrl.isFallback).toBe(true)
+    expect(wsPath.isFallback).toBe(true)
+    expect(blankUrl.summary).not.toMatch(/^url:/)
+    expect(wsPath.summary).not.toMatch(/^path:/)
   })
 })
 
