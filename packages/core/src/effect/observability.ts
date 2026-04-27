@@ -5,6 +5,7 @@ import * as EffectLogger from "./logger"
 import { Flag } from "../flag/flag"
 import { InstallationChannel, InstallationVersion } from "../installation/version"
 import { ensureProcessMetadata } from "../util/opencode-process"
+import { Runtime } from "../runtime"
 
 const base = Flag.OTEL_EXPORTER_OTLP_ENDPOINT
 export const enabled = !!base
@@ -40,7 +41,7 @@ export function resource(): { serviceName: string; serviceVersion: string; attri
   })()
 
   return {
-    serviceName: "opencode",
+    serviceName: Runtime.appName(),
     serviceVersion: InstallationVersion,
     attributes: {
       ...attributes,
