@@ -27,6 +27,7 @@ import { Settings } from "@/settings"
 import { Log } from "@/util/log"
 import { LspTool } from "./lsp"
 import { Truncate } from "./truncate"
+import { WebSearchAuth } from "./websearch-auth"
 import { ApplyPatchTool } from "./apply_patch"
 import { Permission } from "../permission"
 import { Glob } from "../util/glob"
@@ -95,6 +96,7 @@ export namespace ToolRegistry {
     | Provider.Service
     | LSP.Service
     | Settings.Service
+    | WebSearchAuth.Service
     | Instruction.Service
     | AppFileSystem.Service
     | Bus.Service
@@ -386,6 +388,7 @@ export namespace ToolRegistry {
       Layer.provide(Provider.defaultLayer),
       Layer.provide(LSP.defaultLayer),
       Layer.provide(Settings.defaultLayer),
+      Layer.provide(WebSearchAuth.defaultLayer),
       Layer.provide(Instruction.defaultLayer),
       Layer.provide(AppFileSystem.defaultLayer),
       Layer.provide(Bus.layer),
