@@ -1,7 +1,6 @@
 export * as Npm from "./npm"
 
 import path from "path"
-import npa from "npm-package-arg"
 import { Effect, Schema, Context, Layer, Option, FileSystem } from "effect"
 import { NodeFileSystem } from "@effect/platform-node"
 import { AppFileSystem } from "./filesystem"
@@ -67,6 +66,16 @@ interface ArboristTree {
   edgesOut: Map<string, { to?: ArboristNode }>
 }
 
+const loadArborist = () => {
+  if (process.platform === "win32") {
+    // Bun on Windows lacks UV_FS_O_FILEMAP that tar uses for small-file IO.
+    // tar reads __FAKE_PLATFORM__ once on its module init, so set it before
+    // the first @npmcli/arborist import (which transitively loads tar).
+    process.env.__FAKE_PLATFORM__ = "linux"
+  }
+  return import("@npmcli/arborist")
+}
+
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -78,7 +87,7 @@ export const layer = Layer.effect(
     const reify = (input: { dir: string; add?: string[] }) =>
       Effect.gen(function* () {
         yield* flock.acquire(`npm-install:${input.dir}`)
-        const { Arborist } = yield* Effect.promise(() => import("@npmcli/arborist"))
+        const { Arborist } = yield* Effect.promise(loadArborist)
         const add = input.add ?? []
         const npmOptions = yield* NpmConfig.load(input.dir)
         const arborist = new Arborist({
@@ -112,16 +121,34 @@ export const layer = Layer.effect(
 
     const add = Effect.fn("Npm.add")(function* (pkg: string) {
       const dir = directory(pkg)
-      const name = (() => {
-        try {
-          return npa(pkg).name ?? pkg
-        } catch {
-          return pkg
-        }
-      })()
 
-      if (yield* afs.existsSafe(dir)) {
-        return resolveEntryPoint(name, path.join(dir, "node_modules", name))
+      // Only validate cached installs when the lockfile is present — bare cache
+      // dirs without package-lock.json mean reify never finished, so skip
+      // straight to a fresh reify rather than loading Arborist for nothing.
+      const lockExists = yield* afs.existsSafe(path.join(dir, "package-lock.json"))
+      if (lockExists) {
+        // existsSafe alone treats interrupted reifies and missing node_modules
+        // inner files as valid; arborist.loadVirtual reads and validates the
+        // package tree so corrupted caches fall through to a fresh reify.
+        const cached = yield* Effect.gen(function* () {
+          const { Arborist } = yield* Effect.promise(loadArborist)
+          const arb = new Arborist({
+            path: dir,
+            binLinks: true,
+            progress: false,
+            savePrefix: "",
+            ignoreScripts: true,
+          })
+          return yield* (Effect.tryPromise({
+            try: () => arb.loadVirtual(),
+            catch: () => null,
+          }) as Effect.Effect<ArboristTree | null, null>)
+        }).pipe(Effect.orElseSucceed(() => null as ArboristTree | null))
+
+        if (cached) {
+          const first = cached.edgesOut.values().next().value?.to
+          if (first) return resolveEntryPoint(first.name, first.path)
+        }
       }
 
       const tree = yield* reify({ dir, add: [pkg] })
