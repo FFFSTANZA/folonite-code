@@ -2,7 +2,7 @@ import path from "path"
 import z from "zod"
 import { Global } from "@opencode-ai/core/global"
 import { Effect, Layer, Context } from "effect"
-import { AppFileSystem } from "@/filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { makeRuntime } from "@/effect/run-service"
 
 export namespace McpAuth {

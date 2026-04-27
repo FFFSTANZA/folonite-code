@@ -8,7 +8,7 @@ import { SessionID, MessageID } from "../../src/session/schema"
 import { Truncate } from "../../src/tool/truncate"
 import { Agent } from "../../src/agent/agent"
 import { Ripgrep } from "../../src/file/ripgrep"
-import { AppFileSystem } from "../../src/filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import type { Permission } from "../../src/permission"
 
 const runtime = ManagedRuntime.make(

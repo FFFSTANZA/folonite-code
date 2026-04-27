@@ -2,7 +2,7 @@ import { NodePath } from "@effect/platform-node"
 import { Effect, Layer, Path, Schema, Context } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { withTransientReadRetry } from "@/util/effect-http-client"
-import { AppFileSystem } from "@/filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Global } from "../global"
 import { Log } from "@opencode-ai/core/util/log"
 
@@ -36,7 +36,7 @@ export namespace Discovery {
         const cache = path.join(Global.Path.cache, "skills")
 
         const download = Effect.fn("Discovery.download")(function* (url: string, dest: string) {
-          if (yield* fs.exists(dest).pipe(Effect.orDie)) return true
+          if (yield* fs.existsSafe(dest)) return true
 
           return yield* HttpClientRequest.get(url).pipe(
             http.execute,
@@ -96,7 +96,7 @@ export namespace Discovery {
                 )
 
                 const md = path.join(root, "SKILL.md")
-                return (yield* fs.exists(md).pipe(Effect.orDie)) ? root : null
+                return (yield* fs.existsSafe(md)) ? root : null
               }),
             { concurrency: skillConcurrency },
           )

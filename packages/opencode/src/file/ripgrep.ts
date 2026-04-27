@@ -12,7 +12,7 @@ import { NamedError } from "@opencode-ai/util/error"
 import { lazy } from "../util/lazy"
 
 import { Filesystem } from "../util/filesystem"
-import { AppFileSystem } from "../filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Process } from "../util/process"
 import { which } from "../util/which"
 import { text } from "node:stream/consumers"
