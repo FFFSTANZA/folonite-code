@@ -483,17 +483,17 @@ export namespace SessionDiagnostics {
     }
 
     if (!pending.length) return { parts }
-    const hasInputRepeat = pending.some((reminder) => reminder.type === "input_repeat")
-    const hasErrorRepeat = pending.some((reminder) => reminder.type === "error_repeat")
-    const lines = ["<system-reminder>"]
-    if (hasInputRepeat) {
+    const lines: string[] = ["<system-reminder>"]
+    const sawInput = pending.some((r) => r.key.startsWith("input:"))
+    const sawTarget = pending.some((r) => r.key.startsWith("target:"))
+    if (sawInput) {
       lines.push(
         "Detected that you have repeated the same tool input 3 times. Do not call the same input again. Reuse the existing result, change strategy, or summarize the current blocker.",
       )
     }
-    if (hasErrorRepeat) {
+    if (sawTarget) {
       lines.push(
-        "Detected that you have hit the same class of tool error multiple times. Do not keep retrying blindly. Identify the failure layer, change strategy, or summarize the current blocker.",
+        "Detected that you have failed against the same target multiple times even though the errors differ. Do not keep retrying. Change approach, identify why the target is unreachable, or summarize the current blocker.",
       )
     }
     lines.push("</system-reminder>")

@@ -493,4 +493,58 @@ describe("SessionDiagnostics.consumeReminders", () => {
     expect(again.text).toBeUndefined()
     expect(again.parts).toHaveLength(0)
   })
+
+  test("target reminder text describes same-target failures, not same-error class", () => {
+    const part: MessageV2.ToolPart = {
+      id: PartID.make("prt_target"),
+      messageID: MessageID.make("msg_assistant_t"),
+      sessionID,
+      type: "tool",
+      tool: "webfetch",
+      callID: "call_t",
+      state: {
+        status: "error",
+        input: { url: "https://example.com/a" },
+        error: "404",
+        metadata: {
+          diagnostics: {
+            loop: {
+              reminders: [
+                {
+                  key: "target:webfetch:abc",
+                  type: "target_repeat",
+                  status: "pending",
+                  count: 3,
+                  createdAt: 1,
+                },
+              ],
+            },
+          },
+        },
+        time: { start: 1, end: 2 },
+      },
+    }
+    const messages: MessageV2.WithParts[] = [
+      {
+        info: {
+          id: MessageID.make("msg_assistant_t"),
+          role: "assistant",
+          sessionID,
+          mode: "build",
+          agent: "build",
+          path: { cwd: "/tmp", root: "/tmp" },
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          modelID,
+          providerID,
+          parentID,
+          time: { created: 1 },
+        },
+        parts: [part],
+      },
+    ]
+    const result = SessionDiagnostics.consumeReminders({ messages, parentID, now: 10 })
+    expect(result.text).toContain("failed against the same target")
+    expect(result.text).not.toContain("class of tool error")
+  })
 })
