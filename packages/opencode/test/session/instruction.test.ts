@@ -749,6 +749,102 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     }
   })
 
+  test("sources() reports config.instructions URL in diagnostics regardless of fetch outcome", async () => {
+    // Acceptance criterion #7: URL contributions to system() must also appear in the
+    // diagnostic so prompt and diagnostic stay in lockstep. Uses an unreachable URL
+    // so the assertion accepts either fetch outcome deterministically.
+    const originalConfig = process.env.OPENCODE_CONFIG_CONTENT
+    await using fakeHome = await tmpdir()
+    await using pawworkConfig = await tmpdir()
+    await using globalTmp = await tmpdir()
+    await using projectTmp = await tmpdir()
+
+    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
+    process.env.OPENCODE_TEST_HOME = fakeHome.path
+    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
+    delete process.env.OPENCODE_CONFIG_DIR
+    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      instructions: ["http://127.0.0.1:1/never-listening.md"],
+    })
+    const originalGlobalConfig = Global.Path.config
+    ;(Global.Path as { config: string }).config = globalTmp.path
+
+    try {
+      await Instance.provide({
+        directory: projectTmp.path,
+        fn: () =>
+          run(
+            Instruction.Service.use((svc) =>
+              Effect.gen(function* () {
+                const sources = yield* svc.sources()
+                const url = "http://127.0.0.1:1/never-listening.md"
+                const urlEntry = sources.find((s) => s.path === url)
+                expect(urlEntry).toBeDefined()
+                if (urlEntry?.status === "considered") {
+                  expect(urlEntry.reason).toMatch(/fetch failed|empty body/)
+                }
+              }),
+            ),
+          ),
+      })
+    } finally {
+      ;(Global.Path as { config: string }).config = originalGlobalConfig
+      if (originalConfig === undefined) delete process.env.OPENCODE_CONFIG_CONTENT
+      else process.env.OPENCODE_CONFIG_CONTENT = originalConfig
+    }
+  })
+
+  test("sources() reports local file paths from config.instructions", async () => {
+    // Acceptance criterion #7 / parity with system(): non-URL config.instructions
+    // entries are glob-resolved into the system prompt; the diagnostic must mirror
+    // that so debugging reflects what the model actually sees.
+    const originalConfig = process.env.OPENCODE_CONFIG_CONTENT
+    await using fakeHome = await tmpdir()
+    await using pawworkConfig = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "rules", "extra.md"), "# PawWork Relative Instructions")
+      },
+    })
+    await using globalTmp = await tmpdir()
+    await using projectTmp = await tmpdir()
+
+    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
+    process.env.OPENCODE_TEST_HOME = fakeHome.path
+    process.env.OPENCODE_DISABLE_PROJECT_CONFIG = "1"
+    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
+    delete process.env.OPENCODE_CONFIG_DIR
+    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      instructions: ["rules/extra.md"],
+    })
+    const originalGlobalConfig = Global.Path.config
+    ;(Global.Path as { config: string }).config = globalTmp.path
+
+    try {
+      await Instance.provide({
+        directory: projectTmp.path,
+        fn: () =>
+          run(
+            Instruction.Service.use((svc) =>
+              Effect.gen(function* () {
+                const sources = yield* svc.sources()
+                const expected = path.resolve(path.join(pawworkConfig.path, "rules", "extra.md"))
+                const loaded = sources.find((s) => s.status === "loaded" && s.path === expected)
+                expect(loaded).toBeDefined()
+              }),
+            ),
+          ),
+      })
+    } finally {
+      ;(Global.Path as { config: string }).config = originalGlobalConfig
+      if (originalConfig === undefined) delete process.env.OPENCODE_CONFIG_CONTENT
+      else process.env.OPENCODE_CONFIG_CONTENT = originalConfig
+    }
+  })
+
   test("ignores ~/.claude/CLAUDE.md global fallback in PawWork runtime mode", async () => {
     // Verifies acceptance criterion #5 of issue #230: PawWork no longer falls back
     // to global ~/.claude/CLAUDE.md as an instruction source. Project-level CLAUDE.md

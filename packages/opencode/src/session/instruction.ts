@@ -1,4 +1,3 @@
-import os from "os"
 import path from "path"
 import { Effect, Layer, Context } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
@@ -173,7 +172,10 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         if (config.instructions) {
           for (const raw of config.instructions) {
             if (raw.startsWith("https://") || raw.startsWith("http://")) continue
-            const instruction = raw.startsWith("~/") ? path.join(os.homedir(), raw.slice(2)) : raw
+            // Route through Global.Path.home so systemPaths() and sources() agree on
+            // ~/ resolution; otherwise diagnostics could point at one path while the
+            // prompt reads from another.
+            const instruction = raw.startsWith("~/") ? path.join(Global.Path.home, raw.slice(2)) : raw
             const matches = yield* (
               path.isAbsolute(instruction)
                 ? fs.glob(path.basename(instruction), {
@@ -271,6 +273,56 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
           }
           const ok = yield* recordFileEntry(resolved)
           if (ok) globalLoaded = true
+        }
+
+        // Local file entries from config.instructions: glob-resolve them the same way
+        // systemPaths() does so the diagnostic includes file-based config contributions,
+        // not just URLs. Empty/unreadable matches are downgraded to considered so
+        // diagnostics agree with what system() actually loads.
+        const config = yield* cfg.get()
+        const localInstructions = (config.instructions ?? []).filter(
+          (item) => !item.startsWith("https://") && !item.startsWith("http://"),
+        )
+        for (const raw of localInstructions) {
+          const instruction = raw.startsWith("~/") ? path.join(Global.Path.home, raw.slice(2)) : raw
+          const matches = yield* (
+            path.isAbsolute(instruction)
+              ? fs.glob(path.basename(instruction), {
+                  cwd: path.dirname(instruction),
+                  absolute: true,
+                  include: "file",
+                })
+              : relative(instruction)
+          ).pipe(Effect.catch(() => Effect.succeed([] as string[])))
+          if (matches.length === 0) {
+            result.push({
+              status: "considered",
+              path: raw,
+              reason: "config.instructions entry resolved to no files",
+            })
+            continue
+          }
+          for (const match of matches) {
+            const resolved = path.resolve(match)
+            if (loadedPaths.has(resolved)) continue
+            yield* recordFileEntry(resolved)
+          }
+        }
+
+        // Remote instruction URLs from config.instructions: fetch concurrently to match
+        // system()'s 4-way concurrency, so a handful of dead URLs don't stack 5s timeouts
+        // and make sources() noticeably slower than the prompt build.
+        const urls = (config.instructions ?? []).filter(
+          (item) => item.startsWith("https://") || item.startsWith("http://"),
+        )
+        const bodies = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
+        for (const [index, url] of urls.entries()) {
+          const body = bodies[index]
+          if (body) {
+            result.push({ status: "loaded", path: url })
+          } else {
+            result.push({ status: "considered", path: url, reason: "fetch failed or returned empty body" })
+          }
         }
 
         // Explicitly ignored ~/.claude/CLAUDE.md: show reason so users understand why
