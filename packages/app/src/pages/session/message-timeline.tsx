@@ -28,11 +28,13 @@ import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSDK } from "@/context/sdk"
+import { useShellSurface } from "@/context/shell-surface"
 import { useSync } from "@/context/sync"
 import { messageAgentColor } from "@/utils/agent"
 import { sessionTitle } from "@/utils/session-title"
 import { parseCommentNote, readCommentMetadata } from "@/utils/comment-note"
 import { makeTimer } from "@solid-primitives/timer"
+import { webSearchRecoveryToast } from "./websearch-toasts"
 
 type MessageComment = {
   path: string
@@ -41,6 +43,14 @@ type MessageComment = {
     startLine: number
     endLine: number
   }
+}
+
+function isWebSearchToolPart(part: Part): part is Extract<Part, { type: "tool" }> {
+  return part.type === "tool" && part.tool === "websearch"
+}
+
+function isPendingWebSearchToolPart(part: Part) {
+  return isWebSearchToolPart(part) && (part.state.status === "pending" || part.state.status === "running")
 }
 
 const emptyMessages: MessageType[] = []
@@ -232,6 +242,7 @@ export function MessageTimeline(props: {
   const settings = useSettings()
   const dialog = useDialog()
   const language = useLanguage()
+  const shellSurface = useShellSurface()
   const { params, sessionKey } = useSessionKey()
   const platform = usePlatform()
   const server = useServer()
@@ -246,6 +257,46 @@ export function MessageTimeline(props: {
     const id = sessionID()
     if (!id) return emptyMessages
     return sync.data.message[id] ?? emptyMessages
+  })
+  const webSearchToastSurfaced = new Set<string>()
+  const webSearchPartCursor = new Map<string, number>()
+  const webSearchPendingParts = new Map<string, Set<string>>()
+  let webSearchToastSessionID: string | undefined
+
+  createEffect(() => {
+    const id = sessionID()
+    if (id !== webSearchToastSessionID) {
+      webSearchToastSessionID = id
+      webSearchToastSurfaced.clear()
+      webSearchPartCursor.clear()
+      webSearchPendingParts.clear()
+    }
+    for (const message of sessionMessages()) {
+      const parts = sync.data.part[message.id] ?? []
+      const start = webSearchPartCursor.get(message.id) ?? 0
+      const pending = webSearchPendingParts.get(message.id) ?? new Set<string>()
+      const candidates = [...parts.slice(start), ...parts.slice(0, start).filter((part) => pending.has(part.id))]
+      for (const part of candidates) {
+        if (isPendingWebSearchToolPart(part)) pending.add(part.id)
+        else pending.delete(part.id)
+        const toast = webSearchRecoveryToast(part, { surfaced: webSearchToastSurfaced })
+        if (!toast) continue
+        showToast({
+          title: language.t(toast.titleKey),
+          description: language.t(toast.descriptionKey),
+          variant: "error",
+          actions: [
+            {
+              label: language.t(toast.actionKey),
+              onClick: () => shellSurface.openSettings(),
+            },
+          ],
+        })
+      }
+      webSearchPartCursor.set(message.id, parts.length)
+      if (pending.size > 0) webSearchPendingParts.set(message.id, pending)
+      else webSearchPendingParts.delete(message.id)
+    }
   })
   const pending = createMemo(() => {
     const messages = sessionMessages() ?? emptyMessages
