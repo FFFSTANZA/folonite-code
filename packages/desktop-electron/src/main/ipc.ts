@@ -206,6 +206,49 @@ export function registerIpcHandlers(deps: Deps) {
     }
   })
 
+  ipcMain.handle("websearch-set-enabled", async (_event: IpcMainInvokeEvent, value: boolean) => {
+    const { Settings, ToolRegistry, Instance } = await import("virtual:opencode-server")
+    const previous = await Settings.webSearchEnabled()
+    await Settings.setWebSearchEnabled(value)
+    const directories = Instance.directories()
+    const results = await Promise.allSettled(
+      directories.map((directory) =>
+        Instance.provide({
+          directory,
+          fn: () => ToolRegistry.invalidate(),
+        }),
+      ),
+    )
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") {
+        console.warn("websearch-set-enabled failed for instance", {
+          directory: directories[index],
+          error: result.reason,
+        })
+      }
+    }
+    const failures = results.filter((result) => result.status === "rejected")
+    if (failures.length > 0) {
+      await Settings.setWebSearchEnabled(previous)
+      throw new Error(`Failed to refresh Web Search tools in ${failures.length} project instance(s)`)
+    }
+  })
+
+  ipcMain.handle("websearch-status", async () => {
+    const { WebSearchAuth } = await import("virtual:opencode-server")
+    return WebSearchAuth.status()
+  })
+
+  ipcMain.handle("websearch-save-exa-key", async (_event: IpcMainInvokeEvent, key: string) => {
+    const { WebSearchAuth } = await import("virtual:opencode-server")
+    return WebSearchAuth.saveKey(key)
+  })
+
+  ipcMain.handle("websearch-remove-exa-key", async () => {
+    const { WebSearchAuth } = await import("virtual:opencode-server")
+    return WebSearchAuth.removeKey()
+  })
+
   ipcMain.handle(
     "open-directory-picker",
     async (_event: IpcMainInvokeEvent, opts?: { multiple?: boolean; title?: string; defaultPath?: string }) => {

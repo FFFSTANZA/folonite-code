@@ -22,6 +22,13 @@ export type WindowConfig = {
 
 export type LinuxDisplayBackend = "wayland" | "auto"
 
+export type WebSearchStatus = {
+  source: "saved" | "env" | "anonymous"
+  configured: boolean
+  needsAttention: boolean
+  quotaExceeded: boolean
+}
+
 export type AboutInfo = {
   version: string
   electronVersion: string
@@ -100,6 +107,10 @@ export type ElectronAPI = {
   installUpdate: () => Promise<void>
   setBackgroundColor: (color: string) => Promise<void>
   setLspEnabled: (value: boolean) => Promise<void>
+  setWebSearchEnabled: (value: boolean) => Promise<void>
+  webSearchStatus: () => Promise<WebSearchStatus>
+  saveExaApiKey: (key: string) => Promise<WebSearchStatus>
+  removeExaApiKey: () => Promise<WebSearchStatus>
   getAboutInfo: () => Promise<AboutInfo>
   onAboutOpen: (handler: () => void) => () => void
 }

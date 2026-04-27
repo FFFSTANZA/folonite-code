@@ -37,6 +37,20 @@ declare module "virtual:opencode-server" {
   export namespace Settings {
     export function setLspEnabled(value: boolean): Promise<void>
     export function lspEnabled(): Promise<boolean>
+    export function setWebSearchEnabled(value: boolean): Promise<void>
+    export function webSearchEnabled(): Promise<boolean>
+  }
+
+  export namespace WebSearchAuth {
+    export type Status = {
+      source: "saved" | "env" | "anonymous"
+      configured: boolean
+      needsAttention: boolean
+      quotaExceeded: boolean
+    }
+    export function status(): Promise<Status>
+    export function saveKey(key: string): Promise<Status>
+    export function removeKey(): Promise<Status>
   }
 
   export namespace LSP {
