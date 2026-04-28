@@ -144,7 +144,11 @@ export const useSessionHashScroll = (input: {
 
   createEffect(() => {
     const hash = location.hash
-    if (!hash) clearing = false
+    if (!hash) {
+      clearing = false
+    } else if (clearing) {
+      return
+    }
     if (!input.sessionID() || !input.messagesReady()) return
     cancel()
     queue(() => applyHash("auto"))
