@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
-import { createStableLayoutMemo } from "./session-layout"
+import { createStableLayoutMemo } from "./stable-layout-memo"
 
 describe("createStableLayoutMemo", () => {
   test("reuses the last value when a disposed memo turns empty", () => {
