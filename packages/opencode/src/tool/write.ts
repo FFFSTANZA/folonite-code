@@ -1,7 +1,7 @@
-import z from "zod"
+import { Schema } from "effect"
 import * as path from "path"
 import { Effect } from "effect"
-import { Tool } from "./tool"
+import * as Tool from "./tool"
 import { LSP } from "../lsp"
 import { createTwoFilesPatch } from "diff"
 import DESCRIPTION from "./write.txt"
@@ -9,12 +9,20 @@ import { Bus } from "../bus"
 import { File } from "../file"
 import { FileWatcher } from "../file/watcher"
 import { Format } from "../format"
-import { AppFileSystem } from "../filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Instance } from "../project/instance"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
+import * as Bom from "@/util/bom"
 
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
+
+export const Parameters = Schema.Struct({
+  content: Schema.String.annotate({ description: "The content to write to the file" }),
+  filePath: Schema.String.annotate({
+    description: "The absolute path to the file to write (must be absolute, not relative)",
+  }),
+})
 
 export const WriteTool = Tool.define(
   "write",
@@ -26,10 +34,7 @@ export const WriteTool = Tool.define(
 
     return {
       description: DESCRIPTION,
-      parameters: z.object({
-        content: z.string().describe("The content to write to the file"),
-        filePath: z.string().describe("The absolute path to the file to write (must be absolute, not relative)"),
-      }),
+      parameters: Parameters,
       execute: (params: { content: string; filePath: string }, ctx: Tool.Context) =>
         Effect.gen(function* () {
           const filepath = path.isAbsolute(params.filePath)
@@ -38,9 +43,18 @@ export const WriteTool = Tool.define(
           yield* assertExternalDirectoryEffect(ctx, filepath)
 
           const exists = yield* fs.existsSafe(filepath)
-          const contentOld = exists ? yield* fs.readFileString(filepath) : ""
+          const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }
+          const next = Bom.split(params.content)
+          // Only preserve the existing file's BOM. Letting `params.content`
+          // introduce a new BOM (or strip an existing one) would change file
+          // bytes in a way the diff preview cannot show, which can silently
+          // break shebangs and first-token parsing.
+          const desiredBom = source.bom
+          const bomChanged = source.bom !== next.bom
+          const contentOld = source.text
+          const contentNew = next.text
 
-          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
+          let diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, contentNew))
           yield* ctx.ask({
             permission: "edit",
             patterns: [path.relative(Instance.worktree, filepath)],
@@ -48,11 +62,19 @@ export const WriteTool = Tool.define(
             metadata: {
               filepath,
               diff,
+              ...(bomChanged && { bomDiscarded: true }),
             },
           })
 
-          yield* fs.writeWithDirs(filepath, params.content)
-          yield* format.file(filepath)
+          yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
+          let finalContent = contentNew
+          if (yield* format.file(filepath)) {
+            const synced = yield* Bom.syncFile(fs, filepath, desiredBom)
+            finalContent = synced
+            // Recompute the diff so the bus event / snapshot reflects the
+            // post-format on-disk content. Mirrors the same pattern in edit.ts.
+            diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, finalContent))
+          }
           yield* bus.publish(File.Event.Edited, { file: filepath })
           yield* bus.publish(FileWatcher.Event.Updated, {
             file: filepath,

@@ -8,7 +8,7 @@ import { Auth } from "../../src/auth"
 import { Config, ConfigManaged } from "../../src/config"
 import { ConfigPaths } from "../../src/config/paths"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
-import { AppFileSystem } from "../../src/filesystem"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { Global } from "../../src/global"
 import { Instance } from "../../src/project/instance"
 import { Filesystem } from "../../src/util/filesystem"
@@ -103,7 +103,7 @@ describe("default OpenCode config compatibility", () => {
       process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
       process.env.XDG_CONFIG_HOME = ${JSON.stringify(root.path)}
       const { ConfigPaths } = await import("./src/config/paths.ts")
-      const { AppFileSystem } = await import("./src/filesystem/index.ts")
+      const { AppFileSystem } = await import("@opencode-ai/core/filesystem")
       const { Effect } = await import("effect")
       const dirs = await Effect.runPromise(
         ConfigPaths.directories(${JSON.stringify(project)}, ${JSON.stringify(project)}).pipe(Effect.provide(AppFileSystem.defaultLayer)),

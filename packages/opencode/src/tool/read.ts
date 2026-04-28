@@ -1,15 +1,14 @@
-import z from "zod"
-import { Effect, Option } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { createReadStream } from "fs"
 import * as path from "path"
 import { createInterface } from "readline"
-import { Tool } from "./tool"
-import { AppFileSystem } from "../filesystem"
+import * as Tool from "./tool"
+import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import DESCRIPTION from "./read.txt"
 import { Instance } from "../project/instance"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
-import { isImageAttachment, isPdfAttachment, sniffAttachmentMime } from "../util/media"
+import { isImageAttachment, isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -20,10 +19,19 @@ const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB`
 const SAMPLE_BYTES = 4096
 
-const parameters = z.object({
-  filePath: z.string().describe("The absolute path to the file or directory to read"),
-  offset: z.coerce.number().describe("The line number to start reading from (1-indexed)").optional(),
-  limit: z.coerce.number().describe("The maximum number of lines to read (defaults to 2000)").optional(),
+// `offset` and `limit` were originally `z.coerce.number()` — the runtime
+// coercion was useful when the tool was called from a shell but serves no
+// purpose in the LLM tool-call path (the model emits typed JSON). The JSON
+// Schema output is identical (`type: "number"`), so the LLM view is
+// unchanged; purely CLI-facing uses must now send numbers rather than strings.
+export const Parameters = Schema.Struct({
+  filePath: Schema.String.annotate({ description: "The absolute path to the file or directory to read" }),
+  offset: Schema.optional(Schema.Number).annotate({
+    description: "The line number to start reading from (1-indexed)",
+  }),
+  limit: Schema.optional(Schema.Number).annotate({
+    description: "The maximum number of lines to read (defaults to 2000)",
+  }),
 })
 
 export const ReadTool = Tool.define(
@@ -73,21 +81,85 @@ export const ReadTool = Tool.define(
       ).pipe(Effect.map((items: string[]) => items.sort((a, b) => a.localeCompare(b))))
     })
 
-    const readSample = Effect.fn("ReadTool.sample")(function* (filepath: string, fileSize: number) {
+    const readSample = Effect.fn("ReadTool.readSample")(function* (
+      filepath: string,
+      fileSize: number,
+      sampleSize: number,
+    ) {
       if (fileSize === 0) return new Uint8Array()
 
       return yield* Effect.scoped(
         Effect.gen(function* () {
           const file = yield* fs.open(filepath, { flag: "r" })
-          const bytes = yield* file.readAlloc(Math.min(SAMPLE_BYTES, fileSize))
-          return Option.getOrElse(bytes, () => new Uint8Array())
+          return Option.getOrElse(yield* file.readAlloc(Math.min(sampleSize, fileSize)), () => new Uint8Array())
         }),
       )
     })
 
-    const run = Effect.fn("ReadTool.execute")(function* (params: z.infer<typeof parameters>, ctx: Tool.Context) {
-      if (params.offset !== undefined && params.offset < 1) {
-        return yield* Effect.fail(new Error("offset must be greater than or equal to 1"))
+    const isBinaryByExt = (filepath: string) => {
+      const ext = path.extname(filepath).toLowerCase()
+      switch (ext) {
+        case ".zip":
+        case ".tar":
+        case ".gz":
+        case ".exe":
+        case ".dll":
+        case ".so":
+        case ".class":
+        case ".jar":
+        case ".war":
+        case ".7z":
+        case ".doc":
+        case ".docx":
+        case ".xls":
+        case ".xlsx":
+        case ".ppt":
+        case ".pptx":
+        case ".odt":
+        case ".ods":
+        case ".odp":
+        case ".bin":
+        case ".dat":
+        case ".obj":
+        case ".o":
+        case ".a":
+        case ".lib":
+        case ".wasm":
+        case ".pyc":
+        case ".pyo":
+          return true
+      }
+      return false
+    }
+
+    // .bin and .dat are generic enough that they may carry renamed image/PDF
+    // attachments; allow the MIME sniffer to override the extension verdict.
+    const shouldSniffBeforeBinaryExt = (filepath: string) => {
+      const ext = path.extname(filepath).toLowerCase()
+      return ext === ".bin" || ext === ".dat"
+    }
+
+    const isBinaryByContent = (bytes: Uint8Array) => {
+      if (bytes.length === 0) return false
+      let nonPrintableCount = 0
+      for (let i = 0; i < bytes.length; i++) {
+        if (bytes[i] === 0) return true
+        if (bytes[i] < 9 || (bytes[i] > 13 && bytes[i] < 32)) {
+          nonPrintableCount++
+        }
+      }
+      return nonPrintableCount / bytes.length > 0.3
+    }
+
+    const run = Effect.fn("ReadTool.execute")(function* (
+      params: Schema.Schema.Type<typeof Parameters>,
+      ctx: Tool.Context,
+    ) {
+      if (params.offset !== undefined && (!Number.isInteger(params.offset) || params.offset < 1)) {
+        return yield* Effect.fail(new Error("offset must be a positive integer (>= 1)"))
+      }
+      if (params.limit !== undefined && (!Number.isInteger(params.limit) || params.limit < 1)) {
+        return yield* Effect.fail(new Error("limit must be a positive integer (>= 1)"))
       }
 
       let filepath = params.filePath
@@ -150,24 +222,25 @@ export const ReadTool = Tool.define(
 
       const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
 
+      // Reject obvious binary extensions before we even sample, except for the
+      // generic .bin / .dat that may carry renamed image/PDF attachments — those
+      // get sniffed by content first.
       if (isBinaryByExt(filepath) && !shouldSniffBeforeBinaryExt(filepath)) {
         return yield* Effect.fail(
           new Error(`Cannot read binary file (extension: ${path.extname(filepath).toLowerCase()}): ${filepath}`),
         )
       }
 
-      const sample = yield* readSample(filepath, Number(stat.size))
+      const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
       const mime = sniffAttachmentMime(sample, AppFileSystem.mimeType(filepath))
-      const isImage = isImageAttachment(mime)
-      const isPdf = isPdfAttachment(mime)
-      if (isImage || isPdf) {
+      if (isImageAttachment(mime) || isPdfAttachment(mime)) {
         if (Number(stat.size) > MAX_ATTACHMENT_BYTES) {
           return yield* Effect.fail(
             new Error(`Cannot read attachment larger than ${MAX_ATTACHMENT_BYTES_LABEL}: ${filepath}`),
           )
         }
-
-        const msg = `${isImage ? "Image" : "PDF"} read successfully`
+        const bytes = yield* fs.readFile(filepath)
+        const msg = isPdfAttachment(mime) ? "PDF read successfully" : "Image read successfully"
         return {
           title,
           output: msg,
@@ -180,13 +253,13 @@ export const ReadTool = Tool.define(
             {
               type: "file" as const,
               mime,
-              url: `data:${mime};base64,${Buffer.from(yield* fs.readFile(filepath)).toString("base64")}`,
+              url: `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`,
             },
           ],
         }
       }
 
-      if (isBinaryFile(filepath, sample)) {
+      if (isBinaryByContent(sample)) {
         return yield* Effect.fail(new Error(`Cannot read binary file (content inspection): ${filepath}`))
       }
 
@@ -199,7 +272,7 @@ export const ReadTool = Tool.define(
         )
       }
 
-      let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>" + "\n"].join("\n")
+      let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
       output += file.raw.map((line, i) => `${i + file.offset}: ${line}`).join("\n")
 
       const last = file.offset + file.raw.length - 1
@@ -231,8 +304,9 @@ export const ReadTool = Tool.define(
 
     return {
       description: DESCRIPTION,
-      parameters,
-      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context) => run(params, ctx).pipe(Effect.orDie),
+      parameters: Parameters,
+      execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
+        run(params, ctx).pipe(Effect.orDie),
     }
   }),
 )
@@ -279,64 +353,4 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
   }
 
   return { raw, count, cut, more, offset: opts.offset }
-}
-
-function isBinaryFile(filepath: string, sample: Uint8Array): boolean {
-  if (isBinaryByExt(filepath)) return true
-
-  if (sample.byteLength === 0) return false
-
-  let nonPrintableCount = 0
-  for (let i = 0; i < sample.byteLength; i++) {
-    if (sample[i] === 0) return true
-    if (sample[i] < 9 || (sample[i] > 13 && sample[i] < 32)) {
-      nonPrintableCount++
-    }
-  }
-  // If >30% non-printable characters, consider it binary
-  return nonPrintableCount / sample.byteLength > 0.3
-}
-
-function shouldSniffBeforeBinaryExt(filepath: string): boolean {
-  const ext = path.extname(filepath).toLowerCase()
-  // These common generic binary extensions may still contain renamed image/PDF attachments.
-  return ext === ".bin" || ext === ".dat"
-}
-
-function isBinaryByExt(filepath: string): boolean {
-  const ext = path.extname(filepath).toLowerCase()
-  // binary check for common non-text extensions
-  switch (ext) {
-    case ".zip":
-    case ".tar":
-    case ".gz":
-    case ".exe":
-    case ".dll":
-    case ".so":
-    case ".class":
-    case ".jar":
-    case ".war":
-    case ".7z":
-    case ".doc":
-    case ".docx":
-    case ".xls":
-    case ".xlsx":
-    case ".ppt":
-    case ".pptx":
-    case ".odt":
-    case ".ods":
-    case ".odp":
-    case ".bin":
-    case ".dat":
-    case ".obj":
-    case ".o":
-    case ".a":
-    case ".lib":
-    case ".wasm":
-    case ".pyc":
-    case ".pyo":
-      return true
-    default:
-      return false
-  }
 }

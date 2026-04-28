@@ -296,7 +296,7 @@ test("list - returns all pending requests", async () => {
           {
             question: "Question 1?",
             header: "Q1",
-            options: [{ label: "A", description: "A" }],
+            options: [{ label: "A", description: "A" }, { label: "B", description: "B" }],
           },
         ],
       })
@@ -307,7 +307,7 @@ test("list - returns all pending requests", async () => {
           {
             question: "Question 2?",
             header: "Q2",
-            options: [{ label: "B", description: "B" }],
+            options: [{ label: "B", description: "B" }, { label: "C", description: "C" }],
           },
         ],
       })
@@ -345,7 +345,7 @@ test("questions stay isolated by directory", async () => {
           {
             question: "Question 1?",
             header: "Q1",
-            options: [{ label: "A", description: "A" }],
+            options: [{ label: "A", description: "A" }, { label: "B", description: "B" }],
           },
         ],
       }),
@@ -360,7 +360,7 @@ test("questions stay isolated by directory", async () => {
           {
             question: "Question 2?",
             header: "Q2",
-            options: [{ label: "B", description: "B" }],
+            options: [{ label: "B", description: "B" }, { label: "C", description: "C" }],
           },
         ],
       }),
@@ -405,7 +405,7 @@ test("pending question rejects on instance dispose", async () => {
           {
             question: "Dispose me?",
             header: "Dispose",
-            options: [{ label: "Yes", description: "Yes" }],
+            options: [{ label: "Yes", description: "Yes" }, { label: "No", description: "No" }],
           },
         ],
       })
@@ -440,7 +440,7 @@ test("pending question rejects on instance reload", async () => {
           {
             question: "Reload me?",
             header: "Reload",
-            options: [{ label: "Yes", description: "Yes" }],
+            options: [{ label: "Yes", description: "Yes" }, { label: "No", description: "No" }],
           },
         ],
       })
