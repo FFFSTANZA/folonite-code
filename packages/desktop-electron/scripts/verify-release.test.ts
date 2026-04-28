@@ -10,6 +10,8 @@ import {
   normalizeTag,
   parseUpdaterFileUrls,
   readStartupLogFile,
+  releaseAssetNames,
+  releaseUpdaterAssetNames,
   verifyReleasePayload,
   verifyStartupLog,
   type GithubRelease,
@@ -81,6 +83,25 @@ describe("verify-release", () => {
     expect(() => normalizeTag("2026.4.28-hotfix.1")).toThrow("Invalid release tag")
   })
 
+  test("derives release and updater asset names from the CalVer version", () => {
+    expect(releaseAssetNames("2026.4.28")).toEqual([
+      "pawwork-mac-arm64-2026.4.28.dmg",
+      "pawwork-mac-arm64-2026.4.28.zip",
+      "pawwork-mac-arm64-2026.4.28.zip.blockmap",
+      "pawwork-mac-x64-2026.4.28.dmg",
+      "pawwork-mac-x64-2026.4.28.zip",
+      "pawwork-mac-x64-2026.4.28.zip.blockmap",
+      "pawwork-win-x64-2026.4.28.exe",
+      "pawwork-win-x64-2026.4.28.exe.blockmap",
+      "latest.yml",
+      "latest-mac.yml",
+    ])
+    expect(releaseUpdaterAssetNames("2026.4.28")).toEqual({
+      "latest.yml": ["pawwork-win-x64-2026.4.28.exe"],
+      "latest-mac.yml": ["pawwork-mac-arm64-2026.4.28.zip", "pawwork-mac-x64-2026.4.28.zip"],
+    })
+  })
+
   test("parses updater file urls and path entries", () => {
     expect(
       parseUpdaterFileUrls(`version: 2026.4.28
@@ -102,7 +123,12 @@ path: pawwork-mac-arm64-2026.4.28.zip
   - url: "pawwork-mac#arm64.zip"
     path: "pawwork-win-x64-2026.4.28.exe" # Windows updater asset
 `),
-    ).toEqual(["pawwork-mac-arm64-2026.4.28.zip", "pawwork-mac-x64-2026.4.28.zip", "pawwork-mac#arm64.zip", "pawwork-win-x64-2026.4.28.exe"])
+    ).toEqual([
+      "pawwork-mac-arm64-2026.4.28.zip",
+      "pawwork-mac-x64-2026.4.28.zip",
+      "pawwork-mac#arm64.zip",
+      "pawwork-win-x64-2026.4.28.exe",
+    ])
   })
 
   test("keeps inline comments outside escaped quoted values", () => {
@@ -129,7 +155,8 @@ path: pawwork-win-x64-2026.4.28.exe
     expect(
       verifyReleasePayload({
         release: baseRelease,
-        latestYml: "files:\n  - url: https://github.com/Astro-Han/pawwork/releases/download/v2026.4.28/pawwork-win-x64-2026.4.28.exe\n",
+        latestYml:
+          "files:\n  - url: https://github.com/Astro-Han/pawwork/releases/download/v2026.4.28/pawwork-win-x64-2026.4.28.exe\n",
         latestMacYml:
           "files:\n  - url: https://github.com/Astro-Han/pawwork/releases/download/v2026.4.28/pawwork-mac-arm64-2026.4.28.zip\n  - url: https://github.com/Astro-Han/pawwork/releases/download/v2026.4.28/pawwork-mac-x64-2026.4.28.zip\n",
       }),
@@ -164,7 +191,8 @@ path: pawwork-win-x64-2026.4.28.exe
       release: {
         ...baseRelease,
         assets: baseRelease.assets.filter(
-          (asset) => asset.name !== "pawwork-mac-arm64-2026.4.28.dmg" && asset.name !== "pawwork-win-x64-2026.4.28.exe.blockmap",
+          (asset) =>
+            asset.name !== "pawwork-mac-arm64-2026.4.28.dmg" && asset.name !== "pawwork-win-x64-2026.4.28.exe.blockmap",
         ),
       },
       latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
@@ -222,6 +250,16 @@ path: pawwork-win-x64-2026.4.28.exe
     expect(failures).toContain("latest.yml does not include pawwork-win-x64-2026.4.28.exe")
     expect(failures).toContain("latest-mac.yml does not include pawwork-mac-arm64-2026.4.28.zip")
     expect(failures).toContain("latest-mac.yml does not include pawwork-mac-x64-2026.4.28.zip")
+  })
+
+  test("reports invalid release tags in release payloads without throwing", () => {
+    expect(
+      verifyReleasePayload({
+        release: { ...baseRelease, tag_name: "v2026.4.28.1" },
+        latestYml: "",
+        latestMacYml: "",
+      }),
+    ).toEqual(["Invalid release tag: v2026.4.28.1. Expected vYYYY.M.D or YYYY.M.D."])
   })
 
   test("accepts a complete startup log for the release version", () => {
@@ -342,7 +380,7 @@ path: pawwork-win-x64-2026.4.28.exe
 `,
         "v",
       ),
-    ).toEqual(["Invalid release tag: v. Expected vX.Y.Z or X.Y.Z."])
+    ).toEqual(["Invalid release tag: v. Expected vYYYY.M.D or YYYY.M.D."])
   })
 
   test("reports invalid release tags with other startup failures", () => {
@@ -353,7 +391,7 @@ path: pawwork-win-x64-2026.4.28.exe
         "v",
       ),
     ).toEqual([
-      "Invalid release tag: v. Expected vX.Y.Z or X.Y.Z.",
+      "Invalid release tag: v. Expected vYYYY.M.D or YYYY.M.D.",
       "Latest startup log does not include server ready",
       "Latest startup log does not include loading task finished",
       "Latest startup log does not include init step done",

@@ -10,7 +10,11 @@ import { serializeAppUpdateConfig } from "./scripts/write-app-update-config"
 const roots: string[] = []
 type AfterPackContext = Parameters<Extract<NonNullable<Configuration["afterPack"]>, (...args: any[]) => unknown>>[0]
 
-function macAfterPackContext(appOutDir: string, appBundleName: string, electronPlatformName = "darwin"): AfterPackContext {
+function macAfterPackContext(
+  appOutDir: string,
+  appBundleName: string,
+  electronPlatformName = "darwin",
+): AfterPackContext {
   return {
     appOutDir,
     electronPlatformName,
@@ -50,6 +54,12 @@ describe("electron builder app-update config", () => {
     expect(createConfig("prod").mac?.extendInfo).toMatchObject({
       LSHasLocalizedDisplayName: true,
     })
+  })
+
+  test("all channels share the versioned artifact name", () => {
+    expect(createConfig("dev").artifactName).toBe("pawwork-${os}-${arch}-${version}.${ext}")
+    expect(createConfig("beta").artifactName).toBe("pawwork-${os}-${arch}-${version}.${ext}")
+    expect(createConfig("prod").artifactName).toBe("pawwork-${os}-${arch}-${version}.${ext}")
   })
 
   test("afterPack writes app-update.yml to the packager-reported macOS resources path", async () => {

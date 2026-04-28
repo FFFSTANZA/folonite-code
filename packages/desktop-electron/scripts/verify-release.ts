@@ -21,27 +21,41 @@ type VerificationInput = {
 const DEFAULT_REPO = "Astro-Han/pawwork"
 const FETCH_TIMEOUT_MS = 15_000
 
+const RELEASE_TARGETS = [
+  { os: "mac", arch: "arm64", installerExt: "dmg", updaterExt: "zip", metadata: "latest-mac.yml" },
+  { os: "mac", arch: "x64", installerExt: "dmg", updaterExt: "zip", metadata: "latest-mac.yml" },
+  { os: "win", arch: "x64", installerExt: "exe", updaterExt: "exe", metadata: "latest.yml" },
+] as const
+
+type MetadataFile = (typeof RELEASE_TARGETS)[number]["metadata"]
+
+function releaseTargetAssetName(target: (typeof RELEASE_TARGETS)[number], version: string, ext: string) {
+  return `pawwork-${target.os}-${target.arch}-${version}.${ext}`
+}
+
 export function releaseAssetNames(version: string) {
   return [
-    `pawwork-mac-arm64-${version}.dmg`,
-    `pawwork-mac-arm64-${version}.zip`,
-    `pawwork-mac-arm64-${version}.zip.blockmap`,
-    `pawwork-mac-x64-${version}.dmg`,
-    `pawwork-mac-x64-${version}.zip`,
-    `pawwork-mac-x64-${version}.zip.blockmap`,
-    `pawwork-win-x64-${version}.exe`,
-    `pawwork-win-x64-${version}.exe.blockmap`,
-    "latest.yml",
-    "latest-mac.yml",
+    ...new Set([
+      ...RELEASE_TARGETS.flatMap((target) => [
+        releaseTargetAssetName(target, version, target.installerExt),
+        releaseTargetAssetName(target, version, target.updaterExt),
+        `${releaseTargetAssetName(target, version, target.updaterExt)}.blockmap`,
+      ]),
+      "latest.yml",
+      "latest-mac.yml",
+    ]),
   ]
 }
 
-function windowsUpdaterAsset(version: string) {
-  return `pawwork-win-x64-${version}.exe`
-}
-
-function macUpdaterAssets(version: string) {
-  return [`pawwork-mac-arm64-${version}.zip`, `pawwork-mac-x64-${version}.zip`]
+export function releaseUpdaterAssetNames(version: string): Record<MetadataFile, string[]> {
+  return {
+    "latest.yml": RELEASE_TARGETS.filter((target) => target.metadata === "latest.yml").map((target) =>
+      releaseTargetAssetName(target, version, target.updaterExt),
+    ),
+    "latest-mac.yml": RELEASE_TARGETS.filter((target) => target.metadata === "latest-mac.yml").map((target) =>
+      releaseTargetAssetName(target, version, target.updaterExt),
+    ),
+  }
 }
 
 export function parseUpdaterFileUrls(source: string) {
@@ -77,7 +91,7 @@ function stripInlineComment(value: string) {
   for (let index = 0; index < value.length; index += 1) {
     const char = value[index]
     if ((char === `"` || char === `'`) && !isEscaped(value, index)) {
-      quote = quote === char ? undefined : quote ?? char
+      quote = quote === char ? undefined : (quote ?? char)
       continue
     }
 
@@ -171,7 +185,8 @@ export function verifyStartupLog(source: string, expectedTag: string) {
   }
   if (!hasPackagedStartup(startupLine)) failures.push("Latest startup log does not include packaged true")
   if (!hasServerReady(latest)) failures.push("Latest startup log does not include server ready")
-  if (!latest.includes("loading task finished")) failures.push("Latest startup log does not include loading task finished")
+  if (!latest.includes("loading task finished"))
+    failures.push("Latest startup log does not include loading task finished")
   if (!hasInitDone(latest)) failures.push("Latest startup log does not include init step done")
 
   return failures
@@ -180,26 +195,33 @@ export function verifyStartupLog(source: string, expectedTag: string) {
 export function verifyReleasePayload(input: VerificationInput) {
   const failures: string[] = []
   const assetNames = new Set(input.release.assets.map((asset) => asset.name))
-  const version = releaseVersion(input.release.tag_name)
+  let version: string | undefined
+  try {
+    version = releaseVersion(input.release.tag_name)
+  } catch (error) {
+    failures.push(error instanceof Error ? error.message : String(error))
+  }
 
   if (input.release.draft) failures.push(`Release ${input.release.tag_name} is still a draft`)
   if (input.release.prerelease) failures.push(`Release ${input.release.tag_name} is marked as a prerelease`)
 
-  for (const asset of releaseAssetNames(version)) {
-    if (!assetNames.has(asset)) failures.push(`Missing release asset: ${asset}`)
-  }
-
   const latestUrls = input.latestYml === undefined ? [] : parseUpdaterFileUrls(input.latestYml)
   verifyReferencedAssets("latest.yml", latestUrls, assetNames, failures)
-  const winUpdaterAsset = windowsUpdaterAsset(version)
-  if (!hasUpdaterEntry(latestUrls, winUpdaterAsset)) {
-    failures.push(`latest.yml does not include ${winUpdaterAsset}`)
-  }
-
   const latestMacUrls = input.latestMacYml === undefined ? [] : parseUpdaterFileUrls(input.latestMacYml)
   verifyReferencedAssets("latest-mac.yml", latestMacUrls, assetNames, failures)
-  for (const asset of macUpdaterAssets(version)) {
-    if (!hasUpdaterEntry(latestMacUrls, asset)) failures.push(`latest-mac.yml does not include ${asset}`)
+
+  if (version) {
+    for (const asset of releaseAssetNames(version)) {
+      if (!assetNames.has(asset)) failures.push(`Missing release asset: ${asset}`)
+    }
+
+    const updaterAssets = releaseUpdaterAssetNames(version)
+    for (const asset of updaterAssets["latest.yml"]) {
+      if (!hasUpdaterEntry(latestUrls, asset)) failures.push(`latest.yml does not include ${asset}`)
+    }
+    for (const asset of updaterAssets["latest-mac.yml"]) {
+      if (!hasUpdaterEntry(latestMacUrls, asset)) failures.push(`latest-mac.yml does not include ${asset}`)
+    }
   }
 
   if (input.startupLog !== undefined) failures.push(...verifyStartupLog(input.startupLog, input.release.tag_name))
@@ -209,8 +231,8 @@ export function verifyReleasePayload(input: VerificationInput) {
 
 export function normalizeTag(raw: string) {
   const normalized = raw.startsWith("v") ? raw : `v${raw}`
-  if (!/^v\d+\.\d+\.\d+$/.test(normalized)) {
-    throw new Error(`Invalid release tag: ${raw}. Expected vX.Y.Z or X.Y.Z.`)
+  if (!/^v\d{4}\.\d{1,2}\.\d{1,2}$/.test(normalized)) {
+    throw new Error(`Invalid release tag: ${raw}. Expected vYYYY.M.D or YYYY.M.D.`)
   }
   return normalized
 }
