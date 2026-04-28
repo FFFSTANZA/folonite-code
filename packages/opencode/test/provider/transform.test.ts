@@ -955,6 +955,40 @@ describe("ProviderTransform.schema - Moonshot/Kimi tool schemas", () => {
     expect(result.$defs.VariantOptions.description).toBe("Referenced schema description stays here.")
   })
 
+  test("preserves root definitions when sanitizing referenced schemas", () => {
+    const result = ProviderTransform.schema(
+      moonshotModel,
+      {
+        $ref: "#/$defs/VariantOptions",
+        description: "Moonshot rejects this sibling after ref expansion.",
+        $defs: {
+          VariantOptions: {
+            type: "object",
+            properties: {
+              value: {
+                type: "string",
+              },
+            },
+          },
+        },
+      } as any,
+    ) as any
+
+    expect(result).toEqual({
+      $ref: "#/$defs/VariantOptions",
+      $defs: {
+        VariantOptions: {
+          type: "object",
+          properties: {
+            value: {
+              type: "string",
+            },
+          },
+        },
+      },
+    })
+  })
+
   test("also sanitizes Kimi models outside the Moonshot provider", () => {
     const result = ProviderTransform.schema(
       {

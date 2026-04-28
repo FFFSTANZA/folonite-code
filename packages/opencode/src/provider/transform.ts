@@ -1070,8 +1070,15 @@ export function schema(model: Provider.Model, schema: JSONSchema.BaseSchema | JS
     const sanitizeMoonshot = (obj: unknown): unknown => {
       if (obj === null || typeof obj !== "object") return obj
       if (Array.isArray(obj)) return obj.map(sanitizeMoonshot)
-      if ("$ref" in obj && typeof obj.$ref === "string") return { $ref: obj.$ref }
-      const result = Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, sanitizeMoonshot(value)]))
+      const result = Object.fromEntries(
+        Object.entries(obj).map(([key, value]) => [key, sanitizeMoonshot(value)]),
+      ) as Record<string, unknown>
+      if (typeof result.$ref === "string") {
+        const refOnly: Record<string, unknown> = { $ref: result.$ref }
+        if (result.$defs && typeof result.$defs === "object") refOnly.$defs = result.$defs
+        if (result.definitions && typeof result.definitions === "object") refOnly.definitions = result.definitions
+        return refOnly
+      }
       if (Array.isArray(result.items)) result.items = result.items[0] ?? {}
       return result
     }
