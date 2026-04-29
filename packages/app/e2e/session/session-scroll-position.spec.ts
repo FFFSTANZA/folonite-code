@@ -1,7 +1,13 @@
 import type { Page } from "@playwright/test"
 import { test, expect } from "../fixtures"
 import { withSession } from "../actions"
-import { promptSelector, sessionItemSelector, sessionMessageItemSelector, sessionTurnListSelector } from "../selectors"
+import {
+  promptSelector,
+  scrollViewportSelector,
+  sessionItemSelector,
+  sessionMessageItemSelector,
+  sessionTurnListSelector,
+} from "../selectors"
 import { createSdk } from "../utils"
 
 type Sdk = ReturnType<typeof createSdk>
@@ -15,10 +21,15 @@ type TimelineMetrics = {
   distanceFromBottom: number
 }
 
+type TimelineScrollSample = TimelineMetrics & {
+  at: number
+  url: string
+}
+
 function timelineMetrics(page: Page) {
-  return page.evaluate((turnListSelector) => {
+  return page.evaluate(({ scrollViewportSelector, turnListSelector }) => {
     const list = document.querySelector(turnListSelector)
-    const viewport = list?.closest(".scroll-view__viewport")
+    const viewport = list?.closest(scrollViewportSelector)
     if (!(viewport instanceof HTMLElement)) return null
     return {
       top: viewport.scrollTop,
@@ -26,7 +37,7 @@ function timelineMetrics(page: Page) {
       client: viewport.clientHeight,
       distanceFromBottom: viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop,
     }
-  }, sessionTurnListSelector) as Promise<TimelineMetrics | null>
+  }, { scrollViewportSelector, turnListSelector: sessionTurnListSelector }) as Promise<TimelineMetrics | null>
 }
 
 async function expectTimelineMetrics(page: Page) {
@@ -36,14 +47,92 @@ async function expectTimelineMetrics(page: Page) {
 }
 
 async function scrollTimelineToBottom(page: Page) {
-  const found = await page.evaluate((turnListSelector) => {
+  const found = await page.evaluate(({ scrollViewportSelector, turnListSelector }) => {
     const list = document.querySelector(turnListSelector)
-    const viewport = list?.closest(".scroll-view__viewport")
+    const viewport = list?.closest(scrollViewportSelector)
     if (!(viewport instanceof HTMLElement)) return false
     viewport.scrollTop = viewport.scrollHeight
     return true
-  }, sessionTurnListSelector)
+  }, { scrollViewportSelector, turnListSelector: sessionTurnListSelector })
   expect(found, "session timeline viewport should exist").toBe(true)
+}
+
+async function installTimelineScrollProbe(page: Page) {
+  await page.evaluate(
+    ({ maxSamples, scrollViewportSelector, turnListSelector }) => {
+      const read = () => {
+        const list = document.querySelector(turnListSelector)
+        const viewport = list?.closest(scrollViewportSelector)
+        if (!(viewport instanceof HTMLElement)) return null
+        return {
+          at: performance.now(),
+          url: window.location.href,
+          top: viewport.scrollTop,
+          height: viewport.scrollHeight,
+          client: viewport.clientHeight,
+          distanceFromBottom: viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop,
+        }
+      }
+      const changed = (a: NonNullable<ReturnType<typeof read>>, b: NonNullable<ReturnType<typeof read>>) =>
+        a.url !== b.url ||
+        a.top !== b.top ||
+        a.height !== b.height ||
+        a.client !== b.client ||
+        a.distanceFromBottom !== b.distanceFromBottom
+      const samples: NonNullable<ReturnType<typeof read>>[] = []
+      const push = () => {
+        const next = read()
+        if (!next) return
+        const prev = samples[samples.length - 1]
+        if (prev && !changed(prev, next)) return
+        if (samples.length < maxSamples) samples.push(next)
+      }
+      push()
+      let frame = requestAnimationFrame(function tick() {
+        push()
+        frame = requestAnimationFrame(tick)
+      })
+      const observer = new MutationObserver(push)
+      observer.observe(document.body, { childList: true, subtree: true })
+      const first = read()
+      const viewport = first
+        ? document.querySelector(turnListSelector)?.closest(scrollViewportSelector)
+        : undefined
+      if (viewport instanceof HTMLElement) viewport.addEventListener("scroll", push, { passive: true })
+      const win = window as typeof window & {
+        __opencode_e2e?: Record<string, unknown> & {
+          timelineScrollProbe?: { stop: () => unknown }
+        }
+      }
+      win.__opencode_e2e = {
+        ...(win.__opencode_e2e ?? {}),
+        timelineScrollProbe: {
+          stop() {
+            cancelAnimationFrame(frame)
+            observer.disconnect()
+            if (viewport instanceof HTMLElement) viewport.removeEventListener("scroll", push)
+            push()
+            delete win.__opencode_e2e?.timelineScrollProbe
+            return samples
+          },
+        },
+      }
+    },
+    { maxSamples: 256, scrollViewportSelector, turnListSelector: sessionTurnListSelector },
+  )
+}
+
+async function stopTimelineScrollProbe(page: Page) {
+  return page.evaluate(() => {
+    const win = window as typeof window & {
+      __opencode_e2e?: {
+        timelineScrollProbe?: { stop: () => unknown }
+      }
+    }
+    const probe = win.__opencode_e2e?.timelineScrollProbe
+    if (!probe) throw new Error("timeline scroll probe was not installed")
+    return probe.stop()
+  }) as Promise<TimelineScrollSample[]>
 }
 
 async function sendVisiblePrompt(input: { page: Page; text: string }) {
@@ -166,6 +255,60 @@ test("keeps the latest turn in view when sending from an old message hash", asyn
       items.map((item) => (item instanceof HTMLElement ? item.dataset.messageId : undefined)).filter(Boolean),
     )
     expect(rendered.at(-1)).not.toBe(oldID)
+  })
+})
+
+test("does not jump to the top after sending from an old message hash", async ({ page, project }) => {
+  test.setTimeout(120_000)
+
+  await project.open()
+  const sdk = project.sdk
+
+  await withSession(sdk, `e2e send top guard ${Date.now()}`, async (session) => {
+    project.trackSession(session.id)
+
+    await seedSessionTurns({ sdk, sessionID: session.id, count: 18 })
+
+    await project.gotoSession(session.id)
+    await expect(page.locator(sessionMessageItemSelector)).toHaveCount(INITIAL_SESSION_WINDOW_MESSAGES, {
+      timeout: 30_000,
+    })
+    await scrollTimelineToBottom(page)
+    await expect.poll(async () => (await expectTimelineMetrics(page)).distanceFromBottom).toBeLessThan(20)
+
+    const ids = await page.locator(sessionMessageItemSelector).evaluateAll((items) =>
+      items.map((item) => (item instanceof HTMLElement ? item.dataset.messageId : undefined)).filter(Boolean),
+    )
+    const oldID = ids[1]
+    if (!oldID) throw new Error("expected an older rendered message id")
+
+    await page.goto(`${page.url()}#message-${oldID}`)
+    await expect(page.locator(`#message-${oldID}`)).toBeVisible()
+    await expect.poll(async () => (await expectTimelineMetrics(page)).distanceFromBottom).toBeGreaterThan(100)
+
+    await installTimelineScrollProbe(page)
+    let samples: TimelineScrollSample[] = []
+    const sendStartedAt = await page.evaluate(() => performance.now())
+    try {
+      await sendVisiblePrompt({ page, text: `top guard ${Date.now()}` })
+      await expect.poll(() => page.url()).not.toContain("#message-")
+      await expect
+        .poll(async () => (await expectTimelineMetrics(page)).distanceFromBottom, { timeout: 30_000 })
+        .toBeLessThan(40)
+    } finally {
+      samples = await stopTimelineScrollProbe(page)
+    }
+
+    expect(samples.length).toBeGreaterThan(0)
+    const relevantSamples = samples.filter((sample) => sample.at >= sendStartedAt)
+    expect(relevantSamples.length).toBeGreaterThan(0)
+    const topJumps = relevantSamples.filter(
+      (sample) =>
+        sample.height > sample.client + 100 &&
+        sample.top < 20 &&
+        sample.distanceFromBottom > 100,
+    )
+    expect(topJumps).toEqual([])
   })
 })
 

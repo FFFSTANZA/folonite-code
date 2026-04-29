@@ -34,6 +34,22 @@ export function createAutoScroll(options: AutoScrollOptions) {
     return el.scrollHeight - el.clientHeight > 1
   }
 
+  const updateOverflowAnchor = (el: HTMLElement) => {
+    const mode = options.overflowAnchor ?? "dynamic"
+
+    if (mode === "none") {
+      el.style.overflowAnchor = "none"
+      return
+    }
+
+    if (mode === "auto") {
+      el.style.overflowAnchor = "auto"
+      return
+    }
+
+    el.style.overflowAnchor = store.userScrolled ? "auto" : "none"
+  }
+
   // Browsers can dispatch scroll events asynchronously. If new content arrives
   // between us calling `scrollTo()` and the subsequent `scroll` event firing,
   // the handler can see a non-zero `distanceFromBottom` and incorrectly assume
@@ -79,9 +95,13 @@ export function createAutoScroll(options: AutoScrollOptions) {
   const scrollToBottom = (force: boolean) => {
     if (!force && !active()) return
 
-    if (force && store.userScrolled) setStore("userScrolled", false)
-
     const el = store.scrollRef
+
+    if (force && store.userScrolled) {
+      setStore("userScrolled", false)
+      if (el) updateOverflowAnchor(el)
+    }
+
     if (!el) return
 
     if (!force && store.userScrolled) return
@@ -151,22 +171,6 @@ export function createAutoScroll(options: AutoScrollOptions) {
     if (selection && selection.toString().length > 0) {
       stop()
     }
-  }
-
-  const updateOverflowAnchor = (el: HTMLElement) => {
-    const mode = options.overflowAnchor ?? "dynamic"
-
-    if (mode === "none") {
-      el.style.overflowAnchor = "none"
-      return
-    }
-
-    if (mode === "auto") {
-      el.style.overflowAnchor = "auto"
-      return
-    }
-
-    el.style.overflowAnchor = store.userScrolled ? "auto" : "none"
   }
 
   createResizeObserver(
