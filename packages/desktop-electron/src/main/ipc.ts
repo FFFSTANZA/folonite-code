@@ -392,6 +392,32 @@ export function registerIpcHandlers(deps: Deps) {
     new Notification({ title, body }).show()
   })
 
+  const flashFrameTimers = new Map<number, ReturnType<typeof setTimeout>>()
+
+  ipcMain.handle("flash-frame", (event: IpcMainInvokeEvent) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+
+    if (process.platform === "darwin") {
+      // macOS: bounce the Dock icon once
+      app.dock?.bounce()
+    } else {
+      // Windows/Linux: flash the taskbar button
+      // Clear any existing timer for this window
+      const existing = flashFrameTimers.get(win.id)
+      if (existing !== undefined) clearTimeout(existing)
+
+      win.flashFrame(true)
+      flashFrameTimers.set(
+        win.id,
+        setTimeout(() => {
+          flashFrameTimers.delete(win.id)
+          if (!win.isDestroyed()) win.flashFrame(false)
+        }, 1000),
+      )
+    }
+  })
+
   ipcMain.handle("get-window-count", () => BrowserWindow.getAllWindows().length)
 
   ipcMain.handle("get-window-focused", (event: IpcMainInvokeEvent) => {
