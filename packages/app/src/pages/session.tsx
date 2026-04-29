@@ -59,6 +59,7 @@ import { emptyMessages, emptyUserMessages, readSessionMessages, readUserMessages
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { createSessionRunning } from "@/pages/session/session-running-state"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { nextTimelineSessionID } from "@/pages/session/timeline-session-state"
 import { deriveArtifactFiles, nextFilesPanelAutoOpen, type SessionArtifactFile } from "@/pages/session/files-tab-state"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
@@ -513,6 +514,58 @@ export default function Page() {
     if (!id) return true
     return sync.data.message[id] !== undefined
   })
+  const timelineSessionID = createMemo((current: string | undefined) =>
+    nextTimelineSessionID({
+      current,
+      route: params.id,
+      routeReady: messagesReady(),
+    }),
+  )
+  const timelineSessionKey = createMemo(() => `${params.dir}${timelineSessionID() ? `/${timelineSessionID()}` : ""}`)
+  const timelineMessages = createMemo(
+    () => {
+      const id = timelineSessionID()
+      return readSessionMessages(id ? sync.data.message[id] : undefined)
+    },
+    emptyMessages,
+    { equals: same },
+  )
+  const timelineMessagesReady = createMemo(() => {
+    const id = timelineSessionID()
+    if (!id) return true
+    return sync.data.message[id] !== undefined
+  })
+  const timelineUserMessages = createMemo(
+    () => readUserMessages(timelineMessages()),
+    emptyUserMessages,
+    { equals: same },
+  )
+  const timelineRevertMessageID = createMemo(() => {
+    const id = timelineSessionID()
+    if (!id) return
+    return sync.session.get(id)?.revert?.messageID
+  })
+  const timelineVisibleUserMessages = createMemo(
+    () => {
+      const revert = timelineRevertMessageID()
+      if (!revert) return timelineUserMessages()
+      return timelineUserMessages().filter((m) => m.id < revert)
+    },
+    emptyUserMessages,
+    {
+      equals: same,
+    },
+  )
+  const timelineHistoryMore = createMemo(() => {
+    const id = timelineSessionID()
+    if (!id) return false
+    return sync.session.history.more(id)
+  })
+  const timelineHistoryLoading = createMemo(() => {
+    const id = timelineSessionID()
+    if (!id) return false
+    return sync.session.history.loading(id)
+  })
   const historyMore = createMemo(() => {
     const id = params.id
     if (!id) return false
@@ -796,7 +849,7 @@ export default function Page() {
   }
 
   function navigateMessageByOffset(offset: number) {
-    const msgs = visibleUserMessages()
+    const msgs = timelineVisibleUserMessages()
     if (msgs.length === 0) return
 
     const current = store.messageId && messageMark === scrollMark ? store.messageId : cursor()
@@ -946,7 +999,7 @@ export default function Page() {
 
   createEffect(
     on(
-      () => visibleUserMessages().at(-1)?.id,
+      () => timelineVisibleUserMessages().at(-1)?.id,
       (lastId, prevLastId) => {
         if (lastId && prevLastId && lastId > prevLastId) {
           setStore("messageId", undefined)
@@ -1586,12 +1639,12 @@ export default function Page() {
   )
 
   const historyWindow = createSessionHistoryWindow({
-    sessionID: () => params.id,
-    messagesReady,
-    loaded: () => messages().length,
-    visibleUserMessages,
-    historyMore,
-    historyLoading,
+    sessionID: timelineSessionID,
+    messagesReady: timelineMessagesReady,
+    loaded: () => timelineMessages().length,
+    visibleUserMessages: timelineVisibleUserMessages,
+    historyMore: timelineHistoryMore,
+    historyLoading: timelineHistoryLoading,
     loadMore: (sessionID) => sync.session.history.loadMore(sessionID),
     userScrolled: autoScroll.userScrolled,
     scroller: () => scroller,
@@ -1603,13 +1656,13 @@ export default function Page() {
     fillFrame = requestAnimationFrame(() => {
       fillFrame = undefined
 
-      if (!params.id || !messagesReady()) return
-      if (autoScroll.userScrolled() || historyLoading()) return
+      if (!timelineSessionID() || !timelineMessagesReady()) return
+      if (autoScroll.userScrolled() || timelineHistoryLoading()) return
 
       const el = scroller
       if (!el) return
       if (el.scrollHeight > el.clientHeight + 1) return
-      if (historyWindow.turnStart() <= 0 && !historyMore()) return
+      if (historyWindow.turnStart() <= 0 && !timelineHistoryMore()) return
 
       void historyWindow.loadAndReveal()
     })
@@ -1620,14 +1673,15 @@ export default function Page() {
       () =>
         [
           params.id,
-          messagesReady(),
+          timelineSessionID(),
+          timelineMessagesReady(),
           historyWindow.turnStart(),
-          historyMore(),
-          historyLoading(),
+          timelineHistoryMore(),
+          timelineHistoryLoading(),
           autoScroll.userScrolled(),
-          visibleUserMessages().length,
+          timelineVisibleUserMessages().length,
         ] as const,
-      ([id, ready, start, more, loading, scrolled]) => {
+      ([, id, ready, start, more, loading, scrolled]) => {
         if (!id || !ready || loading || scrolled) return
         if (start <= 0 && !more) return
         fill()
@@ -1928,12 +1982,12 @@ export default function Page() {
   )
 
   const { clearMessageHash, scrollToMessage } = useSessionHashScroll({
-    sessionKey,
-    sessionID: () => params.id,
-    messagesReady,
-    visibleUserMessages,
-    historyMore,
-    historyLoading,
+    sessionKey: timelineSessionKey,
+    sessionID: timelineSessionID,
+    messagesReady: timelineMessagesReady,
+    visibleUserMessages: timelineVisibleUserMessages,
+    historyMore: timelineHistoryMore,
+    historyLoading: timelineHistoryLoading,
     loadMore: (sessionID) => sync.session.history.loadMore(sessionID),
     turnStart: historyWindow.turnStart,
     currentMessageId: () => store.messageId,
@@ -2069,8 +2123,11 @@ export default function Page() {
           <div class="flex-1 min-h-0 overflow-hidden">
             <Switch>
               <Match when={params.id}>
-                <Show when={messagesReady()}>
+                <Show when={timelineSessionID()}>
                   <MessageTimeline
+                    sessionID={timelineSessionID()!}
+                    sessionKey={timelineSessionKey()}
+                    sessionMessages={timelineMessages()}
                     mobileChanges={mobileChanges()}
                     mobileFallback={reviewContent({
                       classes: {
@@ -2101,8 +2158,8 @@ export default function Page() {
                       if (root) scheduleScrollState(root)
                     }}
                     turnStart={historyWindow.turnStart()}
-                    historyMore={historyMore()}
-                    historyLoading={historyLoading()}
+                    historyMore={timelineHistoryMore()}
+                    historyLoading={timelineHistoryLoading()}
                     onLoadEarlier={() => {
                       void historyWindow.loadAndReveal()
                     }}
