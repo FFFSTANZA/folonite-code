@@ -18,7 +18,6 @@ import { useNavigate, useParams } from "@solidjs/router"
 import { useLayout, LocalProject } from "@/context/layout"
 import { useGlobalSync } from "@/context/global-sync"
 import { Persist, persisted } from "@/utils/persist"
-import { PAWWORK_GITHUB_ISSUE_URL } from "@/utils/support-links"
 import { base64Encode } from "@opencode-ai/util/encode"
 import { decode64 } from "@/utils/base64"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
@@ -1752,7 +1751,7 @@ export default function Layout(props: ParentProps) {
       <Dialog title={language.t("workspace.delete.title")} fit>
         <div class="flex flex-col gap-4 pl-6 pr-2.5 pb-3">
           <div class="flex flex-col gap-1">
-            <span class="text-14-regular text-text-strong">
+            <span class="text-13-regular text-text-strong">
               {language.t("workspace.delete.confirm", { name: name() })}
             </span>
             <span class="text-13-regular text-text-weak">{description()}</span>
@@ -1826,7 +1825,7 @@ export default function Layout(props: ParentProps) {
       <Dialog title={language.t("workspace.reset.title")} fit>
         <div class="flex flex-col gap-4 pl-6 pr-2.5 pb-3">
           <div class="flex flex-col gap-1">
-            <span class="text-14-regular text-text-strong">
+            <span class="text-13-regular text-text-strong">
               {language.t("workspace.reset.confirm", { name: name() })}
             </span>
             <span class="text-13-regular text-text-weak">
@@ -2170,8 +2169,8 @@ export default function Layout(props: ParentProps) {
               <div class="flex-1 min-h-0 -mt-4 flex items-center justify-center px-6 pb-64 text-center">
                 <div class="mt-8 flex max-w-60 flex-col items-center gap-6 text-center">
                   <div class="flex flex-col gap-3">
-                    <div class="text-14-medium text-text-strong">{language.t("sidebar.empty.title")}</div>
-                    <div class="text-14-regular text-text-base" style={{ "line-height": "var(--line-height-normal)" }}>
+                    <div class="text-13-medium text-text-strong">{language.t("sidebar.empty.title")}</div>
+                    <div class="text-13-regular text-text-base" style={{ "line-height": "var(--line-height-normal)" }}>
                       {language.t("sidebar.empty.description")}
                     </div>
                   </div>
@@ -2195,8 +2194,8 @@ export default function Layout(props: ParentProps) {
                       if (!item) return
                       renameProject(item, next)
                     }}
-                    class="text-14-medium text-text-strong truncate"
-                    displayClass="text-14-medium text-text-strong truncate"
+                    class="text-13-medium text-text-strong truncate"
+                    displayClass="text-13-medium text-text-strong truncate"
                     stopPropagation
                   />
 
@@ -2376,11 +2375,11 @@ export default function Layout(props: ParentProps) {
           <div class="rounded-xl bg-background-base shadow-xs-border-base" data-component="getting-started">
             <div class="p-3 flex flex-col gap-6">
               <div class="flex flex-col gap-2">
-                <div class="text-14-medium text-text-strong">{language.t("sidebar.gettingStarted.title")}</div>
-                <div class="text-14-regular text-text-base" style={{ "line-height": "var(--line-height-normal)" }}>
+                <div class="text-13-medium text-text-strong">{language.t("sidebar.gettingStarted.title")}</div>
+                <div class="text-13-regular text-text-base" style={{ "line-height": "var(--line-height-normal)" }}>
                   {language.t("sidebar.gettingStarted.line1")}
                 </div>
-                <div class="text-14-regular text-text-base" style={{ "line-height": "var(--line-height-normal)" }}>
+                <div class="text-13-regular text-text-base" style={{ "line-height": "var(--line-height-normal)" }}>
                   {language.t("sidebar.gettingStarted.line2")}
                 </div>
               </div>
@@ -2425,12 +2424,8 @@ export default function Layout(props: ParentProps) {
       onSearch={() => command.show()}
       onOpenProject={chooseProject}
       onOpenSettings={openSettings}
-      onOpenHelp={() => platform.openLink(PAWWORK_GITHUB_ISSUE_URL)}
-      openProjectLabel={() => language.t("command.project.open")}
-      openProjectKeybind={() => command.keybind("project.open")}
       settingsLabel={() => language.t("sidebar.settings")}
       settingsKeybind={() => command.keybind("settings.open")}
-      helpLabel={() => language.t("sidebar.help")}
     />
   )
   const sidebarContent = (mobile?: boolean) =>

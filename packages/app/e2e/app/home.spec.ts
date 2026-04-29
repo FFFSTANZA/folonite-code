@@ -11,7 +11,6 @@ test("@smoke root route renders seeded home entrypoints", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Choose what to do" })).toBeVisible()
   await expect(home.locator(sessionComposerDockSelector)).toHaveCount(1)
   await openSidebar(page)
-  await expect(page.getByRole("button", { name: "Open project" }).first()).toBeVisible()
   await expect(page.getByRole("button", { name: "New session" })).toBeVisible()
   await expect(page.getByText("No recent projects")).toHaveCount(0)
   await expect(page.getByText("Get started by opening a local project")).toHaveCount(0)
@@ -35,8 +34,6 @@ test("@smoke home renders the hero composer and starter cards", async ({ page, p
   await expect(page.getByRole("button", { name: /Start writing/i })).toBeVisible()
   await expect(page.getByRole("button", { name: "Right utility panel" })).toBeVisible()
   await expect(workspaceChip).toBeVisible()
-  await openSidebar(page)
-  await expect(page.getByRole("button", { name: "Open project" }).first()).toBeVisible()
 
   const cardBox = await firstCard.boundingBox()
   const composerBox = await composer.boundingBox()

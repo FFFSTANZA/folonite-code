@@ -100,7 +100,7 @@ const SessionRow = (props: {
 }): JSX.Element => {
   const title = () => sessionTitle(props.session.title)
   const indicator = () => {
-    if (props.isWorking()) return <Spinner class="size-[15px]" />
+    if (props.isWorking()) return <Spinner class="size-[14px]" />
     if (props.hasPermissions()) return <div class="size-1.5 rounded-full bg-surface-warning-strong" />
     if (props.hasError()) return <div class="size-1.5 rounded-full bg-text-diff-delete-base" />
     if (props.unseenCount() > 0) return <div class="size-1.5 rounded-full bg-text-interactive-base" />
@@ -110,7 +110,7 @@ const SessionRow = (props: {
   return (
     <A
       href={`/${props.slug}/session/${props.session.id}`}
-      class={`flex items-center gap-2 min-w-0 w-full text-left focus:outline-none ${props.dense ? "py-0.5" : "py-1"}`}
+      class={`flex items-center gap-2 min-w-0 w-full text-left focus:outline-none ${props.dense ? "py-1" : "py-1.5"}`}
       onPointerDown={props.warmPress}
       onFocus={props.warmFocus}
       onClick={() => {
@@ -119,7 +119,8 @@ const SessionRow = (props: {
       }}
     >
       <div
-        class="shrink-0 size-5 flex items-center justify-center"
+        data-leading-slot
+        class="shrink-0 w-[14px] h-[14px] flex items-center"
         style={{ color: props.tint() ?? "var(--icon-interactive-base)" }}
       >
         {indicator()}
@@ -232,7 +233,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
 
           <Show when={!props.level}>
             <div
-              class="w-6 shrink-0 overflow-hidden transition-opacity"
+              class="w-5 shrink-0 overflow-hidden transition-opacity"
               classList={{
                 "opacity-100 pointer-events-auto": !!props.mobile,
                 "opacity-0 pointer-events-none": !props.mobile,
@@ -248,7 +249,8 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
                       <IconButton
                         icon="archive"
                         variant="ghost"
-                        class="size-6 rounded-md"
+                        size="small"
+                        class="rounded-md"
                         aria-label={language.t("common.archive")}
                         onClick={(event) => {
                           event.preventDefault()
@@ -292,13 +294,13 @@ export const NewSessionItem = (props: {
     <A
       href={`/${props.slug}/session`}
       end
-      class={`flex items-center gap-2 min-w-0 w-full text-left focus:outline-none ${props.dense ? "py-0.5" : "py-1"}`}
+      class={`flex items-center gap-2 min-w-0 w-full text-left focus:outline-none ${props.dense ? "py-1" : "py-1.5"}`}
       onClick={() => {
         if (layout.sidebar.opened()) return
         props.clearHoverProjectSoon()
       }}
     >
-      <div class="shrink-0 size-5 flex items-center justify-center">
+      <div data-leading-slot class="shrink-0 w-[14px] h-[14px] flex items-center">
         <Icon name="new-session" size="small" class="text-icon-weak" />
       </div>
       <span class="text-13-regular text-text-base [.active_&]:font-medium [.active_&]:text-text-strong min-w-0 flex-1 truncate">{label}</span>

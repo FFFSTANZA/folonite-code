@@ -5,7 +5,7 @@
   overflow-wrap: break-word;
   color: var(--text-strong);
   font-family: var(--font-family-sans);
-  font-size: var(--font-size-base); /* 14px */
+  font-size: var(--font-size-base); /* 13px */
   line-height: 160%;
 
   /* Spacing for flow */
@@ -23,7 +23,7 @@
   h4,
   h5,
   h6 {
-    font-size: 14px;
+    font-size: var(--font-size-hierarchy);
     color: var(--text-strong);
     font-weight: var(--font-weight-medium);
     margin-top: 0px;
@@ -121,7 +121,7 @@
   }
 
   .shiki {
-    font-size: 13px;
+    font-size: var(--font-size-x-small);
     padding: 12px;
     border-radius: 6px;
     border: 0.5px solid var(--border-weak-base);
@@ -216,7 +216,7 @@
     font-feature-settings: var(--font-family-mono--font-feature-settings);
     color: var(--syntax-string);
     font-weight: var(--font-weight-medium);
-    /* font-size: 13px; */
+    font-size: var(--font-size-x-small);
 
     /* padding: 2px 2px; */
     /* margin: 0 1.5px; */

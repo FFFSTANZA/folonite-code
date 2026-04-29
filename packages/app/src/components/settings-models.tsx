@@ -16,7 +16,7 @@ type ModelItem = ReturnType<ReturnType<typeof useModels>["list"]>[number]
 const ListLoadingState: Component<{ label: string }> = (props) => {
   return (
     <div class="flex flex-col items-center justify-center py-12 text-center">
-      <span class="text-14-regular text-text-weak">{props.label}</span>
+      <span class="text-13-regular text-text-weak">{props.label}</span>
     </div>
   )
 }
@@ -24,9 +24,9 @@ const ListLoadingState: Component<{ label: string }> = (props) => {
 const ListEmptyState: Component<{ message: string; filter: string }> = (props) => {
   return (
     <div class="flex flex-col items-center justify-center py-12 text-center">
-      <span class="text-14-regular text-text-weak">{props.message}</span>
+      <span class="text-13-regular text-text-weak">{props.message}</span>
       <Show when={props.filter}>
-        <span class="text-14-regular text-text-strong mt-1">&quot;{props.filter}&quot;</span>
+        <span class="text-13-regular text-text-strong mt-1">&quot;{props.filter}&quot;</span>
       </Show>
     </div>
   )
@@ -100,7 +100,7 @@ export const SettingsModels: Component = () => {
                 <div class="flex flex-col gap-1">
                   <div class="flex items-center gap-2 pb-2">
                     <ProviderIcon id={group.category} class="size-5 shrink-0 icon-strong-base" />
-                    <span class="text-14-medium text-text-strong">{group.items[0].provider.name}</span>
+                    <span class="text-13-medium text-text-strong">{group.items[0].provider.name}</span>
                   </div>
                   <SettingsList>
                     <For each={group.items}>
@@ -109,7 +109,7 @@ export const SettingsModels: Component = () => {
                         return (
                           <div class="flex flex-wrap items-center justify-between gap-4 py-3 border-b border-border-weak-base last:border-none">
                             <div class="min-w-0">
-                              <span class="text-14-regular text-text-strong truncate block">{item.name}</span>
+                              <span class="text-13-regular text-text-strong truncate block">{item.name}</span>
                             </div>
                             <div class="flex-shrink-0">
                               <Switch

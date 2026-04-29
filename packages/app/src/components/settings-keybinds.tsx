@@ -408,12 +408,12 @@ export const SettingsKeybinds: Component = () => {
           {(group) => (
             <Show when={(filtered().get(group) ?? []).length > 0}>
               <div class="flex flex-col gap-1">
-                <h3 class="text-14-medium text-text-strong pb-2">{language.t(groupKey[group])}</h3>
+                <h3 class="text-13-medium text-text-strong pb-2">{language.t(groupKey[group])}</h3>
                 <SettingsList>
                   <For each={filtered().get(group) ?? []}>
                     {(id) => (
                       <div class="flex items-center justify-between gap-4 py-3 border-b border-border-weak-base last:border-none">
-                        <span class="text-14-regular text-text-strong">{title(id)}</span>
+                        <span class="text-13-regular text-text-strong">{title(id)}</span>
                         <button
                           type="button"
                           data-keybind-id={id}
@@ -443,9 +443,9 @@ export const SettingsKeybinds: Component = () => {
 
         <Show when={store.filter && !hasResults()}>
           <div class="flex flex-col items-center justify-center py-12 text-center">
-            <span class="text-14-regular text-text-weak">{language.t("settings.shortcuts.search.empty")}</span>
+            <span class="text-13-regular text-text-weak">{language.t("settings.shortcuts.search.empty")}</span>
             <Show when={store.filter}>
-              <span class="text-14-regular text-text-strong mt-1">"{store.filter}"</span>
+              <span class="text-13-regular text-text-strong mt-1">"{store.filter}"</span>
             </Show>
           </div>
         </Show>

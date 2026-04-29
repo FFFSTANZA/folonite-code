@@ -198,7 +198,7 @@ const ProjectPreviewPanel = (props: {
 }): JSX.Element => (
   <div class="-m-3 p-2 flex flex-col w-72">
     <div class="px-4 pt-2 pb-1 flex items-center gap-2">
-      <div class="text-14-medium text-text-strong truncate grow">{displayName(props.project)}</div>
+      <div class="text-13-medium text-text-strong truncate grow">{displayName(props.project)}</div>
     </div>
     <div class="px-4 pb-2 text-13-medium text-text-weak">{props.language.t("sidebar.project.recentSessions")}</div>
     <div class="px-2 pb-2 flex flex-col gap-2">
@@ -226,10 +226,10 @@ const ProjectPreviewPanel = (props: {
             return (
               <div class="flex flex-col gap-1">
                 <div class="px-2 py-0.5 flex items-center gap-1 min-w-0">
-                  <div class="shrink-0 size-6 flex items-center justify-center">
+                  <div data-leading-slot class="shrink-0 size-5 flex items-center justify-center">
                     <Icon name="branch" size="small" class="text-icon-base" />
                   </div>
-                  <span class="truncate text-14-medium text-text-base">{props.label(directory)}</span>
+                  <span class="truncate text-13-medium text-text-base">{props.label(directory)}</span>
                 </div>
                 <For each={sessions().slice(0, 2)}>
                   {(session) => (
