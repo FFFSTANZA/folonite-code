@@ -2417,11 +2417,18 @@ export default function Layout(props: ParentProps) {
         data-platform={platform.platform}
         data-os={platform.os}
         class="relative bg-background-base flex-1 min-h-0 min-w-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text"
+        classList={{
+          "[transition:--sidebar-width_200ms_cubic-bezier(0.22,1,0.36,1),--right-panel-width_240ms_cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none":
+            !state.sizing,
+        }}
         style={{
           "--shell-titlebar-current-height":
             platform.platform === "desktop" && platform.os === "macos"
               ? `calc(var(--shell-titlebar-height, 40px) / ${platform.webviewZoom?.() ?? 1})`
               : "var(--shell-titlebar-height, 40px)",
+          "--sidebar-width": layout.sidebar.opened() ? `${side()}px` : "0px",
+          "--right-panel-width": layout.rightPanel.opened() ? `${layout.rightPanel.width()}px` : "0px",
+          "--right-panel-divider": layout.rightPanel.opened() ? "var(--border-weaker-base)" : "transparent",
         }}
       >
         <div
@@ -2526,7 +2533,7 @@ export default function Layout(props: ParentProps) {
                   data-platform={platform.platform}
                   data-os={platform.os}
                   classList={{
-                    "size-full overflow-x-hidden flex flex-col items-start contain-strict border-t border-border-weak-base bg-background-base": true,
+                    "size-full overflow-x-hidden flex flex-col items-start contain-strict bg-background-base": true,
                   }}
                 >
                   <div class="relative size-full">

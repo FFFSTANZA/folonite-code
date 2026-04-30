@@ -103,7 +103,7 @@ export function Titlebar() {
           <div class="h-full shrink-0" style={{ width: `${72 / zoom()}px` }} />
           <div class="xl:hidden w-10 shrink-0 flex items-center justify-center">
             <IconButton
-              icon="menu"
+              icon={layout.mobileSidebar.opened() ? "sidebar-active" : "sidebar"}
               variant="ghost"
               class="titlebar-icon rounded-md"
               onClick={layout.mobileSidebar.toggle}
@@ -115,7 +115,7 @@ export function Titlebar() {
         <Show when={!mac()}>
           <div class="xl:hidden w-[48px] shrink-0 flex items-center justify-center">
             <IconButton
-              icon="menu"
+              icon={layout.mobileSidebar.opened() ? "sidebar-active" : "sidebar"}
               variant="ghost"
               class="titlebar-icon rounded-md"
               onClick={layout.mobileSidebar.toggle}
@@ -141,17 +141,16 @@ export function Titlebar() {
               <Icon size="small" name={layout.sidebar.opened() ? "sidebar-active" : "sidebar"} />
             </Button>
           </TooltipKeybind>
-          <div class="hidden xl:flex items-center shrink-0">
+          <div class="flex items-center shrink-0">
             <Show when={params.dir}>
               <div
                 class="flex items-center shrink-0 w-8"
                 aria-hidden={layout.sidebar.opened() ? "true" : undefined}
               >
                 <div
-                  class="transition-opacity"
+                  class="transition-opacity duration-120 ease-out opacity-100"
                   classList={{
-                    "opacity-100 duration-120 ease-out": !layout.sidebar.opened(),
-                    "opacity-0 duration-120 ease-in delay-0 pointer-events-none": layout.sidebar.opened(),
+                    "xl:opacity-0 xl:ease-in xl:delay-0 xl:pointer-events-none": layout.sidebar.opened(),
                   }}
                 >
                   <TooltipKeybind
