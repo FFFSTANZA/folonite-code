@@ -32,7 +32,6 @@ export const dict = {
   "command.session.next": "Next session",
   "command.session.previous.unseen": "Previous unread session",
   "command.session.next.unseen": "Next unread session",
-  "command.session.archive": "Archive session",
 
   "command.palette": "Command palette",
 
@@ -487,8 +486,8 @@ export const dict = {
   "toast.update.action.installRestart": "Install and restart",
   "toast.update.action.notYet": "Not yet",
 
-  "error.page.title": "Something went wrong",
-  "error.page.description": "An error occurred while loading the application.",
+  "error.page.title": "Something broke",
+  "error.page.description": "A restart usually fixes this. If not, send us the details.",
   "error.page.details.label": "Error Details",
   "error.page.action.restart": "Restart",
   "error.page.action.checking": "Checking...",
@@ -618,7 +617,7 @@ export const dict = {
   "session.todo.title": "Todos",
   "session.todo.collapse": "Collapse",
   "session.todo.expand": "Expand",
-  "session.todo.progress": "{{done}} of {{total}} todos completed",
+  "session.todo.progress": "Task {{current}} of {{total}}",
   "session.todo.cancelled": "Cancelled",
   "session.question.progress": "{{current}} of {{total}} questions",
   "session.followupDock.summary.one": "{{count}} queued message",
@@ -710,7 +709,7 @@ export const dict = {
   "session.share.copy.copied": "Copied",
   "session.share.copy.copyLink": "Copy link",
 
-  "session.export.action.export": "Export session log",
+  "session.export.action.export": "Export session",
   "session.export.success": "Session exported",
   "session.export.error.failed": "Export failed",
 
@@ -735,7 +734,6 @@ export const dict = {
   "common.learnMore": "Learn more",
   "common.rename": "Rename",
   "common.reset": "Reset",
-  "common.archive": "Archive",
   "common.delete": "Delete",
   "common.close": "Close",
   "common.edit": "Edit",
@@ -1097,6 +1095,7 @@ export const dict = {
   "workspace.chip.empty": "No workspaces available",
   "workspace.chip.popover.title": "Workspaces",
   "workspace.chip.add": "Add workspace",
+  "prompt.variant.popover.title": "Reasoning effort",
   "about.title": "About PawWork",
   "about.version": "Version",
   "about.build": "Build",

@@ -88,10 +88,36 @@
     --sidebar: #181818;
   }
 
+  /* Register --sidebar-width as a length so the titlebar gradient interpolates
+     smoothly when sidebar toggles open/close. */
+  @property --sidebar-width {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0px;
+  }
+
+  @property --right-panel-width {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0px;
+  }
+
+  @property --composer-dock-height {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 140px;
+  }
+
+  /* Mac native unified-chrome pattern: titlebar bg matches whatever surface
+     sits below it on each side. Left of --sidebar-width = sidebar bg (seamless
+     vertical extension of the sidebar panel up through the titlebar). Right
+     = main bg. The only visual seam is the sidebar/main vertical divider,
+     which now runs continuously from window top to bottom.
+     The xl+ gradient form lives inside the existing 1280px media block below
+     to satisfy shell-frame-contract.test.ts CSS rule ordering. */
   [data-component="titlebar-shell"][data-platform="desktop"][data-os="macos"] {
     padding-inline: 8px;
-    background: var(--shell-surface-raised);
-    border-bottom: 1px solid var(--shell-titlebar-border);
+    background: var(--background-base);
   }
 
   [data-component="titlebar-shell"][data-platform="desktop"][data-os="macos"] [data-shell-slot="left-portal"] {
@@ -143,9 +169,18 @@
       overflow: hidden;
     }
 
-    [data-component="desktop-shell-main"][data-platform="desktop"] {
-      background: color-mix(in srgb, var(--shell-background-base) 92%, white 8%);
+    [data-component="titlebar-shell"][data-platform="desktop"][data-os="macos"] {
+      background: linear-gradient(
+        to right,
+        var(--background-weak) 0,
+        var(--background-weak) var(--sidebar-width, 0px),
+        var(--background-base) var(--sidebar-width, 0px),
+        var(--background-base) calc(100% - var(--right-panel-width, 0px)),
+        var(--right-panel-divider, transparent) calc(100% - var(--right-panel-width, 0px)),
+        var(--right-panel-divider, transparent) calc(100% - var(--right-panel-width, 0px) + 1px),
+        var(--background-base) calc(100% - var(--right-panel-width, 0px) + 1px),
+        var(--background-base) 100%
+      );
     }
-
   }
 }

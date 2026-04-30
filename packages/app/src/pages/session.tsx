@@ -1543,6 +1543,7 @@ export default function Page() {
     scroller = el
     autoScroll.scrollRef(el)
     if (!el) return
+    el.style.paddingBottom = "calc(var(--composer-dock-height, 0px) + 16px)"
     scheduleScrollState(el)
     fill()
   }
@@ -1898,10 +1899,12 @@ export default function Page() {
     () => promptDock,
     ({ height }) => {
       const next = Math.ceil(height)
+      const el = scroller
+
+      document.documentElement.style.setProperty("--composer-dock-height", `${next}px`)
 
       if (next === dockHeight) return
 
-      const el = scroller
       const delta = next - dockHeight
       const stick = el
         ? !autoScroll.userScrolled() || el.scrollHeight - el.clientHeight - el.scrollTop < 10 + Math.max(0, delta)
@@ -2024,6 +2027,13 @@ export default function Page() {
       }
       setPromptDockRef={(el) => {
         promptDock = el
+        if (!el) return
+        const next = Math.ceil(el.getBoundingClientRect().height)
+        if (next <= 0) return
+        if (next !== dockHeight) {
+          dockHeight = next
+          document.documentElement.style.setProperty("--composer-dock-height", `${next}px`)
+        }
       }}
     />
   )

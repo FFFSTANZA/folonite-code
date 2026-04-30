@@ -324,7 +324,13 @@ export function registerIpcHandlers(deps: Deps) {
 
   ipcMain.handle(
     "export-session",
-    async (_event: IpcMainInvokeEvent, sessionID: string, directory: string, defaultName?: string) => {
+    async (
+      _event: IpcMainInvokeEvent,
+      sessionID: string,
+      directory: string,
+      defaultName?: string,
+      title?: string,
+    ) => {
       if (typeof sessionID !== "string" || typeof directory !== "string") {
         return { ok: false, error: "invalid_args" } as const
       }
@@ -334,7 +340,7 @@ export function registerIpcHandlers(deps: Deps) {
 
       const fallbackStamp = new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "")
       const result = await dialog.showSaveDialog({
-        title: "Export session log",
+        title: title ?? "Export session",
         defaultPath: defaultName ?? `pawwork-session-${sessionID.slice(-8)}-${fallbackStamp}.json`,
         filters: [{ name: "JSON", extensions: ["json"] }],
       })

@@ -39,7 +39,6 @@ export const dict = {
   "command.session.next": "下一个会话",
   "command.session.previous.unseen": "上一个未读会话",
   "command.session.next.unseen": "下一个未读会话",
-  "command.session.archive": "归档会话",
 
   "command.palette": "命令面板",
 
@@ -474,8 +473,8 @@ export const dict = {
   "toast.update.action.installRestart": "安装并重启",
   "toast.update.action.notYet": "稍后",
 
-  "error.page.title": "出了点问题",
-  "error.page.description": "加载应用程序时发生错误。",
+  "error.page.title": "应用出错了",
+  "error.page.description": "重启通常能解决。如果不行，把错误详情发给我们看看。",
   "error.page.details.label": "错误详情",
   "error.page.action.restart": "重启",
   "error.page.action.checking": "检查中...",
@@ -646,7 +645,7 @@ export const dict = {
   "session.share.copy.copied": "已复制",
   "session.share.copy.copyLink": "复制链接",
 
-  "session.export.action.export": "导出会话日志",
+  "session.export.action.export": "导出会话",
   "session.export.success": "会话已导出",
   "session.export.error.failed": "导出失败",
 
@@ -669,7 +668,6 @@ export const dict = {
   "common.learnMore": "了解更多",
   "common.rename": "重命名",
   "common.reset": "重置",
-  "common.archive": "归档",
   "common.delete": "删除",
   "common.close": "关闭",
   "common.edit": "编辑",
@@ -1001,7 +999,7 @@ export const dict = {
   "session.review.noVcs.createGit.description": "在此项目中跟踪、审查和撤消更改",
   "session.review.noVcs.createGit.actionLoading": "正在创建 Git 仓库...",
   "session.review.noVcs.createGit.action": "创建 Git 仓库",
-  "session.todo.progress": "已完成 {{done}} 个任务（共 {{total}} 个）",
+  "session.todo.progress": "第 {{current}} 项任务 / 共 {{total}} 项",
   "session.todo.cancelled": "已取消",
   "session.question.progress": "{{current}}/{{total}} 个问题",
   "session.header.open.finder": "访达",
@@ -1045,6 +1043,7 @@ export const dict = {
   "workspace.chip.empty": "暂无可用工作目录",
   "workspace.chip.popover.title": "工作目录",
   "workspace.chip.add": "添加工作目录",
+  "prompt.variant.popover.title": "思考强度",
   "common.key.ctrl": "Ctrl",
   "common.key.alt": "Alt",
   "common.key.shift": "Shift",

@@ -757,6 +757,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         },
       },
       rightPanel: {
+        opened: createMemo(() => store.rightPanel?.opened ?? false),
         width: createMemo(() => clampRightPanelWidth(store.rightPanel?.width)),
         resize(width: number) {
           setStore("rightPanel", "width", clampRightPanelWidth(width))

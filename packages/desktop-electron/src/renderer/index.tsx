@@ -175,8 +175,8 @@ const createPlatform = (): Platform => {
       return handleWslPicker(result)
     },
 
-    exportSession(sessionID, directory, defaultName) {
-      return window.api.exportSession(sessionID, directory, defaultName)
+    exportSession(sessionID, directory, defaultName, title) {
+      return window.api.exportSession(sessionID, directory, defaultName, title)
     },
 
     openLink(url: string) {
