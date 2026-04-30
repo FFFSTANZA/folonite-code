@@ -85,6 +85,7 @@ export type ElectronAPI = {
     sessionID: string,
     directory: string,
     defaultName?: string,
+    title?: string,
   ) => Promise<{ ok: true; path: string } | { ok: false; error: string }>
   openLink: (url: string) => void
   openPath: (path: string, app?: string) => Promise<void>

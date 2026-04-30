@@ -103,6 +103,7 @@ export type Platform = {
     sessionID: string,
     directory: string,
     defaultName?: string,
+    title?: string,
   ): Promise<{ ok: true; path: string } | { ok: false; error: string }>
 
   /** Storage mechanism, defaults to localStorage */

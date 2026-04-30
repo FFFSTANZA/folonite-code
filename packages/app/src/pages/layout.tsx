@@ -98,6 +98,7 @@ import { PawworkSidebar, type PawworkSidebarSession } from "./layout/pawwork-sid
 import { ProjectDragOverlay, SortableProject, type ProjectSidebarContext } from "./layout/sidebar-project"
 import { PawworkTitlebar } from "./layout/pawwork-titlebar"
 import { SettingsPage, type SettingsPageTab } from "@/components/settings-page"
+import { DialogDeleteSession } from "@/components/dialog-delete-session"
 
 export default function Layout(props: ParentProps) {
   const [store, setStore, , ready] = persisted(
@@ -652,11 +653,21 @@ export default function Layout(props: ParentProps) {
 
         const [dirStore] = globalSync.child(directory, { bootstrap: true })
         for (const session of sortedRootSessions(dirStore)) {
+          const messages = dirStore.message[session.id]
+          let lastUserAt = 0
+          if (messages?.length) {
+            for (let i = messages.length - 1; i >= 0; i--) {
+              if (messages[i].role === "user") {
+                lastUserAt = messages[i].time?.created ?? 0
+                break
+              }
+            }
+          }
           result.push({
             session,
             slug: base64Encode(session.directory),
             projectLabel: labels.get(project.worktree) ?? displayName(project),
-            created: session.time?.created ?? session.time?.updated ?? 0,
+            created: lastUserAt || session.time?.updated || session.time?.created || 0,
           })
         }
       }
@@ -988,32 +999,6 @@ export default function Layout(props: ParentProps) {
     }
   }
 
-  async function archiveSession(session: Session) {
-    const [store, setStore] = globalSync.child(session.directory)
-    const sessions = store.session ?? []
-    const index = sessions.findIndex((s) => s.id === session.id)
-    const nextSession = sessions[index + 1] ?? sessions[index - 1]
-
-    await globalSDK.client.session.update({
-      directory: session.directory,
-      sessionID: session.id,
-      time: { archived: Date.now() },
-    })
-    setStore(
-      produce((draft) => {
-        const match = Binary.search(draft.session, session.id, (s) => s.id)
-        if (match.found) draft.session.splice(match.index, 1)
-      }),
-    )
-    if (session.id === params.id) {
-      if (nextSession) {
-        navigate(`/${params.dir}/session/${nextSession.id}`)
-      } else {
-        navigate(`/${params.dir}/session`)
-      }
-    }
-  }
-
   async function renamePawworkSession(session: Session, next: string) {
     const title = next.trim()
     if (!title || title === (session.title ?? "")) return
@@ -1050,6 +1035,117 @@ export default function Layout(props: ParentProps) {
 
   function setPawworkSortMode(mode: "time" | "project") {
     setStore("pawworkSortMode", mode)
+  }
+
+  // Export hits the embedded sidecar via main-process IPC. When the user has
+  // switched the active server to a remote target, the sidecar holds different
+  // data than the UI; hide the action rather than ship a misleading export.
+  const exportSessionAvailable = createMemo(
+    () => !!platform.exportSession && server.current?.type === "sidecar",
+  )
+
+  async function exportSession(session: Session) {
+    if (!platform.exportSession) return
+    const [store] = globalSync.child(session.directory)
+    const sessionInfo = store.session?.find((s) => s.id === session.id)
+    const slugSource = sessionInfo?.slug ?? session.id
+    const sanitized = slugSource.replace(/[\\/:*?"<>|]/g, "-").slice(0, 32)
+    const slug = /[\p{L}\p{N}]/u.test(sanitized) ? sanitized : session.id.slice(-8)
+    const stamp = new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "")
+    const defaultName = `pawwork-session-${slug}-${stamp}.json`
+
+    let result: { ok: true; path: string } | { ok: false; error: string }
+    try {
+      result = await platform.exportSession(
+        session.id,
+        session.directory,
+        defaultName,
+        language.t("session.export.action.export"),
+      )
+    } catch (err) {
+      showToast({
+        title: language.t("session.export.error.failed"),
+        description: errorMessage(err, language.t("common.requestFailed")),
+        variant: "error",
+      })
+      return
+    }
+    if (!result.ok) {
+      if (result.error === "cancelled") return
+      showToast({
+        title: language.t("session.export.error.failed"),
+        description: result.error,
+        variant: "error",
+      })
+      return
+    }
+    showToast({
+      title: language.t("session.export.success"),
+      description: result.path,
+    })
+  }
+
+  async function deleteSession(session: Session) {
+    const [store, setStore] = globalSync.child(session.directory)
+    const sessions = (store.session ?? []).filter((s) => !s.parentID && !s.time?.archived)
+    const index = sessions.findIndex((s) => s.id === session.id)
+    const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
+
+    const result = await globalSDK.client.session
+      .delete({ directory: session.directory, sessionID: session.id })
+      .then((x) => x.data)
+      .catch((err) => {
+        showToast({
+          title: language.t("session.delete.failed.title"),
+          description: errorMessage(err, language.t("common.requestFailed")),
+          variant: "error",
+        })
+        return false
+      })
+
+    if (!result) return false
+
+    setStore(
+      produce((draft) => {
+        const removed = new Set<string>([session.id])
+        const byParent = new Map<string, string[]>()
+        for (const item of draft.session) {
+          const parentID = item.parentID
+          if (!parentID) continue
+          const existing = byParent.get(parentID)
+          if (existing) {
+            existing.push(item.id)
+            continue
+          }
+          byParent.set(parentID, [item.id])
+        }
+        const stack = [session.id]
+        while (stack.length) {
+          const parentID = stack.pop()
+          if (!parentID) continue
+          const children = byParent.get(parentID)
+          if (!children) continue
+          for (const child of children) {
+            if (removed.has(child)) continue
+            removed.add(child)
+            stack.push(child)
+          }
+        }
+        dropSessionCaches(draft, [...removed])
+        draft.session = draft.session.filter((s) => !removed.has(s.id))
+      }),
+    )
+
+    if (session.id === params.id) {
+      navigate(nextSession ? `/${params.dir}/session/${nextSession.id}` : `/${params.dir}/session`)
+    }
+    return true
+  }
+
+  function confirmDeleteSession(session: Session) {
+    dialog.show(() => (
+      <DialogDeleteSession sessionID={session.id} onConfirm={() => void deleteSession(session)} />
+    ))
   }
 
   command.register("layout", () => {
@@ -1128,17 +1224,6 @@ export default function Layout(props: ParentProps) {
         category: language.t("command.category.session"),
         keybind: "shift+alt+arrowdown",
         onSelect: () => navigateSessionByUnseen(1),
-      },
-      {
-        id: "session.archive",
-        title: language.t("command.session.archive"),
-        category: language.t("command.category.session"),
-        keybind: "mod+shift+backspace",
-        disabled: !params.dir || !params.id,
-        onSelect: () => {
-          const session = currentSessions().find((s) => s.id === params.id)
-          if (session) archiveSession(session)
-        },
       },
       {
         id: "workspace.new",
@@ -2021,7 +2106,6 @@ export default function Layout(props: ParentProps) {
     sidebarHovering,
     clearHoverProjectSoon,
     prefetchSession,
-    archiveSession,
     workspaceName,
     renameWorkspace,
     editorOpen,
@@ -2067,7 +2151,6 @@ export default function Layout(props: ParentProps) {
       sidebarExpanded,
       clearHoverProjectSoon,
       prefetchSession,
-      archiveSession,
     },
   }
 
@@ -2386,9 +2469,11 @@ export default function Layout(props: ParentProps) {
       setScrollContainerRef={workspaceSidebarCtx.setScrollContainerRef}
       clearHoverProjectSoon={clearHoverProjectSoon}
       prefetchSession={prefetchSession}
-      archiveSession={archiveSession}
       onRenameSession={renamePawworkSession}
       onTogglePinnedSession={togglePinnedSession}
+      exportSessionAvailable={exportSessionAvailable}
+      onExportSession={exportSession}
+      onDeleteSession={confirmDeleteSession}
       onSetSortMode={setPawworkSortMode}
       onNew={() => openPawworkHome(options?.directory)}
       onSearch={() => command.show()}

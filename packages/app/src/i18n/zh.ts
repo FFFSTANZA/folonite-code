@@ -39,7 +39,6 @@ export const dict = {
   "command.session.next": "下一个会话",
   "command.session.previous.unseen": "上一个未读会话",
   "command.session.next.unseen": "下一个未读会话",
-  "command.session.archive": "归档会话",
 
   "command.palette": "命令面板",
 
@@ -646,7 +645,7 @@ export const dict = {
   "session.share.copy.copied": "已复制",
   "session.share.copy.copyLink": "复制链接",
 
-  "session.export.action.export": "导出会话日志",
+  "session.export.action.export": "导出会话",
   "session.export.success": "会话已导出",
   "session.export.error.failed": "导出失败",
 
@@ -669,7 +668,6 @@ export const dict = {
   "common.learnMore": "了解更多",
   "common.rename": "重命名",
   "common.reset": "重置",
-  "common.archive": "归档",
   "common.delete": "删除",
   "common.close": "关闭",
   "common.edit": "编辑",

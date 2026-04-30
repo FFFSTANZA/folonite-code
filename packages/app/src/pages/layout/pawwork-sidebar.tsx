@@ -7,6 +7,7 @@ import { IconButton } from "@opencode-ai/ui/icon-button"
 import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { createEffect, createMemo, createSignal, For, Show, type Accessor, type JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
+import { getRelativeTime } from "@/utils/time"
 import { createInlineEditorController } from "./inline-editor"
 import { buildPawworkSessionSections, type PawworkSortMode } from "./pawwork-session-nav"
 import { SessionItem } from "./sidebar-items"
@@ -40,9 +41,11 @@ export const PawworkSidebar = (props: {
   setScrollContainerRef: (el: HTMLDivElement | undefined, mobile?: boolean) => void
   clearHoverProjectSoon: () => void
   prefetchSession: (session: Session, priority?: "high" | "low") => void
-  archiveSession: (session: Session) => Promise<void>
   onRenameSession: (session: Session, next: string) => Promise<void>
   onTogglePinnedSession: (sessionID: string) => void
+  exportSessionAvailable: Accessor<boolean>
+  onExportSession: (session: Session) => Promise<void>
+  onDeleteSession: (session: Session) => void
   onSetSortMode: (mode: PawworkSortMode) => void
   onNew: () => void
   onSearch: () => void
@@ -109,33 +112,12 @@ export const PawworkSidebar = (props: {
             sidebarExpanded={props.sidebarExpanded}
             clearHoverProjectSoon={props.clearHoverProjectSoon}
             prefetchSession={props.prefetchSession}
-            archiveSession={props.archiveSession}
-            hideDefaultArchiveAction
-            leadingSlot={() => (
-              <button
-                type="button"
-                data-action="pawwork-session-pin"
-                data-pinned={isPinned() ? "true" : "false"}
-                aria-label={pinLabel()}
-                title={pinLabel()}
-                tabIndex={isPinned() ? 0 : -1}
-                aria-hidden={isPinned() ? undefined : "true"}
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  if (isPinned()) event.currentTarget.blur()
-                  props.onTogglePinnedSession(session.id)
-                }}
-                classList={{
-                  "inline-flex w-[14px] h-[14px] items-center justify-center rounded-md transition-colors": true,
-                  "text-text-strong opacity-100 pointer-events-auto": isPinned(),
-                  "text-text-weak opacity-0 pointer-events-none group-hover/session:opacity-100 group-hover/session:pointer-events-auto group-focus-within/session:opacity-100 group-focus-within/session:pointer-events-auto hover:text-text-base":
-                    !isPinned(),
-                }}
-              >
-                <Icon name="pin" size="small" />
-              </button>
-            )}
+            pinned={() => isPinned()}
+            timeText={() =>
+              entry.item.created > 0
+                ? getRelativeTime(new Date(entry.item.created).toISOString(), language.t)
+                : undefined
+            }
             titleContent={({ session: rowSession, title }) => (
               <editor.InlineEditor
                 id={`pawwork-session:${rowSession.id}`}
@@ -183,8 +165,16 @@ export const PawworkSidebar = (props: {
                     >
                       <DropdownMenu.ItemLabel>{language.t("common.rename")}</DropdownMenu.ItemLabel>
                     </DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => void props.archiveSession(rowSession)}>
-                      <DropdownMenu.ItemLabel>{language.t("common.archive")}</DropdownMenu.ItemLabel>
+                    <Show when={props.exportSessionAvailable()}>
+                      <DropdownMenu.Item onSelect={() => void props.onExportSession(rowSession)}>
+                        <DropdownMenu.ItemLabel>
+                          {language.t("session.export.action.export")}
+                        </DropdownMenu.ItemLabel>
+                      </DropdownMenu.Item>
+                    </Show>
+                    <DropdownMenu.Separator />
+                    <DropdownMenu.Item onSelect={() => props.onDeleteSession(rowSession)}>
+                      <DropdownMenu.ItemLabel>{language.t("common.delete")}</DropdownMenu.ItemLabel>
                     </DropdownMenu.Item>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
@@ -204,8 +194,14 @@ export const PawworkSidebar = (props: {
             >
               <ContextMenu.ItemLabel>{language.t("common.rename")}</ContextMenu.ItemLabel>
             </ContextMenu.Item>
-            <ContextMenu.Item onSelect={() => void props.archiveSession(session)}>
-              <ContextMenu.ItemLabel>{language.t("common.archive")}</ContextMenu.ItemLabel>
+            <Show when={props.exportSessionAvailable()}>
+              <ContextMenu.Item onSelect={() => void props.onExportSession(session)}>
+                <ContextMenu.ItemLabel>{language.t("session.export.action.export")}</ContextMenu.ItemLabel>
+              </ContextMenu.Item>
+            </Show>
+            <ContextMenu.Separator />
+            <ContextMenu.Item onSelect={() => props.onDeleteSession(session)}>
+              <ContextMenu.ItemLabel>{language.t("common.delete")}</ContextMenu.ItemLabel>
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>
@@ -308,13 +304,13 @@ export const PawworkSidebar = (props: {
                   title={sortAriaLabel()}
                   onClick={() => props.onSetSortMode(props.sortMode() === "time" ? "project" : "time")}
                   classList={{
-                    "inline-flex items-center justify-center rounded-md p-1 transition-colors": true,
+                    "inline-flex items-center justify-center size-5 rounded-md transition-colors": true,
                     "hover:bg-surface-raised-base-hover": true,
                     "text-text-strong": props.sortMode() === "project",
                     "text-text-weak": props.sortMode() !== "project",
                   }}
                 >
-                  <FilterIcon size={16} />
+                  <FilterIcon size={14} />
                 </button>
               </div>
               <Show when={props.sortMode() === "time"}>

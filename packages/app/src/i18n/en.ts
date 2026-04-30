@@ -32,7 +32,6 @@ export const dict = {
   "command.session.next": "Next session",
   "command.session.previous.unseen": "Previous unread session",
   "command.session.next.unseen": "Next unread session",
-  "command.session.archive": "Archive session",
 
   "command.palette": "Command palette",
 
@@ -710,7 +709,7 @@ export const dict = {
   "session.share.copy.copied": "Copied",
   "session.share.copy.copyLink": "Copy link",
 
-  "session.export.action.export": "Export session log",
+  "session.export.action.export": "Export session",
   "session.export.success": "Session exported",
   "session.export.error.failed": "Export failed",
 
@@ -735,7 +734,6 @@ export const dict = {
   "common.learnMore": "Learn more",
   "common.rename": "Rename",
   "common.reset": "Reset",
-  "common.archive": "Archive",
   "common.delete": "Delete",
   "common.close": "Close",
   "common.edit": "Edit",
