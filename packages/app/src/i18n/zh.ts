@@ -590,8 +590,6 @@ export const dict = {
   "session.revertDock.expand": "展开已回滚消息",
   "session.revertDock.restore": "恢复消息",
   "session.new.title": "今天想做什么？",
-  // Kept for parity/branding tests; UI usage removed in #300.
-  "session.new.subtitle": "爪印可以帮你处理文件、分析信息、撰写内容并完成各类任务。",
   "session.new.reassurance": "文件和对话仅在本机处理",
   "session.new.card.document.title": "处理文档",
   "session.new.card.document.description": "编辑、转换并提取 Word、Excel、PowerPoint 和 PDF 文件内容。",
@@ -674,7 +672,6 @@ export const dict = {
   "common.loadMore": "加载更多",
   "common.key.esc": "ESC",
 
-  "sidebar.menu.toggle": "切换菜单",
   "sidebar.nav.projectsAndSessions": "项目和会话",
   "sidebar.settings": "设置",
   "sidebar.workspaces.enable": "启用工作区",
@@ -689,7 +686,6 @@ export const dict = {
   "sidebar.empty.description": "打开一个项目开始使用",
   "sidebar.pawwork.search": "搜索",
   "sidebar.pawwork.empty.description": "打开一个项目后，即可使用以会话为中心的侧边栏。",
-  "sidebar.pawwork.empty.sessions": "还没有会话，先新建一个开始。",
   "sidebar.pawwork.pinned": "已置顶",
   "sidebar.pawwork.all": "全部会话",
   "sidebar.pawwork.pinSession": "置顶会话",
@@ -983,9 +979,9 @@ export const dict = {
   "error.server.invalidConfiguration": "配置无效",
   "common.moreCountSuffix": " (还有 {{count}} 个)",
   "common.time.justNow": "刚刚",
-  "common.time.minutesAgo.short": "{{count}}分钟前",
-  "common.time.hoursAgo.short": "{{count}}小时前",
-  "common.time.daysAgo.short": "{{count}}天前",
+  "common.time.minutesAgo.short": "{{count}}分钟",
+  "common.time.hoursAgo.short": "{{count}}小时",
+  "common.time.daysAgo.short": "{{count}}天",
   "settings.providers.connected.environmentDescription": "已通过环境变量连接",
   "settings.providers.custom.description": "通过基础 URL 添加与 OpenAI 兼容的提供商。",
 

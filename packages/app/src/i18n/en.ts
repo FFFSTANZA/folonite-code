@@ -632,10 +632,7 @@ export const dict = {
   "session.revertDock.expand": "Expand rolled back messages",
   "session.revertDock.restore": "Restore message",
 
-  "session.new.title": "Choose what to do",
-  // Kept for parity/branding tests; UI usage removed in #300.
-  "session.new.subtitle":
-    "PawWork helps you process files, analyze information, write content, and tackle everyday tasks.",
+  "session.new.title": "What do you want to do?",
   "session.new.reassurance": "Files and conversations stay on your computer",
   "session.new.card.document.title": "Process docs",
   "session.new.card.document.description": "Edit, convert, and extract from Word, Excel, PowerPoint, and PDF files.",
@@ -756,11 +753,10 @@ export const dict = {
   "common.unknown": "unknown",
 
   "common.time.justNow": "Just now",
-  "common.time.minutesAgo.short": "{{count}}m ago",
-  "common.time.hoursAgo.short": "{{count}}h ago",
-  "common.time.daysAgo.short": "{{count}}d ago",
+  "common.time.minutesAgo.short": "{{count}}m",
+  "common.time.hoursAgo.short": "{{count}}h",
+  "common.time.daysAgo.short": "{{count}}d",
 
-  "sidebar.menu.toggle": "Toggle menu",
   "sidebar.nav.projectsAndSessions": "Projects and sessions",
   "sidebar.settings": "Settings",
   "sidebar.workspaces.enable": "Enable workspaces",
@@ -775,7 +771,6 @@ export const dict = {
   "sidebar.empty.description": "Open a project to get started",
   "sidebar.pawwork.search": "Search",
   "sidebar.pawwork.empty.description": "Open a project to start using the session-first sidebar.",
-  "sidebar.pawwork.empty.sessions": "No sessions yet. Start a new one to begin.",
   "sidebar.pawwork.pinned": "Pinned",
   "sidebar.pawwork.all": "All sessions",
   "sidebar.pawwork.pinSession": "Pin session",

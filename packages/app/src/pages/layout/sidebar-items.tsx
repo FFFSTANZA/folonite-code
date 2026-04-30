@@ -8,7 +8,7 @@ import { A, useParams } from "@solidjs/router"
 import { type Accessor, createMemo, For, type JSX, Show } from "solid-js"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
-import { getAvatarColors, type LocalProject, useLayout } from "@/context/layout"
+import { getAvatarColors, type LocalProject } from "@/context/layout"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { messageAgentColor } from "@/utils/agent"
@@ -65,13 +65,10 @@ export type SessionItemProps = {
   list: Session[]
   navList?: Accessor<Session[]>
   slug: string
-  mobile?: boolean
   dense?: boolean
   showTooltip?: boolean
   showChild?: boolean
   level?: number
-  sidebarExpanded: Accessor<boolean>
-  clearHoverProjectSoon: () => void
   prefetchSession: (session: Session, priority?: "high" | "low") => void
   titleContent?: (input: { session: Session; title: Accessor<string> }) => JSX.Element
   actionSlot?: (session: Session) => JSX.Element
@@ -82,10 +79,7 @@ export type SessionItemProps = {
 const SessionRow = (props: {
   session: Session
   slug: string
-  mobile?: boolean
   dense?: boolean
-  clearHoverProjectSoon: () => void
-  sidebarOpened: Accessor<boolean>
   warmPress: () => void
   warmFocus: () => void
   titleContent?: JSX.Element
@@ -98,10 +92,6 @@ const SessionRow = (props: {
       class={`flex items-center min-w-0 w-full text-left focus:outline-none leading-[1.4] ${props.dense ? "py-1" : "py-[5px]"}`}
       onPointerDown={props.warmPress}
       onFocus={props.warmFocus}
-      onClick={() => {
-        if (props.sidebarOpened()) return
-        props.clearHoverProjectSoon()
-      }}
     >
       <Show when={props.titleContent} fallback={<span class="text-13-regular text-text-base [.active_&]:text-text-strong min-w-0 flex-1 truncate">{title()}</span>}>
         {props.titleContent}
@@ -112,7 +102,6 @@ const SessionRow = (props: {
 
 export const SessionItem = (props: SessionItemProps): JSX.Element => {
   const params = useParams()
-  const layout = useLayout()
   const notification = useNotification()
   const permission = usePermission()
   const globalSync = useGlobalSync()
@@ -134,7 +123,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
   })
 
   const tint = createMemo(() => messageAgentColor(sessionStore.message[props.session.id], sessionStore.agent))
-  const tooltip = createMemo(() => props.showTooltip ?? (props.mobile || !props.sidebarExpanded()))
+  const tooltip = createMemo(() => props.showTooltip ?? false)
   const currentChild = createMemo(() => {
     if (!props.showChild) return
     return childSessionOnPath(sessionStore.session, props.session.id, params.id)
@@ -175,10 +164,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
     <SessionRow
       session={props.session}
       slug={props.slug}
-      mobile={props.mobile}
       dense={props.dense}
-      clearHoverProjectSoon={props.clearHoverProjectSoon}
-      sidebarOpened={layout.sidebar.opened}
       warmPress={() => warm(2, "high")}
       warmFocus={() => warm(2, "high")}
       titleContent={props.titleContent?.({ session: props.session, title: () => sessionTitle(props.session.title) ?? "" })}
@@ -198,7 +184,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
               when={!tooltip()}
               fallback={
                 <Tooltip
-                  placement={props.mobile ? "bottom" : "right"}
+                  placement="right"
                   value={sessionTitle(props.session.title)}
                   gutter={10}
                   class="min-w-0 w-full"
@@ -248,24 +234,15 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
 
 export const NewSessionItem = (props: {
   slug: string
-  mobile?: boolean
   dense?: boolean
-  sidebarExpanded: Accessor<boolean>
-  clearHoverProjectSoon: () => void
 }): JSX.Element => {
-  const layout = useLayout()
   const language = useLanguage()
   const label = language.t("command.session.new")
-  const tooltip = () => props.mobile || !props.sidebarExpanded()
   const item = (
     <A
       href={`/${props.slug}/session`}
       end
       class={`flex items-center gap-2 min-w-0 w-full text-left focus:outline-none leading-[1.4] ${props.dense ? "py-1" : "py-[5px]"}`}
-      onClick={() => {
-        if (layout.sidebar.opened()) return
-        props.clearHoverProjectSoon()
-      }}
     >
       <div data-leading-slot class="shrink-0 w-4 h-4 flex items-center">
         <Icon name="new-session" size="small" class="text-icon-weak" />
@@ -276,16 +253,7 @@ export const NewSessionItem = (props: {
 
   return (
     <div class="group/session relative w-full min-w-0 rounded-md cursor-default transition-colors pl-2 pr-2 hover:bg-surface-raised-base-hover [&:has(:focus-visible)]:bg-surface-raised-base-hover has-[.active]:bg-surface-base-active">
-      <Show
-        when={!tooltip()}
-        fallback={
-          <Tooltip placement={props.mobile ? "bottom" : "right"} value={label} gutter={10} class="min-w-0 w-full">
-            {item}
-          </Tooltip>
-        }
-      >
-        {item}
-      </Show>
+      {item}
     </div>
   )
 }
