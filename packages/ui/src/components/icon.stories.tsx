@@ -72,6 +72,7 @@ const names = [
   "menu",
   "server",
   "branch",
+  "worktree",
   "edit",
   "help",
   "settings-gear",
