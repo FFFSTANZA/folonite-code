@@ -704,11 +704,18 @@ export function MessageTimeline(props: {
             "--sticky-accordion-top": "0px",
           }}
         >
-          <div ref={props.setContentRef} class="min-w-0 w-full">
+          <div
+            ref={props.setContentRef}
+            class="min-w-0 w-full"
+            style={{
+              "padding-top": "calc(2rem + 16px)",
+              "padding-bottom": "calc(var(--composer-dock-height, 0px) + 16px)",
+            }}
+          >
             <div
               role="log"
               data-slot="session-turn-list"
-              class="flex flex-col items-start justify-start pb-16 transition-[margin]"
+              class="flex flex-col items-start justify-start pb-8 transition-[margin]"
               classList={{
                 "w-full": true,
                 "md:max-w-200 md:mx-auto 2xl:max-w-[1000px]": props.centered,
