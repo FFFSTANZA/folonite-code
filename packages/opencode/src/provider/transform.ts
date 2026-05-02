@@ -69,6 +69,65 @@ function isLegacyDeepSeekVariantID(id: string) {
   return /(^|[/:])deepseek-(?:chat|reasoner|r1|v3)(?:[.\-/]|$)/.test(id.toLowerCase())
 }
 
+function isKimiMoonshotModel(model: Provider.Model) {
+  const ids = [model.id, model.providerID, model.api.id].filter(Boolean).map((id) => id.toLowerCase())
+  return ids.some((id) => id.includes("moonshot") || id.includes("kimi") || /(^|[/:])k2p\d*(?:[.\-/]|$)/.test(id))
+}
+
+function isPlainObject(node: unknown): node is Record<string, unknown> {
+  return node !== null && typeof node === "object" && !Array.isArray(node)
+}
+
+const COMBINATOR_SCHEMA_KEYS = ["anyOf", "oneOf", "allOf", "not", "if", "then", "else", "$ref"]
+const OBJECT_SCHEMA_KEYS = [
+  "properties",
+  "additionalProperties",
+  "patternProperties",
+  "propertyNames",
+  "required",
+  "minProperties",
+  "maxProperties",
+]
+const ARRAY_SCHEMA_KEYS = ["items", "prefixItems", "minItems", "maxItems", "uniqueItems", "contains"]
+const STRING_SCHEMA_KEYS = ["minLength", "maxLength", "pattern", "format"]
+const NUMBER_SCHEMA_KEYS = ["minimum", "maximum", "multipleOf", "exclusiveMinimum", "exclusiveMaximum"]
+
+function schemaTypeFromValues(values: unknown[]): string | undefined {
+  const types = new Set(
+    values.map((value) => {
+      if (typeof value === "number") return Number.isInteger(value) ? "integer" : "number"
+      if (Array.isArray(value)) return "array"
+      if (value === null) return "null"
+      return typeof value
+    }),
+  )
+  if (types.size === 1) return types.values().next().value
+  if (types.size === 2 && types.has("integer") && types.has("number")) return "number"
+  return undefined
+}
+
+function inferSchemaType(node: Record<string, unknown>): string | undefined {
+  const enumValues = node.enum
+  if (Array.isArray(enumValues) && enumValues.length > 0) return schemaTypeFromValues(enumValues)
+  if ("const" in node) return schemaTypeFromValues([node.const])
+  if (OBJECT_SCHEMA_KEYS.some((key) => key in node)) return "object"
+  if (ARRAY_SCHEMA_KEYS.some((key) => key in node)) return "array"
+  if (STRING_SCHEMA_KEYS.some((key) => key in node)) return "string"
+  if (NUMBER_SCHEMA_KEYS.some((key) => key in node)) return "number"
+  return undefined
+}
+
+function shouldSkipSchemaType(node: Record<string, unknown>) {
+  return COMBINATOR_SCHEMA_KEYS.some((key) => key in node)
+}
+
+function isEffectivelyEmptyOpenAIContent(content: unknown) {
+  if (content === null || content === undefined) return true
+  if (typeof content === "string") return content.trim() === ""
+  if (!Array.isArray(content)) return false
+  return content.every((part) => isPlainObject(part) && part.type === "text" && String(part.text ?? "").trim() === "")
+}
+
 function normalizeMessages(
   msgs: ModelMessage[],
   model: Provider.Model,
@@ -82,6 +141,10 @@ function normalizeMessages(
 
   // Bedrock specific transforms
   if (model.api.npm === "@ai-sdk/amazon-bedrock") {
+    msgs = msgs.map(filterEmptyMessageContent).filter((msg): msg is ModelMessage => msg !== undefined)
+  }
+
+  if (isKimiMoonshotModel(model)) {
     msgs = msgs.map(filterEmptyMessageContent).filter((msg): msg is ModelMessage => msg !== undefined)
   }
 
@@ -1087,12 +1150,26 @@ export function schema(model: Provider.Model, schema: JSONSchema.BaseSchema | JS
   }
   */
 
-  if (model.providerID === "moonshotai" || model.api.id.toLowerCase().includes("kimi")) {
-    const sanitizeMoonshot = (obj: unknown): unknown => {
+  if (isKimiMoonshotModel(model)) {
+    const sanitizeMoonshot = (obj: unknown, schemaPosition = false): unknown => {
       if (obj === null || typeof obj !== "object") return obj
-      if (Array.isArray(obj)) return obj.map(sanitizeMoonshot)
+      if (Array.isArray(obj)) return obj.map((value) => sanitizeMoonshot(value, schemaPosition))
       const result = Object.fromEntries(
-        Object.entries(obj).map(([key, value]) => [key, sanitizeMoonshot(value)]),
+        Object.entries(obj).map(([key, value]) => {
+          if ((key === "properties" || key === "$defs" || key === "definitions") && isPlainObject(value)) {
+            return [key, Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeMoonshot(v, true)]))]
+          }
+          if (key === "items") {
+            if (Array.isArray(value)) return [key, value.map((item) => sanitizeMoonshot(item, true))]
+            if (isPlainObject(value)) return [key, sanitizeMoonshot(value, true)]
+          }
+          if (key === "additionalProperties" && isPlainObject(value)) return [key, sanitizeMoonshot(value, true)]
+          if (["anyOf", "oneOf", "allOf"].includes(key) && Array.isArray(value)) {
+            return [key, value.map((item) => sanitizeMoonshot(item, true))]
+          }
+          if (["not", "if", "then", "else"].includes(key) && isPlainObject(value)) return [key, sanitizeMoonshot(value, true)]
+          return [key, sanitizeMoonshot(value)]
+        }),
       ) as Record<string, unknown>
       if (typeof result.$ref === "string") {
         const refOnly: Record<string, unknown> = { $ref: result.$ref }
@@ -1101,6 +1178,10 @@ export function schema(model: Provider.Model, schema: JSONSchema.BaseSchema | JS
         return refOnly
       }
       if (Array.isArray(result.items)) result.items = result.items[0] ?? {}
+      if (schemaPosition && !("type" in result) && !shouldSkipSchemaType(result)) {
+        const inferredType = inferSchemaType(result)
+        if (inferredType) result.type = inferredType
+      }
       return result
     }
 
@@ -1189,11 +1270,41 @@ export function schema(model: Provider.Model, schema: JSONSchema.BaseSchema | JS
   return schema as JSONSchema7
 }
 
+export function openAICompatibleRequestBody(model: Provider.Model, body: Record<string, unknown>): Record<string, unknown> {
+  if (!isKimiMoonshotModel(model)) return body
+  if (!Array.isArray(body.messages)) return body
+
+  return {
+    ...body,
+    messages: body.messages.map((message) => {
+      if (!isPlainObject(message)) return message
+      if (message.role !== "assistant") return message
+      if (!Array.isArray(message.tool_calls) || message.tool_calls.length === 0) return message
+      if (!("content" in message) || !isEffectivelyEmptyOpenAIContent(message.content)) return message
+
+      const result = { ...message }
+      delete result.content
+      return result
+    }),
+  }
+}
+
+export function openAICompatibleRequestBodyText(model: Provider.Model, body: unknown): string | undefined {
+  if (typeof body !== "string") return undefined
+  try {
+    return JSON.stringify(openAICompatibleRequestBody(model, JSON.parse(body)))
+  } catch {
+    return undefined
+  }
+}
+
 const ProviderTransformOptionsValue = options
 const ProviderTransformMessageValue = message
 const ProviderTransformVariantsValue = variants
 const ProviderTransformProviderOptionsValue = providerOptions
 const ProviderTransformSchemaValue = schema
+const ProviderTransformOpenAICompatibleRequestBodyValue = openAICompatibleRequestBody
+const ProviderTransformOpenAICompatibleRequestBodyTextValue = openAICompatibleRequestBodyText
 const ProviderTransformOutputTokenMaxValue = OUTPUT_TOKEN_MAX
 const ProviderTransformMaxOutputTokensValue = maxOutputTokens
 const ProviderTransformTemperatureValue = temperature
@@ -1208,6 +1319,8 @@ export namespace ProviderTransform {
   export const variants = ProviderTransformVariantsValue
   export const providerOptions = ProviderTransformProviderOptionsValue
   export const schema = ProviderTransformSchemaValue
+  export const openAICompatibleRequestBody = ProviderTransformOpenAICompatibleRequestBodyValue
+  export const openAICompatibleRequestBodyText = ProviderTransformOpenAICompatibleRequestBodyTextValue
   export const maxOutputTokens = ProviderTransformMaxOutputTokensValue
   export const temperature = ProviderTransformTemperatureValue
   export const topP = ProviderTransformTopPValue

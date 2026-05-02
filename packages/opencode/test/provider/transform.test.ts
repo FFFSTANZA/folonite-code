@@ -1098,6 +1098,95 @@ describe("ProviderTransform.schema - Moonshot/Kimi tool schemas", () => {
     })
   })
 
+  test("also sanitizes Kimi for Coding aliases that do not include kimi in api id", () => {
+    const result = ProviderTransform.schema(
+      {
+        id: "kimi-for-coding/k2p6",
+        providerID: "kimi-for-coding",
+        api: {
+          id: "k2p6",
+        },
+      } as any,
+      {
+        type: "object",
+        properties: {
+          value: {
+            $ref: "#/$defs/Value",
+            description: "Moonshot rejects this sibling after ref expansion.",
+          },
+        },
+        $defs: {
+          Value: {
+            type: "object",
+          },
+        },
+      } as any,
+    ) as any
+
+    expect(result.properties.value).toEqual({
+      $ref: "#/$defs/Value",
+    })
+  })
+
+  test("sanitizes k2p aliases from canonical api ids", () => {
+    const result = ProviderTransform.schema(
+      {
+        id: "custom-provider/model",
+        providerID: "custom-provider",
+        api: {
+          id: "k2p6",
+        },
+      } as any,
+      {
+        type: "object",
+        properties: {
+          value: {
+            $ref: "#/$defs/Value",
+            description: "Moonshot rejects this sibling after ref expansion.",
+          },
+        },
+        $defs: {
+          Value: {
+            type: "object",
+          },
+        },
+      } as any,
+    ) as any
+
+    expect(result.properties.value).toEqual({
+      $ref: "#/$defs/Value",
+    })
+  })
+
+  test("does not opt in based on display name alone", () => {
+    const result = ProviderTransform.schema(
+      {
+        id: "custom-provider/model",
+        providerID: "custom-provider",
+        name: "Kimi-compatible proxy",
+        api: {
+          id: "model",
+        },
+      } as any,
+      {
+        type: "object",
+        properties: {
+          value: {
+            $ref: "#/$defs/Value",
+            description: "should remain",
+          },
+        },
+        $defs: {
+          Value: {
+            type: "object",
+          },
+        },
+      } as any,
+    ) as any
+
+    expect(result.properties.value.description).toBe("should remain")
+  })
+
   test("converts tuple-style array items to a single item schema", () => {
     const result = ProviderTransform.schema(
       moonshotModel,
@@ -1117,6 +1206,94 @@ describe("ProviderTransform.schema - Moonshot/Kimi tool schemas", () => {
     expect(result.properties.renderedSize.items).toEqual({
       type: "number",
     })
+  })
+
+  test("fills missing property types using conservative schema intent", () => {
+    const result = ProviderTransform.schema(
+      moonshotModel,
+      {
+        type: "object",
+        properties: {
+          options: {
+            properties: {
+              enabled: { type: "boolean" },
+            },
+          },
+          tags: {
+            items: { type: "string" },
+          },
+          mode: {
+            enum: ["read", "write"],
+          },
+          count: {
+            type: "integer",
+            enum: [1, 2],
+          },
+          referenced: {
+            $ref: "#/$defs/Referenced",
+          },
+        },
+        $defs: {
+          Referenced: {
+            properties: {
+              value: { type: "string" },
+            },
+          },
+        },
+      } as any,
+    ) as any
+
+    expect(result.properties.options.type).toBe("object")
+    expect(result.properties.tags.type).toBe("array")
+    expect(result.properties.mode.type).toBe("string")
+    expect(result.properties.count.type).toBe("integer")
+    expect(result.properties.referenced).toEqual({ $ref: "#/$defs/Referenced" })
+    expect(result.$defs.Referenced.type).toBe("object")
+  })
+
+  test("infers missing property types for consts, numeric constraints, and nested schema positions", () => {
+    const result = ProviderTransform.schema(
+      moonshotModel,
+      {
+        type: "object",
+        properties: {
+          limit: {
+            minimum: 1,
+          },
+          enabled: {
+            const: true,
+          },
+          metadata: {
+            additionalProperties: {
+              enum: ["small", "large"],
+            },
+          },
+          choice: {
+            anyOf: [{ enum: [1, 2] }, { const: "auto" }],
+          },
+          flexible: {
+            anyOf: [{ type: "string" }, { type: "number" }],
+          },
+          mixedEnum: {
+            enum: [1, "1"],
+          },
+          described: {
+            description: "optional field",
+          },
+        },
+      } as any,
+    ) as any
+
+    expect(result.properties.limit.type).toBe("number")
+    expect(result.properties.enabled.type).toBe("boolean")
+    expect(result.properties.metadata.type).toBe("object")
+    expect(result.properties.metadata.additionalProperties.type).toBe("string")
+    expect(result.properties.choice.type).toBeUndefined()
+    expect(result.properties.choice.anyOf[0].type).toBe("integer")
+    expect(result.properties.choice.anyOf[1].type).toBe("string")
+    expect(result.properties.flexible.type).toBeUndefined()
+    expect(result.properties.mixedEnum.type).toBeUndefined()
+    expect(result.properties.described.type).toBeUndefined()
   })
 })
 
@@ -1771,6 +1948,177 @@ describe("ProviderTransform.message - anthropic empty content filtering", () => 
         { type: "tool-call", toolCallId: "toolu_2", toolName: "glob", input: { pattern: "**/*.pdf" } },
       ],
     })
+  })
+})
+
+describe("ProviderTransform.message - Kimi/Moonshot empty content filtering", () => {
+  const kimiModel = {
+    id: "kimi-for-coding/k2p6",
+    providerID: "kimi-for-coding",
+    api: {
+      id: "k2p6",
+      url: "https://api.moonshot.cn",
+      npm: "@ai-sdk/openai-compatible",
+    },
+    name: "Kimi K2.6",
+    capabilities: {
+      temperature: true,
+      reasoning: true,
+      attachment: true,
+      toolcall: true,
+      input: { text: true, audio: false, image: true, video: true, pdf: false },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+      interleaved: false,
+    },
+    cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+    limit: { context: 262144, output: 32768 },
+    status: "active",
+    options: {},
+    headers: {},
+  } as any
+
+  test("drops empty string and empty array messages for Kimi-compatible requests", () => {
+    const msgs = [
+      { role: "user", content: "Hello" },
+      { role: "assistant", content: "" },
+      { role: "assistant", content: [] },
+      { role: "user", content: "World" },
+    ] as any[]
+
+    const result = ProviderTransform.message(msgs, kimiModel, {})
+
+    expect(result).toHaveLength(2)
+    expect(result.map((msg) => msg.content)).toEqual(["Hello", "World"])
+  })
+
+  test("removes empty text around assistant tool calls while preserving the tool call", () => {
+    const msgs = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "" },
+          { type: "tool-call", toolCallId: "call_1", toolName: "bash", input: { command: "pwd" } },
+          { type: "reasoning", text: "" },
+        ],
+      },
+    ] as any[]
+
+    const result = ProviderTransform.message(msgs, kimiModel, {})
+
+    expect(result).toHaveLength(1)
+    expect(result[0].content).toEqual([
+      { type: "tool-call", toolCallId: "call_1", toolName: "bash", input: { command: "pwd" } },
+    ])
+  })
+
+  test("omits empty content from final OpenAI-compatible assistant tool-call payloads", () => {
+    const result = ProviderTransform.openAICompatibleRequestBody(kimiModel, {
+      model: "k2p6",
+      messages: [
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              id: "call_1",
+              type: "function",
+              function: { name: "bash", arguments: "{\"command\":\"pwd\"}" },
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "not empty" }],
+          tool_calls: [
+            {
+              id: "call_2",
+              type: "function",
+              function: { name: "bash", arguments: "{\"command\":\"ls\"}" },
+            },
+          ],
+        },
+      ],
+    }) as any
+
+    expect(result.messages[0]).not.toHaveProperty("content")
+    expect(result.messages[0].tool_calls).toHaveLength(1)
+    expect(result.messages[1].content).toEqual([{ type: "text", text: "not empty" }])
+  })
+
+  test("does not omit empty content from assistant messages without tool calls", () => {
+    const result = ProviderTransform.openAICompatibleRequestBody(kimiModel, {
+      model: "k2p6",
+      messages: [
+        {
+          role: "assistant",
+          content: "",
+        },
+      ],
+    }) as any
+
+    expect(result.messages[0].content).toBe("")
+  })
+
+  test("does not omit empty content from non-Kimi OpenAI-compatible payloads", () => {
+    const result = ProviderTransform.openAICompatibleRequestBody(
+      {
+        ...kimiModel,
+        id: "custom-provider/model",
+        providerID: "custom-provider",
+        name: "Kimi-compatible proxy",
+        api: {
+          ...kimiModel.api,
+          id: "model",
+        },
+      },
+      {
+        model: "model",
+        messages: [
+          {
+            role: "assistant",
+            content: "",
+            tool_calls: [
+              {
+                id: "call_1",
+                type: "function",
+                function: { name: "bash", arguments: "{\"command\":\"pwd\"}" },
+              },
+            ],
+          },
+        ],
+      },
+    ) as any
+
+    expect(result.messages[0].content).toBe("")
+  })
+
+  test("rewrites OpenAI-compatible request body text only when it is valid JSON", () => {
+    const result = ProviderTransform.openAICompatibleRequestBodyText(
+      kimiModel,
+      JSON.stringify({
+        model: "k2p6",
+        messages: [
+          {
+            role: "assistant",
+            content: "",
+            tool_calls: [
+              {
+                id: "call_1",
+                type: "function",
+                function: { name: "bash", arguments: "{\"command\":\"pwd\"}" },
+              },
+            ],
+          },
+        ],
+      }),
+    )
+
+    expect(JSON.parse(result ?? "{}").messages[0]).not.toHaveProperty("content")
+  })
+
+  test("leaves invalid or non-string OpenAI-compatible request bodies unchanged", () => {
+    expect(ProviderTransform.openAICompatibleRequestBodyText(kimiModel, "not json")).toBeUndefined()
+    expect(ProviderTransform.openAICompatibleRequestBodyText(kimiModel, new Uint8Array([1, 2, 3]))).toBeUndefined()
   })
 })
 
