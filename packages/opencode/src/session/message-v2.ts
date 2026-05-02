@@ -484,10 +484,12 @@ export const Assistant = Base.extend({
    */
   mode: z.string(),
   agent: z.string(),
-  path: z.object({
-    cwd: z.string(),
-    root: z.string(),
-  }),
+  // Pre-design messages serialised path as a single absolute string. Readers lift it to
+  // {cwd, root} where cwd === root; writers still emit only the modern object shape.
+  path: z.union([
+    z.object({ cwd: z.string(), root: z.string() }),
+    z.string().transform((s) => ({ cwd: s, root: s })),
+  ]),
   summary: z.boolean().optional(),
   cost: z.number(),
   tokens: z.object({
@@ -585,12 +587,19 @@ export const cursor = {
   },
 }
 
-const info = (row: typeof MessageTable.$inferSelect) =>
-  ({
+const info = (row: typeof MessageTable.$inferSelect) => {
+  const raw = {
     ...row.data,
     id: row.id,
     sessionID: row.session_id,
-  }) as Info
+  } as Record<string, unknown>
+
+  if (raw.role === "assistant" && typeof raw.path === "string") {
+    raw.path = { cwd: raw.path, root: raw.path }
+  }
+
+  return raw as Info
+}
 
 const part = (row: typeof PartTable.$inferSelect) =>
   ({

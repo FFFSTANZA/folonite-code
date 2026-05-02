@@ -26,6 +26,10 @@ export function Titlebar() {
   const zoom = () => platform.webviewZoom?.() ?? 1
   const currentTitlebarHeight = () =>
     mac() ? "var(--shell-titlebar-current-height, var(--shell-titlebar-height, 40px))" : undefined
+  const leftPortalStyle = () => ({
+    left: "max(172px, calc(var(--sidebar-width, 0px) + 16px))",
+    right: "calc(var(--right-panel-width, 0px) + 52px)",
+  })
 
   const [history, setHistory] = createStore({
     stack: [] as string[],
@@ -34,12 +38,6 @@ export function Titlebar() {
   })
 
   const path = () => `${location.pathname}${location.search}${location.hash}`
-  const creating = createMemo(() => {
-    if (!params.dir) return false
-    if (params.id) return false
-    const parts = location.pathname.replace(/\/+$/, "").split("/")
-    return parts.at(-1) === "session"
-  })
 
   createEffect(() => {
     const current = path()
@@ -118,45 +116,34 @@ export function Titlebar() {
               <Icon size="small" name={layout.sidebar.opened() ? "sidebar-active" : "sidebar"} />
             </Button>
           </TooltipKeybind>
-          <div class="flex items-center shrink-0">
-            <Show when={params.dir}>
-              <div
-                class="flex items-center shrink-0 w-8"
-                aria-hidden={layout.sidebar.opened() ? "true" : undefined}
-              >
-                <div
-                  class="transition-opacity duration-120 ease-out opacity-100"
-                  classList={{
-                    "opacity-0 ease-in delay-0 pointer-events-none": layout.sidebar.opened(),
-                  }}
-                >
-                  <TooltipKeybind
-                    placement="bottom"
-                    title={language.t("command.session.new")}
-                    keybind={command.keybind("session.new")}
-                    openDelay={2000}
-                  >
-                    <Button
-                      variant="ghost"
-                      icon={creating() ? "new-session-active" : "new-session"}
-                      class="titlebar-icon w-8 h-6 p-0 box-border"
-                      disabled={layout.sidebar.opened()}
-                      tabIndex={layout.sidebar.opened() ? -1 : undefined}
-                      onClick={() => {
-                        if (!params.dir) return
-                        navigate(`/${params.dir}/session`)
-                      }}
-                      aria-label={language.t("command.session.new")}
-                      aria-current={creating() ? "page" : undefined}
-                    />
-                  </TooltipKeybind>
-                </div>
-              </div>
-            </Show>
-          </div>
+          <Show when={params.dir && !layout.sidebar.opened()}>
+            <TooltipKeybind
+              placement="bottom"
+              title={language.t("command.session.new")}
+              keybind={command.keybind("session.new")}
+              openDelay={2000}
+            >
+              <Button
+                variant="ghost"
+                icon="new-session"
+                class="titlebar-icon w-8 h-6 p-0 box-border"
+                onClick={() => {
+                  if (!params.dir) return
+                  navigate(`/${params.dir}/session`)
+                }}
+                aria-label={language.t("command.session.new")}
+              />
+            </TooltipKeybind>
+          </Show>
         </div>
-        <div id="opencode-titlebar-left" data-shell-slot="left-portal" class="flex items-center gap-3 min-w-0 px-2" />
       </div>
+
+      <div
+        id="opencode-titlebar-left"
+        data-shell-slot="left-portal"
+        class="@container pointer-events-none absolute inset-y-0 z-10 flex min-w-0 items-center gap-3 overflow-hidden"
+        style={leftPortalStyle()}
+      />
 
       <div class="min-w-0 flex items-center justify-center pointer-events-none">
         <div id="opencode-titlebar-center" class="pointer-events-auto min-w-0 flex justify-center w-fit max-w-full" />

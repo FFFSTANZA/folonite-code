@@ -8,7 +8,7 @@ import { type ProviderMetadata, type LanguageModelUsage } from "ai"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Installation } from "../installation"
 
-import { Database, NotFoundError, eq, and, or, gte, isNull, desc, asc, like, inArray, lt, gt } from "../storage/db"
+import { Database, NotFoundError, eq, and, or, gte, isNull, desc, asc, like, inArray, lt, gt, sql } from "../storage/db"
 import { SyncEvent } from "../sync"
 import type { SQL } from "../storage/db"
 import { PartTable, SessionTable } from "./session.sql"
@@ -31,11 +31,9 @@ import type { Provider } from "@/provider"
 import { Permission } from "@/permission"
 import { Global } from "@/global"
 import { Effect, Layer, Option, Context } from "effect"
-import {
-  SubagentRunWriterContext,
-  SubagentRunGuardViolation,
-  lifecycleFieldsChanged,
-} from "./subagent-run-context"
+import { SubagentRunWriterContext, SubagentRunGuardViolation, lifecycleFieldsChanged } from "./subagent-run-context"
+import { ActiveWorktree, SessionExecutionContext, canonicalDirectory, rootContext, sameDirectory } from "./execution-context"
+import { backfillExecutionContextRows } from "./execution-context-store"
 
 const log = Log.create({ service: "session" })
 
@@ -53,8 +51,97 @@ export function isDefaultTitle(title: string) {
 }
 
 type SessionRow = typeof SessionTable.$inferSelect
+type ProjectFallback = { worktree?: string | null; vcs?: string | null }
 
-export function fromRow(row: SessionRow): Info {
+function legacyExecutionContext(row: SessionRow, project: ProjectFallback | undefined) {
+  const ownerDirectoryRaw = project?.vcs === "git" ? (project.worktree ?? row.directory) : row.directory
+  return rootContext(canonicalDirectory(ownerDirectoryRaw))
+}
+
+function recoverExecutionContext(row: SessionRow) {
+  const raw = row.execution_context
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined
+  const record = raw as Record<string, unknown>
+  const ownerDirectory = record.ownerDirectory
+  const activeDirectory = record.activeDirectory
+  if (
+    typeof ownerDirectory !== "string" ||
+    typeof activeDirectory !== "string" ||
+    !path.isAbsolute(ownerDirectory) ||
+    !path.isAbsolute(activeDirectory)
+  ) {
+    return undefined
+  }
+
+  const activeWorktreeRaw = record.activeWorktree
+  let activeWorktree: ActiveWorktree | undefined
+  if (activeWorktreeRaw && typeof activeWorktreeRaw === "object" && !Array.isArray(activeWorktreeRaw)) {
+    const worktree = activeWorktreeRaw as Record<string, unknown>
+    const directory = worktree.directory
+    if (typeof directory === "string" && path.isAbsolute(directory)) {
+      const parsed = ActiveWorktree.safeParse({
+        directory: canonicalDirectory(directory),
+        name: worktree.name,
+        branch: worktree.branch,
+        source: worktree.source,
+      })
+      if (parsed.success) activeWorktree = parsed.data
+    }
+  }
+
+  const recovered = SessionExecutionContext.safeParse({
+    ownerDirectory: canonicalDirectory(ownerDirectory),
+    activeDirectory: canonicalDirectory(activeDirectory),
+    activeWorktree,
+    lastChangedAt:
+      typeof record.lastChangedAt === "number" && Number.isFinite(record.lastChangedAt)
+        ? record.lastChangedAt
+        : row.time_updated,
+  })
+  return recovered.success ? normalizeExecutionContext(recovered.data) : undefined
+}
+
+function isPersistedExecutionContextUsable(ctx: SessionExecutionContext) {
+  return (
+    path.isAbsolute(ctx.ownerDirectory) &&
+    path.isAbsolute(ctx.activeDirectory) &&
+    (!ctx.activeWorktree || path.isAbsolute(ctx.activeWorktree.directory))
+  )
+}
+
+function normalizeExecutionContext(ctx: SessionExecutionContext): SessionExecutionContext {
+  const ownerDirectory = canonicalDirectory(ctx.ownerDirectory)
+  const activeDirectory = canonicalDirectory(ctx.activeDirectory)
+  return {
+    ...ctx,
+    ownerDirectory,
+    activeDirectory,
+    activeWorktree:
+      ctx.activeWorktree && !sameDirectory(activeDirectory, ownerDirectory)
+        ? {
+            ...ctx.activeWorktree,
+            directory: canonicalDirectory(ctx.activeWorktree.directory),
+          }
+        : undefined,
+  }
+}
+
+function parseExecutionContext(row: SessionRow, project: ProjectFallback | undefined) {
+  if (row.execution_context !== null) {
+    const parsed = SessionExecutionContext.safeParse(row.execution_context)
+    if (parsed.success && isPersistedExecutionContextUsable(parsed.data)) return normalizeExecutionContext(parsed.data)
+    const recovered = recoverExecutionContext(row)
+    if (recovered) return recovered
+  }
+  return legacyExecutionContext(row, project)
+}
+
+function needsProjectFallback(row: SessionRow) {
+  const parsed = SessionExecutionContext.safeParse(row.execution_context)
+  return !parsed.success || !isPersistedExecutionContextUsable(parsed.data)
+}
+
+export function fromRow(row: SessionRow, project: ProjectFallback | undefined): Info {
   const summary =
     row.summary_additions !== null || row.summary_deletions !== null || row.summary_files !== null
       ? {
@@ -82,6 +169,7 @@ export function fromRow(row: SessionRow): Info {
     share,
     revert,
     permission: row.permission ?? undefined,
+    executionContext: parseExecutionContext(row, project),
     time: {
       created: row.time_created,
       updated: row.time_updated,
@@ -101,6 +189,7 @@ export function toRow(info: Info) {
     subagent_type: info.subagentType,
     slug: info.slug,
     directory: info.directory,
+    execution_context: info.executionContext,
     title: info.title,
     skill: info.skill,
     version: info.version,
@@ -169,6 +258,7 @@ export const Info = z
         diff: z.string().optional(),
       })
       .optional(),
+    executionContext: SessionExecutionContext,
   })
   .meta({
     ref: "Session",
@@ -219,6 +309,19 @@ export const SetRevertInput = z.object({
   summary: Info.shape.summary,
 })
 export const MessagesInput = z.object({ sessionID: SessionID.zod, limit: z.number().optional() })
+const AbsoluteDirectory = z
+  .string()
+  .min(1, "Expected an absolute directory path")
+  .refine((value) => path.isAbsolute(value), "Expected an absolute directory path")
+const ActiveWorktreeInput = ActiveWorktree.extend({
+  directory: AbsoluteDirectory,
+})
+export const UpdateExecutionContextInput = z.object({
+  sessionID: SessionID.zod,
+  activeDirectory: AbsoluteDirectory.optional(),
+  activeWorktree: ActiveWorktreeInput.nullable().optional(),
+})
+export const FindActiveWorktreeBindingInput = AbsoluteDirectory
 export const RemovePartInput = z.object({
   sessionID: SessionID.zod,
   messageID: MessageID.zod,
@@ -378,6 +481,12 @@ export interface Interface {
   }) => Effect.Effect<void>
   readonly clearRevert: (sessionID: SessionID) => Effect.Effect<void>
   readonly setSummary: (input: { sessionID: SessionID; summary: Info["summary"] }) => Effect.Effect<void>
+  readonly updateExecutionContext: (input: {
+    sessionID: SessionID
+    activeDirectory?: string
+    activeWorktree?: SessionExecutionContext["activeWorktree"] | null
+  }) => Effect.Effect<Info>
+  readonly findActiveWorktreeBinding: (directory: string) => Effect.Effect<Info | undefined>
   readonly diff: (sessionID: SessionID) => Effect.Effect<Snapshot.FileDiff[]>
   readonly messages: (input: { sessionID: SessionID; limit?: number }) => Effect.Effect<MessageV2.WithParts[]>
   readonly children: (parentID: SessionID) => Effect.Effect<Info[]>
@@ -412,11 +521,18 @@ type Patch = z.infer<typeof Event.Updated.schema>["info"]
 const db = <T>(fn: (d: Parameters<typeof Database.use>[0] extends (trx: infer D) => any ? D : never) => T) =>
   Effect.sync(() => Database.use(fn))
 
+const backfillExecutionContextEffect = Effect.fn("Session.backfillExecutionContext")(function* () {
+  return yield* db(backfillExecutionContextRows)
+})
+
+export const backfillExecutionContext = backfillExecutionContextEffect()
+
 export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
     const storage = yield* Storage.Service
+    yield* backfillExecutionContextEffect()
 
     const createNext = Effect.fn("Session.createNext")(function* (input: {
       id?: SessionID
@@ -425,6 +541,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
       parentID?: SessionID
       workspaceID?: WorkspaceID
       directory: string
+      executionContext?: SessionExecutionContext
       permission?: Permission.Ruleset
       createdByAgentTool?: boolean
       subagentType?: string | null
@@ -443,6 +560,11 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
         title: input.title ?? createDefaultTitle(!!input.parentID),
         skill: input.skill,
         permission: input.permission,
+        // ownerDirectory is the project root for git projects and never moves. For non-git
+        // projects Instance.worktree is "/" today, so keep the opened directory as the owner.
+        executionContext: input.executionContext
+          ? normalizeExecutionContext(input.executionContext)
+          : rootContext(ctx.project.vcs === "git" ? ctx.worktree : input.directory),
         time: {
           created: Date.now(),
           updated: Date.now(),
@@ -467,7 +589,16 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
     const get = Effect.fn("Session.get")(function* (id: SessionID) {
       const row = yield* db((d) => d.select().from(SessionTable).where(eq(SessionTable.id, id)).get())
       if (!row) throw new NotFoundError({ message: `Session not found: ${id}` })
-      return fromRow(row)
+      const project = needsProjectFallback(row)
+        ? yield* db((d) =>
+            d
+              .select({ worktree: ProjectTable.worktree, vcs: ProjectTable.vcs })
+              .from(ProjectTable)
+              .where(eq(ProjectTable.id, row.project_id))
+              .get(),
+          )
+        : undefined
+      return fromRow(row, project)
     })
 
     const children = Effect.fn("Session.children")(function* (parentID: SessionID) {
@@ -478,7 +609,19 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
           .where(and(eq(SessionTable.parent_id, parentID)))
           .all(),
       )
-      return rows.map(fromRow)
+      const ids = [...new Set(rows.filter(needsProjectFallback).map((row) => row.project_id))]
+      const projects = new Map<string, ProjectFallback>()
+      if (ids.length > 0) {
+        const items = yield* db((d) =>
+          d
+            .select({ id: ProjectTable.id, worktree: ProjectTable.worktree, vcs: ProjectTable.vcs })
+            .from(ProjectTable)
+            .where(inArray(ProjectTable.id, ids))
+            .all(),
+        )
+        for (const item of items) projects.set(item.id, item)
+      }
+      return rows.map((row) => fromRow(row, projects.get(row.project_id)))
     })
 
     const remove: Interface["remove"] = Effect.fnUntraced(function* (sessionID: SessionID) {
@@ -536,9 +679,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
                 part as unknown as Record<string, unknown>,
               )
             ) {
-              return yield* Effect.die(
-                new SubagentRunGuardViolation((part as { tool_call_id?: string }).tool_call_id),
-              )
+              return yield* Effect.die(new SubagentRunGuardViolation((part as { tool_call_id?: string }).tool_call_id))
             }
           }
         }
@@ -607,6 +748,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
         workspaceID: original.workspaceID,
         title,
         skill: original.skill,
+        executionContext: original.executionContext,
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
       const idMap = new Map<string, MessageID>()
@@ -675,6 +817,83 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
       summary: Info["summary"]
     }) {
       yield* patch(input.sessionID, { time: { updated: Date.now() }, summary: input.summary })
+    })
+
+    const updateExecutionContext = Effect.fn("Session.updateExecutionContext")(function* (input: {
+      sessionID: SessionID
+      activeDirectory?: string
+      activeWorktree?: SessionExecutionContext["activeWorktree"] | null
+    }) {
+      const current = yield* get(input.sessionID)
+      const now = Date.now()
+      const hasActiveWorktree = input.activeWorktree !== undefined
+      const ownerDirectory = canonicalDirectory(current.executionContext.ownerDirectory)
+      const activeDirectoryInput = hasActiveWorktree
+        ? (input.activeWorktree?.directory ?? ownerDirectory)
+        : (input.activeDirectory ?? current.executionContext.activeDirectory)
+      const activeDirectory = canonicalDirectory(activeDirectoryInput)
+      const activeWorktree = hasActiveWorktree
+        ? input.activeWorktree
+          ? { ...input.activeWorktree, directory: canonicalDirectory(input.activeWorktree.directory) }
+          : undefined
+        : sameDirectory(activeDirectory, ownerDirectory)
+          ? undefined
+          : current.executionContext.activeWorktree
+            ? {
+                ...current.executionContext.activeWorktree,
+                directory: canonicalDirectory(current.executionContext.activeWorktree.directory),
+              }
+            : undefined
+      const next: SessionExecutionContext = {
+        ownerDirectory,
+        activeDirectory,
+        activeWorktree,
+        lastChangedAt: now,
+      }
+      yield* patch(input.sessionID, { time: { updated: now }, executionContext: next })
+      return { ...current, executionContext: next, time: { ...current.time, updated: now } }
+    })
+
+    const findActiveWorktreeBinding = Effect.fn("Session.findActiveWorktreeBinding")(function* (directory: string) {
+      const project = Instance.project
+      const target = canonicalDirectory(directory)
+      const rows = yield* db((d) =>
+        d
+          .select()
+          .from(SessionTable)
+          .where(
+            and(
+              eq(SessionTable.project_id, project.id),
+              sql`${SessionTable.execution_context} IS NOT NULL`,
+              sql`json_extract(${SessionTable.execution_context}, '$.activeDirectory') != json_extract(${SessionTable.execution_context}, '$.ownerDirectory')`,
+            ),
+          )
+          .all(),
+      )
+      const ids = [...new Set(rows.filter(needsProjectFallback).map((row) => row.project_id))]
+      const projects = new Map<string, ProjectFallback>()
+      if (ids.length > 0) {
+        const items = yield* db((d) =>
+          d
+            .select({ id: ProjectTable.id, worktree: ProjectTable.worktree, vcs: ProjectTable.vcs })
+            .from(ProjectTable)
+            .where(inArray(ProjectTable.id, ids))
+            .all(),
+        )
+        for (const item of items) projects.set(item.id, item)
+      }
+      for (const row of rows) {
+        const session = fromRow(row, projects.get(row.project_id))
+        const exec = session.executionContext
+        if (sameDirectory(exec.activeDirectory, exec.ownerDirectory)) continue
+        if (
+          sameDirectory(exec.activeDirectory, target) ||
+          (exec.activeWorktree?.directory && sameDirectory(exec.activeWorktree.directory, target))
+        ) {
+          return session
+        }
+      }
+      return undefined
     })
 
     const diff = Effect.fn("Session.diff")(function* (sessionID: SessionID) {
@@ -750,6 +969,8 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
       setRevert,
       clearRevert,
       setSummary,
+      updateExecutionContext,
+      findActiveWorktreeBinding,
       diff,
       messages,
       children,
@@ -784,6 +1005,12 @@ export const messages = fn(MessagesInput, (input) => runPromise((svc) => svc.mes
 export const removePart = fn(RemovePartInput, (input) => runPromise((svc) => svc.removePart(input)))
 export const updateMessage = fn(MessageV2.Info, (input) => runPromise((svc) => svc.updateMessage(input)))
 export const updatePart = fn(MessageV2.Part, (input) => runPromise((svc) => svc.updatePart(input)))
+export const updateExecutionContext = fn(UpdateExecutionContextInput, (input) =>
+  runPromise((svc) => svc.updateExecutionContext(input)),
+)
+export const findActiveWorktreeBinding = fn(FindActiveWorktreeBindingInput, (directory) =>
+  runPromise((svc) => svc.findActiveWorktreeBinding(directory)),
+)
 
 type ListSort = "updated" | "created"
 type GlobalListCursor =
@@ -842,8 +1069,20 @@ export function* list(input?: {
       .limit(limit)
       .all(),
   )
+  const ids = [...new Set(rows.filter(needsProjectFallback).map((row) => row.project_id))]
+  const projects = new Map<string, ProjectFallback>()
+  if (ids.length > 0) {
+    const items = Database.use((db) =>
+      db
+        .select({ id: ProjectTable.id, worktree: ProjectTable.worktree, vcs: ProjectTable.vcs })
+        .from(ProjectTable)
+        .where(inArray(ProjectTable.id, ids))
+        .all(),
+    )
+    for (const item of items) projects.set(item.id, item)
+  }
   for (const row of rows) {
-    yield fromRow(row)
+    yield fromRow(row, projects.get(row.project_id))
   }
 }
 
@@ -904,16 +1143,25 @@ export function* listGlobal(input?: {
             .where(and(...conditions))
         : db.select().from(SessionTable)
     const order = sessionOrder(sort)
-    return query.orderBy(...order).limit(limit).all()
+    return query
+      .orderBy(...order)
+      .limit(limit)
+      .all()
   })
 
   const ids = [...new Set(rows.map((row) => row.project_id))]
   const projects = new Map<string, ProjectInfo>()
+  const projectFallbacks = new Map<string, ProjectFallback>()
 
   if (ids.length > 0) {
     const items = Database.use((db) =>
       db
-        .select({ id: ProjectTable.id, name: ProjectTable.name, worktree: ProjectTable.worktree })
+        .select({
+          id: ProjectTable.id,
+          name: ProjectTable.name,
+          worktree: ProjectTable.worktree,
+          vcs: ProjectTable.vcs,
+        })
         .from(ProjectTable)
         .where(inArray(ProjectTable.id, ids))
         .all(),
@@ -924,11 +1172,12 @@ export function* listGlobal(input?: {
         name: item.name ?? undefined,
         worktree: item.worktree,
       })
+      projectFallbacks.set(item.id, item)
     }
   }
 
   for (const row of rows) {
     const project = projects.get(row.project_id) ?? null
-    yield { ...fromRow(row), project }
+    yield { ...fromRow(row, projectFallbacks.get(row.project_id)), project }
   }
 }

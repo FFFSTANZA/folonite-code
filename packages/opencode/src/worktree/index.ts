@@ -1,6 +1,5 @@
 import z from "zod"
 import { NamedError } from "@opencode-ai/util/error"
-import { Global } from "../global"
 import { Instance } from "../project/instance"
 import { InstanceBootstrap } from "../project/bootstrap"
 import { Project } from "../project/project"
@@ -13,13 +12,16 @@ import { errorMessage } from "../util/error"
 import { BusEvent } from "@/bus/bus-event"
 import { GlobalBus } from "@/bus/global"
 import { Git } from "@/git"
-import { Effect, Layer, Path, Scope, Context, Stream } from "effect"
+import { Effect, Layer, Path, Scope, Context, Stream, Semaphore } from "effect"
+import { ensureWorktreesIgnored, restoreWorktreesIgnored } from "./gitignore-guard"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { NodePath } from "@effect/platform-node"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
 import { makeRuntime } from "@/effect/run-service"
 import * as CrossSpawnSpawner from "@opencode-ai/core/cross-spawn-spawner"
 import { InstanceState } from "@/effect/instance-state"
+import { Session } from "../session"
+import { sameDirectory } from "../session/execution-context"
 
 export namespace Worktree {
   const log = Log.create({ service: "worktree" })
@@ -45,6 +47,7 @@ export namespace Worktree {
       name: z.string(),
       branch: z.string(),
       directory: z.string(),
+      source: z.enum(["created", "existing"]).default("created"),
     })
     .meta({
       ref: "Worktree",
@@ -160,6 +163,10 @@ export namespace Worktree {
     readonly makeWorktreeInfo: (name?: string) => Effect.Effect<Info>
     readonly createFromInfo: (info: Info, startCommand?: string) => Effect.Effect<void>
     readonly create: (input?: CreateInput) => Effect.Effect<Info>
+    readonly list: () => Effect.Effect<Info[]>
+    readonly lookupByDirectory: (directory: string) => Effect.Effect<Info | undefined>
+    readonly lookupBySlug: (slug: string) => Effect.Effect<Info | undefined>
+    readonly registerExistingByPath: (directory: string) => Effect.Effect<Info>
     readonly remove: (input: RemoveInput) => Effect.Effect<boolean>
     readonly reset: (input: ResetInput) => Effect.Effect<boolean>
   }
@@ -181,6 +188,15 @@ export namespace Worktree {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const gitSvc = yield* Git.Service
       const project = yield* Project.Service
+      const registryLocks = new Map<ProjectID, Semaphore.Semaphore>()
+
+      const registryLock = (projectID: ProjectID) => {
+        const hit = registryLocks.get(projectID)
+        if (hit) return hit
+        const next = Semaphore.makeUnsafe(1)
+        registryLocks.set(projectID, next)
+        return next
+      }
 
       const git = Effect.fnUntraced(
         function* (args: string[], opts?: { cwd?: string }) {
@@ -200,12 +216,144 @@ export namespace Worktree {
         ),
       )
 
+      function asInfo(
+        entry: string | { directory: string; name?: string; branch?: string; source?: "created" | "existing" },
+      ) {
+        if (typeof entry === "string") {
+          return Info.parse({ directory: entry, name: pathSvc.basename(entry), branch: "", source: "created" })
+        }
+        return Info.parse({
+          directory: entry.directory,
+          name: entry.name ?? pathSvc.basename(entry.directory),
+          branch: entry.branch ?? "",
+          source: entry.source ?? "created",
+        })
+      }
+
+      const readRegistry = Effect.fnUntraced(function* () {
+        const row = yield* Effect.sync(() =>
+          Database.use((db) => db.select().from(ProjectTable).where(eq(ProjectTable.id, Instance.project.id)).get()),
+        )
+        if (!row) return [] as Info[]
+        return row.sandboxes.map(asInfo)
+      })
+
+      const writeRegistry = Effect.fnUntraced(function* (entries: Info[]) {
+        const result = yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .update(ProjectTable)
+              .set({
+                sandboxes: entries.map((entry) => ({
+                  directory: entry.directory,
+                  name: entry.name,
+                  branch: entry.branch,
+                  source: entry.source,
+                })),
+                time_updated: Date.now(),
+              })
+              .where(eq(ProjectTable.id, Instance.project.id))
+              .returning()
+              .get(),
+          ),
+        )
+        if (!result) return
+        const data = Project.fromRow(result)
+        GlobalBus.emit("event", {
+          directory: "global",
+          project: data.id,
+          payload: { type: Project.Event.Updated.type, properties: data },
+        })
+      })
+
+      const upsertRegistry = Effect.fnUntraced(function* (info: Info) {
+        yield* registryLock(Instance.project.id).withPermits(1)(
+          Effect.gen(function* () {
+            const target = yield* canonical(info.directory)
+            const entries = yield* readRegistry()
+            const next: Info[] = []
+            for (const entry of entries) {
+              if (!sameDirectory(yield* canonical(entry.directory), target)) next.push(entry)
+            }
+            next.push(info)
+            yield* writeRegistry(next)
+          }),
+        )
+      })
+
+      const removeRegistry = Effect.fnUntraced(function* (directory: string) {
+        yield* registryLock(Instance.project.id).withPermits(1)(
+          Effect.gen(function* () {
+            const target = yield* canonical(directory)
+            const entries = yield* readRegistry()
+            const next: Info[] = []
+            for (const entry of entries) {
+              if (!sameDirectory(yield* canonical(entry.directory), target)) next.push(entry)
+            }
+            yield* writeRegistry(next)
+          }),
+        )
+      })
+
+      const lookupByDirectory = Effect.fn("Worktree.lookupByDirectory")(function* (directory: string) {
+        const target = yield* canonical(directory)
+        const entries = yield* readRegistry()
+        for (const entry of entries) {
+          if (sameDirectory(yield* canonical(entry.directory), target)) return entry
+        }
+        return undefined
+      })
+
+      const lookupBySlug = Effect.fn("Worktree.lookupBySlug")(function* (slug: string) {
+        const normalizedSlug = slugify(slug)
+        const entries = yield* readRegistry()
+        // `name` addresses managed PawWork worktrees only. Worktrees joined by absolute path remain path-addressable.
+        return entries.find((entry) => entry.name === normalizedSlug && entry.source === "created")
+      })
+
+      const registerExistingByPath = Effect.fn("Worktree.registerExistingByPath")(function* (directory: string) {
+        const target = yield* canonical(directory)
+        const existing = yield* lookupByDirectory(target)
+        if (existing) return existing
+        const listed = yield* git(["worktree", "list", "--porcelain"], { cwd: Instance.worktree })
+        if (listed.code !== 0) {
+          throw new CreateFailedError({ message: listed.stderr || listed.text || "Failed to read git worktrees" })
+        }
+        const match = yield* locateWorktree(parseWorktreeList(listed.text), target)
+        if (!match?.path) {
+          throw new CreateFailedError({ message: "Directory is not a worktree for this project" })
+        }
+        const branch = yield* git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: target })
+        const info = Info.parse({
+          directory: target,
+          name: pathSvc.basename(target),
+          branch: branch.code === 0 ? branch.text.trim() : "",
+          source: "existing",
+        })
+        yield* upsertRegistry(info)
+        return info
+      })
+
+      const list = Effect.fn("Worktree.list")(function* () {
+        const entries = yield* readRegistry()
+        return yield* Effect.forEach(
+          entries,
+          (entry) =>
+            fs.isDir(entry.directory).pipe(
+              Effect.orDie,
+              Effect.map((ok) => (ok ? entry : undefined)),
+            ),
+          { concurrency: "unbounded" },
+        ).pipe(Effect.map((arr) => arr.filter((x): x is Info => x !== undefined)))
+      })
+
       const MAX_NAME_ATTEMPTS = 26
+      const BRANCH_PREFIX = "pawwork/"
       const candidate = Effect.fn("Worktree.candidate")(function* (root: string, base?: string) {
         const ctx = yield* InstanceState.context
         for (const attempt of Array.from({ length: MAX_NAME_ATTEMPTS }, (_, i) => i)) {
           const name = base ? (attempt === 0 ? base : `${base}-${Slug.create()}`) : Slug.create()
-          const branch = `opencode/${name}`
+          const branch = `${BRANCH_PREFIX}${name}`
           const directory = pathSvc.join(root, name)
 
           if (yield* fs.exists(directory).pipe(Effect.orDie)) continue
@@ -214,7 +362,7 @@ export namespace Worktree {
           const branchCheck = yield* git(["show-ref", "--verify", "--quiet", ref], { cwd: ctx.worktree })
           if (branchCheck.code === 0) continue
 
-          return Info.parse({ name, branch, directory })
+          return Info.parse({ name, branch, directory, source: "created" })
         }
         throw new NameGenerationFailedError({ message: "Failed to generate a unique worktree name" })
       })
@@ -225,7 +373,7 @@ export namespace Worktree {
           throw new NotGitError({ message: "Worktrees are only supported for git projects" })
         }
 
-        const root = pathSvc.join(Global.Path.data, "worktree", ctx.project.id)
+        const root = pathSvc.join(ctx.worktree, ".worktrees", "pawwork")
         yield* fs.makeDirectory(root, { recursive: true }).pipe(Effect.orDie)
 
         const base = name ? slugify(name) : ""
@@ -234,14 +382,16 @@ export namespace Worktree {
 
       const setup = Effect.fnUntraced(function* (info: Info) {
         const ctx = yield* InstanceState.context
+        const ignoreChange = yield* Effect.promise(() => ensureWorktreesIgnored(ctx.worktree))
         const created = yield* git(["worktree", "add", "--no-checkout", "-b", info.branch, info.directory], {
           cwd: ctx.worktree,
         })
         if (created.code !== 0) {
+          yield* Effect.promise(() => restoreWorktreesIgnored(ignoreChange))
           throw new CreateFailedError({ message: created.stderr || created.text || "Failed to create git worktree" })
         }
 
-        yield* project.addSandbox(ctx.project.id, info.directory).pipe(Effect.catch(() => Effect.void))
+        yield* upsertRegistry(Info.parse({ ...info, source: info.source ?? "created" }))
       })
 
       const boot = Effect.fnUntraced(function* (info: Info, startCommand?: string) {
@@ -315,8 +465,7 @@ export namespace Worktree {
       const canonical = Effect.fnUntraced(function* (input: string) {
         const abs = pathSvc.resolve(input)
         const real = yield* fs.realPath(abs).pipe(Effect.catch(() => Effect.succeed(abs)))
-        const normalized = pathSvc.normalize(real)
-        return process.platform === "win32" ? normalized.toLowerCase() : normalized
+        return pathSvc.normalize(real)
       })
 
       function parseWorktreeList(text: string) {
@@ -345,7 +494,7 @@ export namespace Worktree {
         for (const item of entries) {
           if (!item.path) continue
           const key = yield* canonical(item.path)
-          if (key === directory) return item
+          if (sameDirectory(key, directory)) return item
         }
         return undefined
       })
@@ -382,6 +531,12 @@ export namespace Worktree {
         }
 
         const directory = yield* canonical(input.directory)
+        const bound = yield* Effect.promise(() => Session.findActiveWorktreeBinding(directory))
+        if (bound) {
+          throw new RemoveFailedError({
+            message: `Worktree is in use by session "${bound.title}". Call ExitWorktree from that session first.`,
+          })
+        }
 
         const list = yield* git(["worktree", "list", "--porcelain"], { cwd: Instance.worktree })
         if (list.code !== 0) {
@@ -397,6 +552,7 @@ export namespace Worktree {
             yield* stopFsmonitor(directory)
             yield* cleanDirectory(directory)
           }
+          yield* removeRegistry(input.directory).pipe(Effect.catch(() => Effect.void))
           return true
         }
 
@@ -417,6 +573,7 @@ export namespace Worktree {
         }
 
         yield* cleanDirectory(entry.path)
+        yield* removeRegistry(input.directory).pipe(Effect.catch(() => Effect.void))
 
         const branch = entry.branch?.replace(/^refs\/heads\//, "")
         if (branch) {
@@ -427,7 +584,6 @@ export namespace Worktree {
             })
           }
         }
-
         return true
       })
 
@@ -490,7 +646,7 @@ export namespace Worktree {
           (entry) =>
             Effect.gen(function* () {
               const target = yield* canonical(pathSvc.resolve(root, entry))
-              if (target === base) return
+              if (sameDirectory(target, base)) return
               if (!target.startsWith(`${base}${pathSvc.sep}`)) return
               yield* fs.remove(target, { recursive: true }).pipe(Effect.ignore)
             }),
@@ -516,7 +672,7 @@ export namespace Worktree {
 
         const directory = yield* canonical(input.directory)
         const primary = yield* canonical(Instance.worktree)
-        if (directory === primary) {
+        if (sameDirectory(directory, primary)) {
           throw new ResetFailedError({ message: "Cannot reset the primary workspace" })
         }
 
@@ -594,7 +750,17 @@ export namespace Worktree {
         return true
       })
 
-      return Service.of({ makeWorktreeInfo, createFromInfo, create, remove, reset })
+      return Service.of({
+        makeWorktreeInfo,
+        createFromInfo,
+        create,
+        list,
+        lookupByDirectory,
+        lookupBySlug,
+        registerExistingByPath,
+        remove,
+        reset,
+      })
     }),
   )
 
@@ -617,6 +783,22 @@ export namespace Worktree {
 
   export async function create(input?: CreateInput) {
     return runPromise((svc) => svc.create(input))
+  }
+
+  export async function list() {
+    return runPromise((svc) => svc.list())
+  }
+
+  export async function lookupByDirectory(directory: string) {
+    return runPromise((svc) => svc.lookupByDirectory(directory))
+  }
+
+  export async function lookupBySlug(slug: string) {
+    return runPromise((svc) => svc.lookupBySlug(slug))
+  }
+
+  export async function registerExistingByPath(directory: string) {
+    return runPromise((svc) => svc.registerExistingByPath(directory))
   }
 
   export async function remove(input: RemoveInput) {

@@ -53,8 +53,23 @@ function track(directory: string, next: Promise<InstanceContext>) {
   return task
 }
 
+function matchesOverride(ctx: InstanceContext, input: { worktree?: string; project?: Project.Info }) {
+  if (!input.worktree && !input.project) return true
+  return ctx.worktree === input.worktree && ctx.project.id === input.project?.id
+}
+
 export const Instance = {
-  async provide<R>(input: { directory: string; init?: () => Promise<any>; fn: () => R }): Promise<R> {
+  async provide<R>(input: {
+    directory: string
+    init?: () => Promise<any>
+    worktree?: string
+    project?: Project.Info
+    fn: () => R
+  }): Promise<R> {
+    if (!!input.worktree !== !!input.project) {
+      throw new Error("Instance.provide requires both worktree and project when overriding context")
+    }
+
     const directory = Filesystem.resolve(input.directory)
     let existing = cache.get(directory)
     if (!existing) {
@@ -64,12 +79,50 @@ export const Instance = {
         boot({
           directory,
           init: input.init,
+          worktree: input.worktree,
+          project: input.project,
         }),
       )
     }
-    const ctx = await existing
+    let ctx = await existing
+    if (!matchesOverride(ctx, input)) {
+      Log.Default.info("recreating instance with explicit context", { directory })
+      existing = track(
+        directory,
+        boot({
+          directory,
+          init: input.init,
+          worktree: input.worktree,
+          project: input.project,
+        }),
+      )
+      ctx = await existing
+    }
     return context.provide(ctx, async () => {
       return input.fn()
+    })
+  },
+  /**
+   * Scope a function under a session's executionContext: directory = activeDirectory,
+   * worktree = ownerDirectory. Reuses the per-directory instance cache so entering the
+   * same worktree twice reuses the cached entry.
+   *
+   * The plan's naming-bridge invariant (Instance.worktree === executionContext.ownerDirectory)
+   * requires both `directory` AND `worktree` to be passed to provide; otherwise Project.fromDirectory
+   * would resolve a fresh worktree from the .worktrees/pawwork/<slug> path, breaking permission
+   * scope and any code comparing Instance.worktree to the project root.
+   */
+  async activate<R>(input: {
+    activeDirectory: string
+    ownerDirectory: string
+    project: Project.Info
+    fn: () => R
+  }): Promise<R> {
+    return Instance.provide({
+      directory: input.activeDirectory,
+      worktree: Filesystem.resolve(input.ownerDirectory),
+      project: input.project,
+      fn: input.fn,
     })
   },
   get current() {

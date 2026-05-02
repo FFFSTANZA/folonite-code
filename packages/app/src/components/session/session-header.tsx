@@ -7,13 +7,13 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { createMemo, Show } from "solid-js"
 import { useLocation } from "@solidjs/router"
 import { Portal } from "solid-js/web"
-import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useShellSurface } from "@/context/shell-surface"
 import { useSync } from "@/context/sync"
+import { PawworkWorktreeBadge } from "@/pages/layout/pawwork-worktree-badge"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { decode64 } from "@/utils/base64"
 import { StatusPopover } from "../status-popover"
@@ -42,6 +42,11 @@ export function SessionHeader() {
   })
   const sessionInfo = createMemo(() => (params.id ? sync.session.get(params.id) : undefined))
   const sessionTitle = createMemo(() => sessionInfo()?.title || params.id || "")
+  const activeWorktree = createMemo(() => {
+    const exec = sessionInfo()?.executionContext
+    if (!exec || exec.activeDirectory === exec.ownerDirectory) return
+    return exec.activeWorktree
+  })
   const homeTitle = createMemo(() => language.t("command.session.new"))
   const onSessionRoute = createMemo(() => location.pathname.includes("/session"))
   const fileManagerLabel = createMemo(() => {
@@ -49,9 +54,11 @@ export function SessionHeader() {
     if (platform.os === "linux") return language.t("session.header.open.fileManager")
     return language.t("session.header.open.finder")
   })
-  const canOpenProjectDirectory = createMemo(
-    () => platform.platform === "desktop" && !!platform.openPath && server.isLocal() && !!projectDirectory(),
-  )
+  const canOpenDirectory = (directory?: string) =>
+    platform.platform === "desktop" && !!platform.openPath && server.isLocal() && !!directory
+  const activeWorktreeDirectory = createMemo(() => activeWorktree()?.directory ?? "")
+  const canOpenProjectDirectory = createMemo(() => canOpenDirectory(projectDirectory()))
+  const canOpenActiveWorktreeDirectory = createMemo(() => canOpenDirectory(activeWorktreeDirectory()))
   const rightPanelOpen = createMemo(() => view().sidePanel.opened())
   const toggleRightPanel = () => {
     if (rightPanelOpen()) {
@@ -60,9 +67,8 @@ export function SessionHeader() {
     }
     view().sidePanel.open()
   }
-  const openProjectDirectory = () => {
-    const directory = projectDirectory()
-    if (!directory || !platform.openPath || !canOpenProjectDirectory()) return
+  const openDirectory = (directory: string) => {
+    if (!canOpenDirectory(directory) || !platform.openPath) return
     void platform.openPath(directory).catch((error) => {
       showToast({
         variant: "error",
@@ -71,45 +77,62 @@ export function SessionHeader() {
       })
     })
   }
+  const openProjectDirectory = () => openDirectory(projectDirectory())
+  const openActiveWorktree = () => {
+    openDirectory(activeWorktreeDirectory())
+  }
 
-  const centerMount = createMemo(() => document.getElementById("opencode-titlebar-center"))
+  const leftMount = createMemo(() => document.getElementById("opencode-titlebar-left"))
   const rightMount = createMemo(() => document.getElementById("opencode-titlebar-right"))
 
   return (
     <>
-      <Show when={!shellSurface.settingsOpen() && centerMount()}>
+      <Show when={!shellSurface.settingsOpen() && leftMount()}>
         {(mount) => (
           <Portal mount={mount()}>
-            <div class="hidden md:flex min-w-0 items-center gap-1.5 text-13-medium">
+            <div class="hidden md:flex w-full min-w-0 max-w-[720px] items-center overflow-hidden text-13-medium">
               <Show
                 when={params.id}
                 fallback={<div class="min-w-0 truncate text-text-strong">{homeTitle()}</div>}
               >
-                <Show when={projectDirectory()}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="small"
-                    class="max-w-[180px] min-w-0 items-center gap-1 rounded-md px-1.5 shadow-none text-text-weak hover:text-text-strong"
-                    onClick={openProjectDirectory}
-                    aria-label={
-                      canOpenProjectDirectory() ? language.t("session.header.open.ariaLabel", { app: fileManagerLabel() }) : undefined
-                    }
-                    title={
-                      canOpenProjectDirectory()
-                        ? `${projectDirectory()} (${language.t("session.header.open.ariaLabel", { app: fileManagerLabel() })})`
-                        : projectDirectory()
-                    }
-                    disabled={!canOpenProjectDirectory()}
-                  >
-                    <Icon name="folder" size="small" class="shrink-0 text-icon-weak" />
-                    <span class="min-w-0 truncate">{name()}</span>
-                  </Button>
-                </Show>
-                <Show when={projectDirectory()}>
-                  <span class="shrink-0 text-text-weaker">/</span>
-                </Show>
-                <span class="min-w-0 truncate text-text-strong">{sessionTitle()}</span>
+                <span class="max-w-full shrink-0 truncate text-13-medium text-text-strong" title={sessionTitle()}>
+                  {sessionTitle()}
+                </span>
+                <div class="ml-3 flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                  <Show when={projectDirectory()}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="small"
+                      class="group h-6 max-w-[180px] min-w-0 shrink items-center gap-1 rounded px-1 shadow-none text-13-regular text-text-weak hover:text-text-strong"
+                      onClick={openProjectDirectory}
+                      aria-label={
+                        canOpenProjectDirectory() ? language.t("session.header.open.ariaLabel", { app: fileManagerLabel() }) : undefined
+                      }
+                      title={
+                        canOpenProjectDirectory()
+                          ? `${projectDirectory()} (${language.t("session.header.open.ariaLabel", { app: fileManagerLabel() })})`
+                          : projectDirectory()
+                      }
+                      disabled={!canOpenProjectDirectory()}
+                    >
+                      <Icon name="folder" size="small" class="shrink-0 text-text-weak transition-colors group-hover:text-text-strong" />
+                      <span class="min-w-0 truncate">{name()}</span>
+                    </Button>
+                  </Show>
+                  <Show when={activeWorktree()}>
+                    {(worktree) => (
+                      <PawworkWorktreeBadge
+                        name={worktree().name}
+                        branch={worktree().branch}
+                        directory={worktree().directory}
+                        onClick={openActiveWorktree}
+                        ariaLabel={language.t("session.header.worktree.open")}
+                        disabled={!canOpenActiveWorktreeDirectory()}
+                      />
+                    )}
+                  </Show>
+                </div>
               </Show>
             </div>
           </Portal>

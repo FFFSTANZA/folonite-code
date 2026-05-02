@@ -14,7 +14,7 @@ import {
   type Accessor,
 } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
-import { useNavigate, useParams } from "@solidjs/router"
+import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import { useLayout, LocalProject } from "@/context/layout"
 import { useGlobalSync } from "@/context/global-sync"
 import { Persist, persisted } from "@/utils/persist"
@@ -115,6 +115,7 @@ export default function Layout(props: ParentProps) {
   const [settingsTab, setSettingsTab] = createSignal<SettingsPageTab>("general")
 
   const params = useParams()
+  const location = useLocation()
   const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
   const layout = useLayout()
@@ -1240,6 +1241,17 @@ export default function Layout(props: ParentProps) {
     setSettingsOpen(false)
   }
 
+  let lastSettingsPath: string | undefined
+  createEffect(() => {
+    const current = location.pathname
+    if (settingsOpen()) {
+      if (lastSettingsPath === undefined) lastSettingsPath = current
+      else if (lastSettingsPath !== current) closeSettings()
+    } else {
+      lastSettingsPath = undefined
+    }
+  })
+
   function projectRoot(directory: string) {
     const key = workspaceKey(directory)
     const project = layout.projects
@@ -1310,8 +1322,8 @@ export default function Layout(props: ParentProps) {
       const listed = await globalSDK.client.worktree
         .list({ directory: root })
         .then((x) => x.data ?? [])
-        .catch(() => [] as string[])
-      dirs = effectiveWorkspaceOrder(root, [root, ...listed], store.workspaceOrder[root])
+        .catch(() => [])
+      dirs = effectiveWorkspaceOrder(root, [root, ...listed.map((item) => item.directory)], store.workspaceOrder[root])
       return canOpen(target)
     }
     const openSession = async (target: { directory: string; id: string }) => {

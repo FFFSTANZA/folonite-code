@@ -279,18 +279,18 @@ export const ExperimentalRoutes = lazy(() =>
         operationId: "worktree.list",
         responses: {
           200: {
-            description: "List of worktree directories",
+            description: "List of worktrees",
             content: {
               "application/json": {
-                schema: resolver(z.array(z.string())),
+                schema: resolver(z.array(Worktree.Info)),
               },
             },
           },
         },
       }),
       async (c) => {
-        const sandboxes = await Project.sandboxes(Instance.project.id)
-        return c.json(sandboxes)
+        const worktrees = await Worktree.list()
+        return c.json(worktrees)
       },
     )
     .delete(
@@ -314,8 +314,11 @@ export const ExperimentalRoutes = lazy(() =>
       validator("json", Worktree.RemoveInput),
       async (c) => {
         const body = c.req.valid("json")
+        const session = await Session.findActiveWorktreeBinding(body.directory)
+        if (session) {
+          throw new Error(`Worktree is in use by session "${session.title}". Call ExitWorktree from that session first.`)
+        }
         await Worktree.remove(body)
-        await Project.removeSandbox(Instance.project.id, body.directory)
         return c.json(true)
       },
     )

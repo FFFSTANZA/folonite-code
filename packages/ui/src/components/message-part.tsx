@@ -264,7 +264,7 @@ function getDirectory(path: string | undefined) {
 
 import type { IconProps } from "./icon"
 
-import { agentTitle, buildToolInfo, type ToolInfo } from "./tool-info"
+import { agentTitle, buildToolInfo, enterWorktreeSubtitle, exitWorktreeSubtitle, type ToolInfo } from "./tool-info"
 export { buildToolInfo, type ToolInfo }
 
 const agentTones: Record<string, string> = {
@@ -308,7 +308,7 @@ function taskAgent(
   }
 }
 
-export function getToolInfo(tool: string, input: any = {}): ToolInfo {
+export function getToolInfo(tool: string, input: any = {}, metadata: any = {}): ToolInfo {
   const i18n = useI18n()
   switch (tool) {
     case "read":
@@ -353,6 +353,20 @@ export function getToolInfo(tool: string, input: any = {}): ToolInfo {
         title: i18n.t("ui.tool.codesearch"),
         subtitle: input.query,
       }
+    case "enter-worktree": {
+      return {
+        icon: "worktree",
+        title: i18n.t("ui.tool.worktree.enter"),
+        subtitle: enterWorktreeSubtitle(input, metadata, i18n),
+      }
+    }
+    case "exit-worktree": {
+      return {
+        icon: "worktree",
+        title: i18n.t("ui.tool.worktree.exit"),
+        subtitle: exitWorktreeSubtitle(metadata, i18n),
+      }
+    }
     case "task": // agent-rename:legacy-render
     case "agent": {
       const type =
@@ -710,9 +724,9 @@ function isContextGroupTool(part: PartType): part is ToolPart {
 }
 
 function contextToolDetail(part: ToolPart): string | undefined {
-  const info = getToolInfo(part.tool, part.state.input ?? {})
+  const info = getToolInfo(part.tool, part.state.input ?? {}, toolStateMetadata(part.state))
   if (info.subtitle) return info.subtitle
-  if (part.state.status === "error") return part.state.error
+  if (part.state.status === "error") return toolStateError(part.state)
   if ((part.state.status === "running" || part.state.status === "completed") && part.state.title)
     return part.state.title
   const description = part.state.input?.description
@@ -762,13 +776,32 @@ function contextToolTrigger(part: ToolPart, i18n: ReturnType<typeof useI18n>) {
       }
     }
     default: {
-      const info = getToolInfo(part.tool, input)
+      const info = getToolInfo(part.tool, input, toolStateMetadata(part.state))
       return {
         title: info.title,
         subtitle: info.subtitle || contextToolDetail(part),
         args: [],
       }
     }
+  }
+}
+
+function toolStateMetadata(state: ToolPart["state"] | undefined): Record<string, any> {
+  if (!state || !("metadata" in state)) return {}
+  const metadata = state.metadata
+  return metadata && typeof metadata === "object" ? metadata : {}
+}
+
+function toolStateError(state: ToolPart["state"] | undefined): string | undefined {
+  if (!state || !("error" in state)) return undefined
+  const err: unknown = state.error
+  if (typeof err === "string") return err
+  if (err instanceof Error) return err.message || String(err)
+  if (err == null) return undefined
+  try {
+    return JSON.stringify(err) || String(err)
+  } catch {
+    return String(err)
   }
 }
 
@@ -1316,8 +1349,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   const emptyMetadata: Record<string, any> = {}
 
   const input = () => part().state?.input ?? emptyInput
-  // @ts-expect-error
-  const partMetadata = () => part().state?.metadata ?? emptyMetadata
+  const partMetadata = () => toolStateMetadata(part().state)
   const taskId = createMemo(() => {
     if (part().tool !== "task" && part().tool !== "agent") return // agent-rename:legacy-render
     const value = partMetadata().sessionId
@@ -1340,7 +1372,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper">
         <Switch>
-          <Match when={part().state.status === "error" && (part().state as any).error}>
+          <Match when={part().state.status === "error" && toolStateError(part().state)}>
             {(error) => {
               const cleaned = error().replace("Error: ", "")
               if (part().tool === "question" && cleaned.includes("dismissed this question")) {
@@ -1736,6 +1768,38 @@ ToolRegistry.register({
       >
         <ExaOutput output={props.output} />
       </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "enter-worktree",
+  render(props) {
+    const i18n = useI18n()
+    const subtitle = createMemo(() => enterWorktreeSubtitle(props.input, props.metadata, i18n))
+    return (
+      <BasicTool
+        {...props}
+        hideDetails
+        icon="worktree"
+        trigger={{ title: i18n.t("ui.tool.worktree.enter"), subtitle: subtitle() }}
+      />
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "exit-worktree",
+  render(props) {
+    const i18n = useI18n()
+    const subtitle = createMemo(() => exitWorktreeSubtitle(props.metadata, i18n))
+    return (
+      <BasicTool
+        {...props}
+        hideDetails
+        icon="worktree"
+        trigger={{ title: i18n.t("ui.tool.worktree.exit"), subtitle: subtitle() }}
+      />
     )
   },
 })

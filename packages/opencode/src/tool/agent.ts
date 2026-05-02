@@ -288,6 +288,12 @@ export const AgentTool = Tool.define(
               model,
             })
 
+            // Snapshot the parent's executionContext at dispatch so the subagent inherits the
+            // currently bound worktree (per spec: subagents see the parent's activeDirectory at
+            // the moment of dispatch). Refs #278.
+            const parent = yield* sessions.get(ctx.sessionID)
+            const parentExec = parent.executionContext
+
             const nextSession =
               session ??
               (yield* sessions.create({
@@ -319,6 +325,23 @@ export const AgentTool = Tool.define(
                   })) ?? []),
                 ],
               }))
+
+            const childExec = nextSession.executionContext
+            const sameWorktree =
+              parentExec.activeWorktree?.directory === childExec.activeWorktree?.directory &&
+              parentExec.activeWorktree?.name === childExec.activeWorktree?.name &&
+              parentExec.activeWorktree?.branch === childExec.activeWorktree?.branch &&
+              parentExec.activeWorktree?.source === childExec.activeWorktree?.source
+
+            // Inherit parent's activeWorktree if any (no-op when parent is at root and child was
+            // freshly created at the project root).
+            if (parentExec.activeDirectory !== childExec.activeDirectory || !sameWorktree) {
+              yield* sessions.updateExecutionContext({
+                sessionID: nextSession.id,
+                activeDirectory: parentExec.activeDirectory,
+                activeWorktree: parentExec.activeWorktree ?? null,
+              })
+            }
 
             yield* subagentRun.patchSession(ctx.callID!, nextSession.id)
 
@@ -402,6 +425,8 @@ export const AgentTool = Tool.define(
                 agent: next.name,
                 tools: {
                   agent: false,
+                  "enter-worktree": false,
+                  "exit-worktree": false,
                   ...(canTodo ? {} : { todowrite: false }),
                   ...Object.fromEntries(
                     (cfg.experimental?.primary_tools ?? []).map((item) => [item, false]),
