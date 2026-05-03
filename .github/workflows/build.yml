@@ -351,7 +351,8 @@ jobs:
 
           existing_dir="$RUNNER_TEMP/existing-latest-yml"
           mkdir -p "$existing_dir"
-          tag="v${{ steps.package_version.outputs.version }}"
+          version=$(node -p "require('./packages/desktop-electron/package.json').version")
+          tag="v$version"
 
           download_or_warn() {
             local pattern="$1"
@@ -359,7 +360,7 @@ jobs:
             if gh release download "$tag" --pattern "$pattern" --dir "$existing_dir" --repo "$GITHUB_REPOSITORY" 2>"$err"; then
               return 0
             fi
-            if grep -qiE 'no assets to download|no matches found|no assets match|could not find any assets' "$err"; then
+            if grep -qiE 'no assets to download|no matches found|no assets match|could not find any assets|release not found' "$err"; then
               echo "No existing $pattern found; expected for first release."
               return 0
             fi
