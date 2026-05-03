@@ -56,7 +56,7 @@ export namespace SessionShare {
         if (result.parentID) return result
         if (!gate.isEnabled()) return result
         const conf = yield* cfg.get()
-        if (!(Flag.OPENCODE_AUTO_SHARE || conf.share === "auto")) return result
+        if (!(Flag.FOLONITE_AUTO_SHARE || conf.share === "auto")) return result
         yield* share(result.id).pipe(Effect.ignore, Effect.forkIn(scope))
         return result
       })

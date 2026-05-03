@@ -18,7 +18,7 @@ type VerificationInput = {
   startupLog?: string
 }
 
-const DEFAULT_REPO = "Astro-Han/pawwork"
+const DEFAULT_REPO = "fffstanza/folonite-code"
 const FETCH_TIMEOUT_MS = 15_000
 
 const RELEASE_TARGETS = [
@@ -30,7 +30,7 @@ const RELEASE_TARGETS = [
 type MetadataFile = (typeof RELEASE_TARGETS)[number]["metadata"]
 
 function releaseTargetAssetName(target: (typeof RELEASE_TARGETS)[number], version: string, ext: string) {
-  return `pawwork-${target.os}-${target.arch}-${version}.${ext}`
+  return `folonite-${target.os}-${target.arch}-${version}.${ext}`
 }
 
 export function releaseAssetNames(version: string) {
@@ -308,7 +308,7 @@ async function main() {
     const tag = process.argv[2]
     if (!tag) {
       console.error(
-        "Usage: bun packages/desktop-electron/scripts/verify-release.ts <tag> [owner/repo] [env: PAWWORK_RELEASE_STARTUP_LOG=/path/to/main.log]",
+        "Usage: bun packages/desktop-electron/scripts/verify-release.ts <tag> [owner/repo] [env: FOLONITE_RELEASE_STARTUP_LOG=/path/to/main.log]",
       )
       process.exit(2)
     }
@@ -323,7 +323,7 @@ async function main() {
     )
     const latestYml = await fetchAssetText(release, "latest.yml")
     const latestMacYml = await fetchAssetText(release, "latest-mac.yml")
-    const startupLogPath = process.env.PAWWORK_RELEASE_STARTUP_LOG
+    const startupLogPath = process.env.FOLONITE_RELEASE_STARTUP_LOG
     const startupLog = startupLogPath ? await readStartupLogFile(startupLogPath) : undefined
     const failures = verifyReleasePayload({ release, latestYml, latestMacYml, startupLog })
 

@@ -2,14 +2,14 @@ import { Context, Effect, Layer } from "effect"
 
 import { Instance } from "../project/instance"
 
-import PROMPT_PAWWORK from "./prompt/pawwork.txt"
+import PROMPT_FOLONITE from "./prompt/folonite.txt"
 import type { Provider } from "@/provider"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 
 export function provider(_model: Provider.Model) {
-  return [PROMPT_PAWWORK]
+  return [PROMPT_FOLONITE]
 }
 
 export interface Interface {
@@ -27,8 +27,9 @@ export const layer = Layer.effect(
     return Service.of({
       environment(model, locale) {
         const project = Instance.project
+        const name = "Model"
         const env = [
-          `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
+          `You are powered by the model named ${name}.`,
           `Here is some useful information about the environment you are running in:`,
           `<env>`,
           `  Working directory: ${Instance.directory}`,

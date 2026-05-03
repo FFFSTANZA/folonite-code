@@ -1,7 +1,7 @@
 import type { BrowserWindow, MenuItem } from "electron"
 
 import { menuLabel, menuRoleLabel, type MenuLocale, type MenuRoleLabelKey } from "./menu-labels"
-import { PAWWORK_GITHUB_ISSUE_URL, PAWWORK_GITHUB_URL } from "./support-links"
+import { FOLONITE_GITHUB_ISSUE_URL, FOLONITE_GITHUB_URL } from "./support-links"
 
 export type MenuItemTemplate = {
   label?: string
@@ -37,7 +37,7 @@ export function buildMacosMenuTemplate(options: BuildMenuOptions): MenuItemTempl
   const roleLabel = (key: MenuRoleLabelKey) => menuRoleLabel(locale, key, appName)
 
   const helpSubmenu: MenuItemTemplate[] = [
-    { label: t("pawworkOnGithub"), click: () => deps.openExternal(PAWWORK_GITHUB_URL) },
+    { label: t("foloniteOnGithub"), click: () => deps.openExternal(FOLONITE_GITHUB_URL) },
     { type: "separator" },
   ]
 
@@ -45,7 +45,7 @@ export function buildMacosMenuTemplate(options: BuildMenuOptions): MenuItemTempl
     helpSubmenu.push({ label: t("reportProblem"), click: () => deps.reportProblem() })
   }
 
-  helpSubmenu.push({ label: t("openGithubIssue"), click: () => deps.openExternal(PAWWORK_GITHUB_ISSUE_URL) })
+  helpSubmenu.push({ label: t("openGithubIssue"), click: () => deps.openExternal(FOLONITE_GITHUB_ISSUE_URL) })
 
   return [
     {
@@ -151,13 +151,13 @@ export function buildWindowsMenuTemplate(options: BuildMenuOptions): MenuItemTem
   const roleLabel = (key: MenuRoleLabelKey) => menuRoleLabel(locale, key, appName)
 
   const helpSubmenu: MenuItemTemplate[] = [
-    { label: t("pawworkOnGithub"), click: () => deps.openExternal(PAWWORK_GITHUB_URL) },
+    { label: t("foloniteOnGithub"), click: () => deps.openExternal(FOLONITE_GITHUB_URL) },
     { type: "separator" },
   ]
   if (feedbackEnabled) {
     helpSubmenu.push({ label: t("reportProblem"), click: () => deps.reportProblem() })
   }
-  helpSubmenu.push({ label: t("openGithubIssue"), click: () => deps.openExternal(PAWWORK_GITHUB_ISSUE_URL) })
+  helpSubmenu.push({ label: t("openGithubIssue"), click: () => deps.openExternal(FOLONITE_GITHUB_ISSUE_URL) })
   helpSubmenu.push({ type: "separator" })
   helpSubmenu.push({ label: t("checkForUpdates"), click: () => deps.checkForUpdates() })
   helpSubmenu.push({ type: "separator" })

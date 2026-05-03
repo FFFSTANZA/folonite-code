@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve } from "node:path"
 
-export const rendererProtocol = "pawwork-renderer"
+export const rendererProtocol = "folonite-renderer"
 export const rendererHost = "renderer"
 export const rendererOrigin = `${rendererProtocol}://${rendererHost}`
 

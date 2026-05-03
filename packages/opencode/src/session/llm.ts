@@ -356,7 +356,7 @@ const live: Layer.Layer<
                 "x-opencode-project": Instance.project.id,
                 "x-opencode-session": input.sessionID,
                 "x-opencode-request": input.user.id,
-                "x-opencode-client": Flag.OPENCODE_CLIENT,
+                "x-opencode-client": Flag.FOLONITE_CLIENT,
               }
             : {
                 "x-session-affinity": input.sessionID,

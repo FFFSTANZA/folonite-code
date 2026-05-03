@@ -51,7 +51,7 @@ const args = hideBin(process.argv)
 
 function show(out: string) {
   const text = out.trimStart()
-  if (!text.startsWith("opencode ")) {
+  if (!text.startsWith("folonite ")) {
     process.stderr.write(UI.logo() + EOL + EOL)
     process.stderr.write(text)
     return
@@ -61,7 +61,7 @@ function show(out: string) {
 
 const cli = yargs(args)
   .parserConfiguration({ "populate--": true })
-  .scriptName("opencode")
+  .scriptName("folonite")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -82,7 +82,7 @@ const cli = yargs(args)
   })
   .middleware(async (opts) => {
     if (opts.pure) {
-      process.env.OPENCODE_PURE = "1"
+      process.env.FOLONITE_PURE = "1"
     }
 
     await Log.init({
@@ -98,10 +98,10 @@ const cli = yargs(args)
     Heap.start()
 
     process.env.AGENT = "1"
-    process.env.OPENCODE = "1"
-    process.env.OPENCODE_PID = String(process.pid)
+    process.env.FOLONITE = "1"
+    process.env.FOLONITE_PID = String(process.pid)
 
-    Log.Default.info("opencode", {
+    Log.Default.info("folonite", {
       version: Installation.VERSION,
       args: process.argv.slice(2),
     })

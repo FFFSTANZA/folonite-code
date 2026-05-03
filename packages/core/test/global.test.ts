@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "path"
 
 function readSharedGlobalPath(namespace?: string) {
-  const root = path.join(os.tmpdir(), "pawwork-shared-runtime-test")
+  const root = path.join(os.tmpdir(), "folonite-shared-runtime-test")
   const data = path.join(root, "share")
   const cache = path.join(root, "cache")
   const config = path.join(root, "config")
@@ -15,9 +15,9 @@ function readSharedGlobalPath(namespace?: string) {
     process.env.XDG_CONFIG_HOME = ${JSON.stringify(config)}
     process.env.XDG_STATE_HOME = ${JSON.stringify(state)}
     if (${JSON.stringify(namespace)} !== undefined) {
-      process.env.PAWWORK_RUNTIME_NAMESPACE = ${JSON.stringify(namespace)}
+      process.env.FOLONITE_RUNTIME_NAMESPACE = ${JSON.stringify(namespace)}
     } else {
-      delete process.env.PAWWORK_RUNTIME_NAMESPACE
+      delete process.env.FOLONITE_RUNTIME_NAMESPACE
     }
     const { Effect } = await import("effect")
     const { Global } = await import("./src/global.ts")
@@ -39,23 +39,21 @@ function readSharedGlobalPath(namespace?: string) {
 }
 
 describe("shared Global runtime namespace", () => {
-  test("defaults to OpenCode namespace outside PawWork desktop", () => {
+  test("defaults to folonite namespace", () => {
     const { paths, root } = readSharedGlobalPath()
-    expect(paths.data).toBe(path.join(root.data, "opencode"))
+    expect(paths.data).toBe(path.join(root.data, "folonite"))
   })
 
-  test("uses PawWork namespace when enabled", () => {
-    const { paths, root } = readSharedGlobalPath("pawwork")
-
-    expect(paths.data).toBe(path.join(root.data, "pawwork"))
-    expect(paths.cache).toBe(path.join(root.cache, "pawwork"))
-    expect(paths.config).toBe(path.join(root.config, "pawwork"))
-    expect(paths.state).toBe(path.join(root.state, "pawwork"))
+  test("uses folonite namespace when enabled", () => {
+    const { paths, root } = readSharedGlobalPath("folonite")
+    expect(paths.data).toBe(path.join(root.data, "folonite"))
+    expect(paths.cache).toBe(path.join(root.cache, "folonite"))
+    expect(paths.config).toBe(path.join(root.config, "folonite"))
+    expect(paths.state).toBe(path.join(root.state, "folonite"))
   })
 
-  test("accepts PawWork variant namespaces", () => {
-    const { paths, root } = readSharedGlobalPath("pawwork-dev")
-
-    expect(paths.data).toBe(path.join(root.data, "pawwork"))
+  test("accepts folonite variant namespaces", () => {
+    const { paths, root } = readSharedGlobalPath("folonite-dev")
+    expect(paths.data).toBe(path.join(root.data, "folonite"))
   })
 })

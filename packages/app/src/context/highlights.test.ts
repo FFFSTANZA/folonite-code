@@ -13,7 +13,7 @@ describe("loadReleaseHighlights (GitHub Releases API)", () => {
     const highlights = loadReleaseHighlights(payload, "0.2.3", "0.2.2", "en")
     expect(highlights).toHaveLength(1)
     expect(highlights[0]).toMatchObject({
-      title: "PawWork v0.2.3",
+      title: "Folonite v0.2.3",
       description: "Fixed first-message crash",
     })
   })
@@ -39,11 +39,11 @@ describe("loadReleaseHighlights (GitHub Releases API)", () => {
     const highlights = loadReleaseHighlights(payload, "0.2.10", "0.2.9", "zh")
     expect(highlights).toHaveLength(2)
     expect(highlights[0]).toMatchObject({
-      title: "爪印 v0.2.10",
+      title: "Folonite v0.2.10",
       description: "修复首条消息崩溃",
     })
     expect(highlights[1]).toMatchObject({
-      title: "爪印 v0.2.10",
+      title: "Folonite v0.2.10",
       description: "调整更新提示",
     })
   })
@@ -58,11 +58,11 @@ describe("loadReleaseHighlights (GitHub Releases API)", () => {
     const highlights = loadReleaseHighlights(payload, "0.2.10", "0.2.9", "zh")
     expect(highlights).toHaveLength(2)
     expect(highlights[0]).toMatchObject({
-      title: "爪印 v0.2.10",
+      title: "Folonite v0.2.10",
       description: "修复首条消息崩溃",
     })
     expect(highlights[1]).toMatchObject({
-      title: "爪印 v0.2.10",
+      title: "Folonite v0.2.10",
       description: "调整更新提示",
     })
   })
@@ -77,7 +77,7 @@ describe("loadReleaseHighlights (GitHub Releases API)", () => {
     const highlights = loadReleaseHighlights(payload, "0.2.10", "0.2.9", "zh")
     expect(highlights).toHaveLength(1)
     expect(highlights[0]).toMatchObject({
-      title: "爪印 v0.2.10",
+      title: "Folonite v0.2.10",
       description: "Fixed first-message crash",
     })
   })
@@ -126,13 +126,13 @@ describe("loadReleaseHighlights (GitHub Releases API)", () => {
         body: [
           "## App Update Notice",
           "",
-          "PawWork refreshes the desktop.",
+          "Folonite refreshes the desktop.",
           "",
           "## 中文版本",
           "",
           "### 主要更新",
           "",
-          "PawWork 2026.4.29 刷新桌面界面。",
+          "Folonite 2026.4.29 刷新桌面界面。",
           "",
           "- 刷新桌面界面",
           "- 修复首次进入 Home 时左右侧栏默认打开的问题",
@@ -203,7 +203,7 @@ describe("loadReleaseHighlights (GitHub Releases API)", () => {
     const payload = [
       {
         tag_name: "v0.2.6",
-        body: "## Downloads\n\n- [macOS Apple Silicon](https://github.com/Astro-Han/pawwork/releases/download/v0.2.6/pawwork-mac-arm64.dmg)\n\n## Highlights\n\n- Maintenance fixes\n",
+        body: "## Downloads\n\n- [macOS Apple Silicon](https://github.com/fffstanza/folonite-code/releases/download/v0.2.6/folonite-mac-arm64.dmg)\n\n## Highlights\n\n- Maintenance fixes\n",
       },
     ]
     expect(loadReleaseHighlights(payload, "0.2.6", "0.2.5", "en")).toHaveLength(0)
@@ -250,12 +250,12 @@ describe("loadReleaseHighlights (GitHub Releases API)", () => {
         highlights: [
           {
             source: "desktop",
-            items: [{ title: "PawWork card", description: "Card Description" }],
+            items: [{ title: "Folonite card", description: "Card Description" }],
           },
         ],
       },
     ]
     const highlights = loadReleaseHighlights(payload, "0.2.5", "0.2.4", "zh")
-    expect(highlights[0]?.title).toBe("PawWork card")
+    expect(highlights[0]?.title).toBe("Folonite card")
   })
 })

@@ -93,12 +93,12 @@ describe("pty", () => {
   test("does not expose internal server auth env to terminal sessions", async () => {
     if (process.platform === "win32") return
 
-    const previousUsername = process.env.OPENCODE_SERVER_USERNAME
-    const previousPassword = process.env.OPENCODE_SERVER_PASSWORD
-    const previousCustom = process.env.PAWWORK_E2E_CUSTOM_ENV
-    process.env.OPENCODE_SERVER_USERNAME = "PawWork"
-    process.env.OPENCODE_SERVER_PASSWORD = "secret"
-    process.env.PAWWORK_E2E_CUSTOM_ENV = "kept"
+    const previousUsername = process.env.FOLONITE_SERVER_USERNAME
+    const previousPassword = process.env.FOLONITE_SERVER_PASSWORD
+    const previousCustom = process.env.FOLONITE_E2E_CUSTOM_ENV
+    process.env.FOLONITE_SERVER_USERNAME = "PawWork"
+    process.env.FOLONITE_SERVER_PASSWORD = "secret"
+    process.env.FOLONITE_E2E_CUSTOM_ENV = "kept"
 
     try {
       await using dir = await tmpdir({ git: true })
@@ -123,7 +123,7 @@ describe("pty", () => {
 
             await Pty.write(
               info.id,
-              'printf "username=%s\\n" "${OPENCODE_SERVER_USERNAME}" && printf "password=%s\\n" "${OPENCODE_SERVER_PASSWORD}" && printf "custom=%s\\n" "${PAWWORK_E2E_CUSTOM_ENV-unset}"\nexit\n',
+              'printf "username=%s\\n" "${FOLONITE_SERVER_USERNAME}" && printf "password=%s\\n" "${FOLONITE_SERVER_PASSWORD}" && printf "custom=%s\\n" "${FOLONITE_E2E_CUSTOM_ENV-unset}"\nexit\n',
             )
             await wait(() => output.join("").includes("custom="))
 
@@ -139,22 +139,22 @@ describe("pty", () => {
         },
       })
     } finally {
-      if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME
-      else process.env.OPENCODE_SERVER_USERNAME = previousUsername
-      if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
-      else process.env.OPENCODE_SERVER_PASSWORD = previousPassword
-      if (previousCustom === undefined) delete process.env.PAWWORK_E2E_CUSTOM_ENV
-      else process.env.PAWWORK_E2E_CUSTOM_ENV = previousCustom
+      if (previousUsername === undefined) delete process.env.FOLONITE_SERVER_USERNAME
+      else process.env.FOLONITE_SERVER_USERNAME = previousUsername
+      if (previousPassword === undefined) delete process.env.FOLONITE_SERVER_PASSWORD
+      else process.env.FOLONITE_SERVER_PASSWORD = previousPassword
+      if (previousCustom === undefined) delete process.env.FOLONITE_E2E_CUSTOM_ENV
+      else process.env.FOLONITE_E2E_CUSTOM_ENV = previousCustom
     }
   })
 
   test("preserves explicit terminal auth env overrides", async () => {
     if (process.platform === "win32") return
 
-    const previousUsername = process.env.OPENCODE_SERVER_USERNAME
-    const previousPassword = process.env.OPENCODE_SERVER_PASSWORD
-    process.env.OPENCODE_SERVER_USERNAME = "PawWork"
-    process.env.OPENCODE_SERVER_PASSWORD = "secret"
+    const previousUsername = process.env.FOLONITE_SERVER_USERNAME
+    const previousPassword = process.env.FOLONITE_SERVER_PASSWORD
+    process.env.FOLONITE_SERVER_USERNAME = "PawWork"
+    process.env.FOLONITE_SERVER_PASSWORD = "secret"
 
     try {
       await using dir = await tmpdir({ git: true })
@@ -168,8 +168,8 @@ describe("pty", () => {
               command: "/bin/sh",
               title: "explicit-env",
               env: {
-                OPENCODE_SERVER_USERNAME: "explicit-user",
-                OPENCODE_SERVER_PASSWORD: "explicit-password",
+                FOLONITE_SERVER_USERNAME: "explicit-user",
+                FOLONITE_SERVER_PASSWORD: "explicit-password",
               },
             })
             id = info.id
@@ -183,7 +183,7 @@ describe("pty", () => {
 
             await Pty.write(
               info.id,
-              'printf "username=%s\\n" "${OPENCODE_SERVER_USERNAME}" && printf "password=%s\\n" "${OPENCODE_SERVER_PASSWORD}"\nexit\n',
+              'printf "username=%s\\n" "${FOLONITE_SERVER_USERNAME}" && printf "password=%s\\n" "${FOLONITE_SERVER_PASSWORD}"\nexit\n',
             )
             await wait(() => output.join("").includes("password="))
 
@@ -198,10 +198,10 @@ describe("pty", () => {
         },
       })
     } finally {
-      if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME
-      else process.env.OPENCODE_SERVER_USERNAME = previousUsername
-      if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
-      else process.env.OPENCODE_SERVER_PASSWORD = previousPassword
+      if (previousUsername === undefined) delete process.env.FOLONITE_SERVER_USERNAME
+      else process.env.FOLONITE_SERVER_USERNAME = previousUsername
+      if (previousPassword === undefined) delete process.env.FOLONITE_SERVER_PASSWORD
+      else process.env.FOLONITE_SERVER_PASSWORD = previousPassword
     }
   })
 })

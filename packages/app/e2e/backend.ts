@@ -75,17 +75,17 @@ export function createBackendEnv(input: {
 }): Record<string, string | undefined> {
   const env = {
     ...(input.base ?? process.env),
-    OPENCODE_DISABLE_LSP_DOWNLOAD: "true",
-    OPENCODE_DISABLE_DEFAULT_PLUGINS: "true",
-    OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "true",
-    OPENCODE_TEST_HOME: path.join(input.sandbox, "home"),
+    FOLONITE_DISABLE_LSP_DOWNLOAD: "true",
+    FOLONITE_DISABLE_DEFAULT_PLUGINS: "true",
+    FOLONITE_EXPERIMENTAL_DISABLE_FILEWATCHER: "true",
+    FOLONITE_TEST_HOME: path.join(input.sandbox, "home"),
     XDG_DATA_HOME: path.join(input.sandbox, "share"),
     XDG_CACHE_HOME: path.join(input.sandbox, "cache"),
     XDG_CONFIG_HOME: path.join(input.sandbox, "config"),
     XDG_STATE_HOME: path.join(input.sandbox, "state"),
-    OPENCODE_CLIENT: "app",
-    OPENCODE_STRICT_CONFIG_DEPS: "true",
-    OPENCODE_E2E_LLM_URL: input.llmUrl,
+    FOLONITE_CLIENT: "app",
+    FOLONITE_STRICT_CONFIG_DEPS: "true",
+    FOLONITE_E2E_LLM_URL: input.llmUrl,
   }
   for (const key of Object.keys(env)) {
     if (INTERNAL_SERVER_AUTH_ENV.has(key.toLowerCase())) delete env[key]

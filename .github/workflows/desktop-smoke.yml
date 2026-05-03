@@ -137,7 +137,7 @@ jobs:
         working-directory: packages/desktop-electron
         env:
           OPENCODE_CHANNEL: dev
-          PAWWORK_FEEDBACK_FORM_URL: https://example.com/pawwork-feedback
+          FOLONITE_FEEDBACK_FORM_URL: https://example.com/folonite-feedback
 
       - name: Check desktop runtime imports
         run: bun ./scripts/runtime-import-guard.ts
@@ -151,7 +151,7 @@ jobs:
         run: bun run smoke:report
         working-directory: packages/desktop-electron
         env:
-          PAWWORK_FEEDBACK_FORM_URL: https://example.com/pawwork-feedback
+          FOLONITE_FEEDBACK_FORM_URL: https://example.com/folonite-feedback
 
       - name: Package desktop app
         run: npx electron-builder --mac dir --arm64 --publish never --config electron-builder.config.ts --config.mac.identity=- --config.mac.notarize=false
@@ -164,14 +164,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          APP_PATH="dist/mac-arm64/PawWork Dev.app"
-          EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/PawWork Dev"
+          APP_PATH="dist/mac-arm64/Folonite Dev.app"
+          EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/Folonite Dev"
           INFO_PLIST_PATH="$APP_PATH/Contents/Info.plist"
           ASAR_PATH="$APP_PATH/Contents/Resources/app.asar"
           OFFICECLI_PATH="$APP_PATH/Contents/Resources/tools/officecli"
           THIRD_PARTY_NOTICES_PATH="$APP_PATH/Contents/Resources/THIRD_PARTY_NOTICES.md"
           FRAMEWORK_PATH="$APP_PATH/Contents/Frameworks/Electron Framework.framework"
-          HELPER_APP_PATH="$APP_PATH/Contents/Frameworks/PawWork Dev Helper.app"
+          HELPER_APP_PATH="$APP_PATH/Contents/Frameworks/Folonite Dev Helper.app"
 
           if [ ! -d "$APP_PATH" ]; then
             echo "Expected app bundle at $APP_PATH"
@@ -216,15 +216,15 @@ jobs:
             exit 1
           fi
 
-          codesign -dv --verbose=2 "$APP_PATH" 2>&1 | tee /tmp/pawwork-codesign.txt
-          grep -q "Signature=adhoc" /tmp/pawwork-codesign.txt
+          codesign -dv --verbose=2 "$APP_PATH" 2>&1 | tee /tmp/folonite-codesign.txt
+          grep -q "Signature=adhoc" /tmp/folonite-codesign.txt
         working-directory: packages/desktop-electron
 
       - name: Launch packaged desktop smoke app
         run: |
           set -euo pipefail
 
-          EXECUTABLE_PATH="dist/mac-arm64/PawWork Dev.app/Contents/MacOS/PawWork Dev"
+          EXECUTABLE_PATH="dist/mac-arm64/Folonite Dev.app/Contents/MacOS/Folonite Dev"
           bun ./scripts/ci-smoke.ts packaged dev "$EXECUTABLE_PATH"
         working-directory: packages/desktop-electron
 

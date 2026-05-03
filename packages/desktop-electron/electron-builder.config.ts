@@ -12,9 +12,9 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.
 const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 type Channel = "dev" | "beta" | "prod"
 const localizedMacDisplayNameByChannel: Record<Channel, string> = {
-  dev: "爪印 Dev",
-  beta: "爪印 Beta",
-  prod: "爪印",
+  dev: "Folonite Dev",
+  beta: "Folonite Beta",
+  prod: "Folonite",
 }
 
 async function signWindows(configuration: { path: string }) {
@@ -29,14 +29,14 @@ async function signWindows(configuration: { path: string }) {
 }
 
 function currentChannel(): Channel {
-  const raw = process.env.OPENCODE_CHANNEL
+  const raw = process.env.FOLONITE_CHANNEL
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   return "dev"
 }
 
 export function getPublishConfig(channel: Channel): GitHubPublishConfig | undefined {
-  if (channel === "beta") return { provider: "github", owner: "Astro-Han", repo: "pawwork-beta", channel: "latest" }
-  if (channel === "prod") return { provider: "github", owner: "Astro-Han", repo: "pawwork", channel: "latest" }
+  if (channel === "beta") return { provider: "github", owner: "fffstanza", repo: "folonite-code", channel: "latest" }
+  if (channel === "prod") return { provider: "github", owner: "fffstanza", repo: "folonite-code", channel: "latest" }
   return undefined
 }
 
@@ -52,7 +52,7 @@ async function writeLocalizedMacDisplayName(resourcesDir: string, channel: Chann
 }
 
 const getBase = (): Configuration => ({
-  artifactName: "pawwork-${os}-${arch}-${version}.${ext}",
+  artifactName: "folonite-${os}-${arch}-${version}.${ext}",
   directories: {
     output: "dist",
     buildResources: "resources",
@@ -96,8 +96,8 @@ const getBase = (): Configuration => ({
     sign: true,
   },
   protocols: {
-    name: "PawWork",
-    schemes: ["pawwork"],
+    name: "Folonite",
+    schemes: ["folonite"],
   },
   win: {
     icon: `resources/icons/icon.ico`,
@@ -142,27 +142,27 @@ export function createConfig(channel: Channel = currentChannel(), baseOverrides:
     case "dev": {
       return withAppUpdateConfig({
         ...base,
-        appId: "ai.pawwork.desktop.dev",
-        productName: "PawWork Dev",
-        rpm: { packageName: "pawwork-dev" },
+        appId: "ai.folonite.desktop.dev",
+        productName: "Folonite Dev",
+        rpm: { packageName: "folonite-dev" },
       })
     }
     case "beta": {
       return withAppUpdateConfig({
         ...base,
-        appId: "ai.pawwork.desktop.beta",
-        productName: "PawWork Beta",
-        protocols: { name: "PawWork Beta", schemes: ["pawwork"] },
-        rpm: { packageName: "pawwork-beta" },
+        appId: "ai.folonite.desktop.beta",
+        productName: "Folonite Beta",
+        protocols: { name: "Folonite Beta", schemes: ["folonite"] },
+        rpm: { packageName: "folonite-beta" },
       })
     }
     case "prod": {
       return withAppUpdateConfig({
         ...base,
-        appId: "ai.pawwork.desktop",
-        productName: "PawWork",
-        protocols: { name: "PawWork", schemes: ["pawwork"] },
-        rpm: { packageName: "pawwork" },
+        appId: "ai.folonite.desktop",
+        productName: "Folonite",
+        protocols: { name: "Folonite", schemes: ["folonite"] },
+        rpm: { packageName: "folonite" },
       })
     }
   }

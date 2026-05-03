@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "pawwork",
+  "name": "folonite",
   "description": "Desktop AI workstation for knowledge workers",
   "private": true,
   "type": "module",
@@ -85,7 +85,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Astro-Han/pawwork"
+    "url": "https://github.com/fffstanza/folonite-code"
   },
   "license": "Apache-2.0",
   "prettier": {

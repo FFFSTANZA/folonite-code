@@ -81,18 +81,18 @@ async function installSessionStabilityProbe(page: Page) {
       const observer = new MutationObserver(recordMutations)
       observer.observe(document.body, { childList: true, subtree: true })
       const win = window as typeof window & {
-        __opencode_e2e?: Record<string, unknown> & {
+        __folonite_e2e?: Record<string, unknown> & {
           sessionMountProbe?: { stop: () => unknown }
         }
       }
-      win.__opencode_e2e = {
-        ...win.__opencode_e2e,
+      win.__folonite_e2e = {
+        ...win.__folonite_e2e,
         sessionMountProbe: {
           stop() {
             cancelAnimationFrame(frame)
             observer.disconnect()
             record()
-            delete win.__opencode_e2e?.sessionMountProbe
+            delete win.__folonite_e2e?.sessionMountProbe
             return { samples, unmounts, unmountCount }
           },
         },
@@ -110,11 +110,11 @@ async function installSessionStabilityProbe(page: Page) {
 async function stopSessionStabilityProbe(page: Page) {
   const result = await page.evaluate(() => {
     const win = window as typeof window & {
-      __opencode_e2e?: {
+      __folonite_e2e?: {
         sessionMountProbe?: { stop: () => unknown }
       }
     }
-    const probe = win.__opencode_e2e?.sessionMountProbe
+    const probe = win.__folonite_e2e?.sessionMountProbe
     if (!probe) throw new Error("session stability probe was not installed")
     return probe.stop()
   })

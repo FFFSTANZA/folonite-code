@@ -12,7 +12,7 @@ function part(input: { id?: string; callID?: string; kind: string; source: strin
     callID: input.callID,
     state: {
       status: "error",
-      input: { query: "latest PawWork" },
+      input: { query: "latest Folonite" },
       error: "search failed",
       metadata: {
         webSearch: {

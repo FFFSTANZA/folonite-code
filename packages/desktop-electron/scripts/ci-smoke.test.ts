@@ -20,16 +20,16 @@ describe("ci smoke helpers", () => {
   })
 
   test("buildSmokeEnv isolates the app state in a temporary home", () => {
-    const env = buildSmokeEnv("/tmp/pawwork-ci-smoke")
+    const env = buildSmokeEnv("/tmp/folonite-ci-smoke")
 
-    expect(env.OPENCODE_CHANNEL).toBe("dev")
-    expect(env.PAWWORK_CI_SMOKE).toBe("true")
-    expect(env.PAWWORK_CI_SMOKE_HOME).toBe("/tmp/pawwork-ci-smoke")
-    expect(env.HOME).toBe("/tmp/pawwork-ci-smoke")
-    expect(env.XDG_DATA_HOME).toBe("/tmp/pawwork-ci-smoke")
-    expect(env.XDG_CACHE_HOME).toBe("/tmp/pawwork-ci-smoke")
-    expect(env.XDG_CONFIG_HOME).toBe("/tmp/pawwork-ci-smoke")
-    expect(env.XDG_STATE_HOME).toBe("/tmp/pawwork-ci-smoke")
+    expect(env.FOLONITE_CHANNEL).toBe("dev")
+    expect(env.FOLONITE_CI_SMOKE).toBe("true")
+    expect(env.FOLONITE_CI_SMOKE_HOME).toBe("/tmp/folonite-ci-smoke")
+    expect(env.HOME).toBe("/tmp/folonite-ci-smoke")
+    expect(env.XDG_DATA_HOME).toBe("/tmp/folonite-ci-smoke")
+    expect(env.XDG_CACHE_HOME).toBe("/tmp/folonite-ci-smoke")
+    expect(env.XDG_CONFIG_HOME).toBe("/tmp/folonite-ci-smoke")
+    expect(env.XDG_STATE_HOME).toBe("/tmp/folonite-ci-smoke")
     expect(env.CI).toBe("true")
   })
 
@@ -38,34 +38,34 @@ describe("ci smoke helpers", () => {
   })
 
   test("resolveCiSmokeReadyFile points at the CI-ready marker inside the isolated user data dir", () => {
-    expect(resolveCiSmokeReadyFile("/tmp/pawwork-ci-smoke")).toBe(
-      path.join("/tmp/pawwork-ci-smoke", "ai.pawwork.desktop.dev", "ci-smoke-ready.json"),
+    expect(resolveCiSmokeReadyFile("/tmp/folonite-ci-smoke")).toBe(
+      path.join("/tmp/folonite-ci-smoke", "ai.folonite.desktop.dev", "ci-smoke-ready.json"),
     )
   })
 
   test("appIdForSmoke uses dev app data for raw runs and channel app IDs for packaged runs", () => {
-    expect(appIdForSmoke("dev", "raw")).toBe("ai.pawwork.desktop.dev")
-    expect(appIdForSmoke("prod", "raw")).toBe("ai.pawwork.desktop.dev")
-    expect(appIdForSmoke("dev", "packaged")).toBe("ai.pawwork.desktop.dev")
-    expect(appIdForSmoke("beta", "packaged")).toBe("ai.pawwork.desktop.beta")
-    expect(appIdForSmoke("prod", "packaged")).toBe("ai.pawwork.desktop")
+    expect(appIdForSmoke("dev", "raw")).toBe("ai.folonite.desktop.dev")
+    expect(appIdForSmoke("prod", "raw")).toBe("ai.folonite.desktop.dev")
+    expect(appIdForSmoke("dev", "packaged")).toBe("ai.folonite.desktop.dev")
+    expect(appIdForSmoke("beta", "packaged")).toBe("ai.folonite.desktop.beta")
+    expect(appIdForSmoke("prod", "packaged")).toBe("ai.folonite.desktop")
   })
 
   test("resolveCiSmokeReadyFile follows packaged channel app IDs", () => {
-    expect(resolveCiSmokeReadyFile("/tmp/pawwork-ci-smoke", { channel: "prod", mode: "packaged" })).toBe(
-      path.join("/tmp/pawwork-ci-smoke", "ai.pawwork.desktop", "ci-smoke-ready.json"),
+    expect(resolveCiSmokeReadyFile("/tmp/folonite-ci-smoke", { channel: "prod", mode: "packaged" })).toBe(
+      path.join("/tmp/folonite-ci-smoke", "ai.folonite.desktop", "ci-smoke-ready.json"),
     )
-    expect(resolveCiSmokeReadyFile("/tmp/pawwork-ci-smoke", { channel: "beta", mode: "packaged" })).toBe(
-      path.join("/tmp/pawwork-ci-smoke", "ai.pawwork.desktop.beta", "ci-smoke-ready.json"),
+    expect(resolveCiSmokeReadyFile("/tmp/folonite-ci-smoke", { channel: "beta", mode: "packaged" })).toBe(
+      path.join("/tmp/folonite-ci-smoke", "ai.folonite.desktop.beta", "ci-smoke-ready.json"),
     )
   })
 
   test("buildSmokeEnv carries the requested channel into the child process", () => {
-    const env = buildSmokeEnv("/tmp/pawwork-ci-smoke", "prod")
+    const env = buildSmokeEnv("/tmp/folonite-ci-smoke", "prod")
 
-    expect(env.OPENCODE_CHANNEL).toBe("prod")
-    expect(env.PAWWORK_CI_SMOKE).toBe("true")
-    expect(env.PAWWORK_CI_SMOKE_HOME).toBe("/tmp/pawwork-ci-smoke")
+    expect(env.FOLONITE_CHANNEL).toBe("prod")
+    expect(env.FOLONITE_CI_SMOKE).toBe("true")
+    expect(env.FOLONITE_CI_SMOKE_HOME).toBe("/tmp/folonite-ci-smoke")
   })
 
   test("parseSmokeArgs defaults to raw dev mode", () => {
@@ -73,9 +73,9 @@ describe("ci smoke helpers", () => {
   })
 
   test("parseSmokeArgs accepts a packaged executable path", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "pawwork-ci-smoke-"))
+    const dir = mkdtempSync(path.join(tmpdir(), "folonite-ci-smoke-"))
     try {
-      const executablePath = path.join(dir, "PawWork")
+      const executablePath = path.join(dir, "Folonite")
       writeFileSync(executablePath, "")
 
       expect(parseSmokeArgs(["packaged", "prod", executablePath])).toEqual({
@@ -93,8 +93,8 @@ describe("ci smoke helpers", () => {
   })
 
   test("parseSmokeArgs rejects packaged mode when the executable path is missing", () => {
-    expect(() => parseSmokeArgs(["packaged", "dev", "/tmp/pawwork-missing-executable"])).toThrow(
-      "Packaged smoke executable not found: /tmp/pawwork-missing-executable",
+    expect(() => parseSmokeArgs(["packaged", "dev", "/tmp/folonite-missing-executable"])).toThrow(
+      "Packaged smoke executable not found: /tmp/folonite-missing-executable",
     )
   })
 
@@ -106,18 +106,18 @@ describe("ci smoke helpers", () => {
     const packaged = resolveLaunchCommand({
       mode: "packaged",
       channel: "dev",
-      executablePath: "/tmp/PawWork Dev.app/Contents/MacOS/PawWork Dev",
+      executablePath: "/tmp/Folonite Dev.app/Contents/MacOS/Folonite Dev",
     })
     expect(packaged).toEqual({
-      command: "/tmp/PawWork Dev.app/Contents/MacOS/PawWork Dev",
+      command: "/tmp/Folonite Dev.app/Contents/MacOS/Folonite Dev",
       args: [],
     })
   })
 
   test("packaged smoke reports spawn failures with launch context", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "pawwork-ci-smoke-"))
+    const dir = mkdtempSync(path.join(tmpdir(), "folonite-ci-smoke-"))
     try {
-      const executablePath = path.join(dir, "PawWork")
+      const executablePath = path.join(dir, "Folonite")
       writeFileSync(executablePath, "")
       chmodSync(executablePath, 0o755)
 

@@ -1,8 +1,8 @@
-# Contributing to PawWork
+# Contributing to Folonite
 
-Thanks for contributing to PawWork.
+Thanks for contributing to Folonite.
 
-PawWork is a desktop AI workstation for non-technical knowledge workers. When making changes, optimize for clarity, reversibility, and out-of-the-box usability.
+Folonite is a desktop AI workstation for non-technical knowledge workers. When making changes, optimize for clarity, reversibility, and out-of-the-box usability.
 
 ## Before You Start
 
@@ -29,7 +29,7 @@ Please open an issue first for larger feature proposals or changes that affect p
 
 ## Development Setup
 
-PawWork uses Bun and requires Node 24 in CI.
+Folonite uses Bun and requires Node 24 in CI.
 
 ```bash
 bun install --frozen-lockfile

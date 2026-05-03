@@ -1,17 +1,17 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 
-const dir = process.env.OPENCODE_E2E_PROJECT_DIR ?? process.cwd()
-const title = process.env.OPENCODE_E2E_SESSION_TITLE ?? "E2E Session"
-const text = process.env.OPENCODE_E2E_MESSAGE ?? "Seeded for UI e2e"
-const model = process.env.OPENCODE_E2E_MODEL ?? "opencode/gpt-5-nano"
+const dir = process.env.FOLONITE_E2E_PROJECT_DIR ?? process.cwd()
+const title = process.env.FOLONITE_E2E_SESSION_TITLE ?? "E2E Session"
+const text = process.env.FOLONITE_E2E_MESSAGE ?? "Seeded for UI e2e"
+const model = process.env.FOLONITE_E2E_MODEL ?? "opencode/gpt-5-nano"
 const parts = model.split("/")
 const providerID = parts[0] ?? "opencode"
 const modelID = parts[1] ?? "gpt-5-nano"
 const now = Date.now()
 
 const prepareConfigDependencies = async () => {
-  if (!process.env.OPENCODE_TEST_HOME || !process.env.XDG_CONFIG_HOME) return
+  if (!process.env.FOLONITE_TEST_HOME || !process.env.XDG_CONFIG_HOME) return
 
   const { Global } = await import("../../core/src/global")
   const { Installation } = await import("../src/installation")

@@ -5,7 +5,7 @@ import { getMimeType } from "hono/utils/mime"
 import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
 
-const embeddedUIPromise = Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI
+const embeddedUIPromise = Flag.FOLONITE_DISABLE_EMBEDDED_WEB_UI
   ? Promise.resolve(null)
   : // @ts-expect-error - generated file at build time
     import("opencode-web-ui.gen.ts").then((module) => module.default as Record<string, string>).catch(() => null)
@@ -36,16 +36,16 @@ export const UIRoutes = (): Hono =>
         return c.json({ error: "Not Found" }, 404)
       }
     } else {
-      const response = await proxy(`https://app.opencode.ai${path}`, {
+      const response = await proxy(`https://app.folonite.ai${path}`, {
         ...c.req,
         headers: {
           ...c.req.raw.headers,
-          host: "app.opencode.ai",
+          host: "app.folonite.ai",
         },
       })
       const match = response.headers.get("content-type")?.includes("text/html")
         ? (await response.clone().text()).match(
-            /<script\b(?![^>]*\bsrc\s*=)[^>]*\bid=(['"])oc-theme-preload-script\1[^>]*>([\s\S]*?)<\/script>/i,
+            /<script\b(?![^>]*\bsrc\s*=)[^>]*\bid=(['"])folonite-theme-preload-script\1[^>]*>([\s\S]*?)<\/script>/i,
           )
         : undefined
       const hash = match ? createHash("sha256").update(match[2]).digest("base64") : ""

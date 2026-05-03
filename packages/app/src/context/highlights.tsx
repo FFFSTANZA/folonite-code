@@ -8,7 +8,7 @@ import { useSettings } from "@/context/settings"
 import { persisted } from "@/utils/persist"
 import { DialogReleaseNotes, type Highlight } from "@/components/dialog-release-notes"
 
-const CHANGELOG_URL = "https://api.github.com/repos/Astro-Han/pawwork/releases"
+const CHANGELOG_URL = "https://api.github.com/repos/fffstanza/folonite-code/releases"
 const MAX_RELEASE_HIGHLIGHTS = 15
 
 type Store = {
@@ -130,7 +130,7 @@ function parseReleaseBodyDescriptions(body: string, locale: ReleaseLocale) {
 }
 
 function releaseTitle(tag: string, locale: ReleaseLocale) {
-  return `${locale === "zh" ? "爪印" : "PawWork"} ${tag}`
+  return `Folonite ${tag}`
 }
 
 function parseRelease(value: unknown, locale: ReleaseLocale): ParsedRelease | undefined {

@@ -14,6 +14,7 @@
   --font-size-2x-large: 28px;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
+  --font-weight-semibold: 600;
   --line-height-normal: 130%;
   --line-height-large: 150%;
   --line-height-x-large: 180%;
@@ -90,7 +91,7 @@
     0 13.141px 29.201px 0 rgba(0, 0, 0, 0.04), 0 6.38px 14.177px 0 rgba(0, 0, 0, 0.05),
     0 3.127px 6.95px 0 rgba(0, 0, 0, 0.06), 0 1.237px 2.748px 0 rgba(0, 0, 0, 0.09);
 
-  /* PawWork raised-surface shadow language (light mode default).
+  /* Folonite raised-surface shadow language (light mode default).
      Applied to surfaces that "lift off" the main bg without a 1px border.
      Cast color tints toward the brand warm so shadows share the same
      undertone as borders and warm-tinted surfaces. */
@@ -109,7 +110,7 @@
   color-scheme: light;
   --text-mix-blend-mode: multiply;
 
-  /* PawWork fallback variables (light) */
+  /* Folonite fallback variables (light) */
   --background-base: #faf9f7;
   --background-weak: #f6f3ef;
   --background-strong: #fffdfa;
@@ -372,7 +373,7 @@
     color-scheme: dark;
     --text-mix-blend-mode: plus-lighter;
 
-    /* PawWork raised-surface shadows (dark mode).
+    /* Folonite raised-surface shadows (dark mode).
        Drop the brand-warm tint and shift to neutral black depth so elevated
        surfaces (composer, popover, dialog) read against #181818-class bgs. */
     --shadow-raised:
@@ -645,7 +646,7 @@
   }
 }
 
-:root[data-theme="pawwork"] {
+:root[data-theme="folonite"] {
   --font-family-sans: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --button-primary-base: var(--button-brand-base);
 }

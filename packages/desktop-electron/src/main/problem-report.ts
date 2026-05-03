@@ -89,7 +89,7 @@ function jsonBytes(value: unknown) {
 
 function markdown(payload: Payload) {
   return [
-    "# PawWork Problem Report",
+    "# Folonite Problem Report",
     "",
     "Upload this markdown file to the feedback form after reviewing it.",
     "",
@@ -301,7 +301,7 @@ function redactLocalPathFragments(value: string) {
     .replace(/[A-Za-z]:\\[^\r\n]*/g, "[path]")
     .replace(/\\\\[^\\\s]+\\[^\r\n]*/g, "[path]")
     .replace(/\/(?:Users|home|tmp|var\/folders|private\/tmp)\/[^\r\n]*/g, "[path]")
-    .replace(/\bpawwork\.workspace\.[\w.-]+\.dat\b/gi, "[storage]")
+    .replace(/\bfolonite\.workspace\.[\w.-]+\.dat\b/gi, "[storage]")
     .replace(/\b(storage|key)\s*=\s*[^,\s]+/gi, "$1=[redacted]")
 }
 
@@ -356,11 +356,11 @@ export function buildProblemReportSummary(input: ProblemReportSummaryInput) {
         ]
 
   return [
-    "PawWork Problem Report Summary",
+    "Folonite Problem Report Summary",
     "",
     `Report ID: ${input.reportId}`,
     `Generated: ${input.generatedAt}`,
-    `PawWork: ${input.diagnostics.appVersion} (${input.diagnostics.channel})`,
+    `Folonite: ${input.diagnostics.appVersion} (${input.diagnostics.channel})`,
     `Platform: ${input.diagnostics.platform} ${input.diagnostics.osVersion} ${input.diagnostics.arch}`,
     `Electron: ${input.diagnostics.electronVersion}`,
     `Route: ${safeSummaryRoute(input.diagnostics.route)}`,

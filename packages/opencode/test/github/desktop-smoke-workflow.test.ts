@@ -68,7 +68,7 @@ describe("desktop smoke workflow", () => {
     expect(packageStep?.run).toContain("--config.mac.notarize=false")
     expect(packageStep?.env).toEqual({
       CSC_IDENTITY_AUTO_DISCOVERY: "false",
-      OPENCODE_CHANNEL: "dev",
+      FOLONITE_CHANNEL: "dev",
     })
 
     expect(runtimeGuardStep?.run).toBe("bun ./scripts/runtime-import-guard.ts")

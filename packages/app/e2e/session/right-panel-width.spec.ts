@@ -14,10 +14,10 @@ test("right panel width persists across reload", async ({ page, gotoSession }) =
 
   // Drive the resize through the exposed layout hook (see packages/app/src/context/layout.tsx DEV block).
   await page.evaluate(() => {
-    const layout = (window as unknown as { __pawworkLayout?: { rightPanel?: { resize?: (w: number) => void } } })
-      .__pawworkLayout
+    const layout = (window as unknown as { __foloniteLayout?: { rightPanel?: { resize?: (w: number) => void } } })
+      .__foloniteLayout
     if (!layout?.rightPanel?.resize) {
-      throw new Error("__pawworkLayout.rightPanel.resize is not exposed; check layout.tsx DEV hook")
+      throw new Error("__foloniteLayout.rightPanel.resize is not exposed; check layout.tsx DEV hook")
     }
     layout.rightPanel.resize(400)
   })

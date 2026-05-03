@@ -1,5 +1,5 @@
 import type { ComponentProps } from "solid-js"
-import type { PawworkSkillName } from "@/components/session/pawwork-skill-meta"
+import type { FoloniteSkillName } from "@/components/session/folonite-skill-meta"
 import { SessionComposerRegion, type createSessionComposerState } from "@/pages/session/composer"
 
 type ComposerRegionProps = ComponentProps<typeof SessionComposerRegion>
@@ -17,7 +17,7 @@ export function SessionPageComposerRegion(props: {
   onSubmit: () => void
   onResponseSubmit: () => void
   onModeChange?: (mode: "normal" | "shell") => void
-  selectedSkill?: () => PawworkSkillName | undefined
+  selectedSkill?: () => FoloniteSkillName | undefined
   followup?: ComposerRegionProps["followup"]
   revert?: ComposerRegionProps["revert"]
   setPromptDockRef: (el: HTMLDivElement) => void

@@ -1,13 +1,16 @@
 import { ComponentProps } from "solid-js"
 
-const PawMarkShape = (props: { fill: string }) => {
+const FoloniteMarkShape = (props: { fill: string }) => {
   return (
     <g fill={props.fill}>
-      <circle cx="24.8" cy="22" r="4.4" />
-      <circle cx="39.2" cy="22" r="4.4" />
-      <circle cx="18.3" cy="30.75" r="3.8" />
-      <circle cx="45.75" cy="30.75" r="3.8" />
-      <path d="M32 29.2 C24.2 29.2 19.8 37.6 19.8 42.6 C19.8 46.4 23.3 47.9 28.3 46.1 C30.1 45.4 33.9 45.4 35.8 46.1 C40.8 47.9 44.2 46.4 44.2 42.6 C44.2 37.6 39.8 29.2 32 29.2 Z" />
+      <path d="M32 4 L58 18 V46 L32 60 L6 46 V18 Z" fill-opacity="0.15" />
+      <path
+        d="M32 4 L58 18 V46 L32 60 L6 46 V18 Z"
+        stroke={props.fill}
+        stroke-width="3.5"
+        stroke-linejoin="round"
+      />
+      <path d="M32 4 V32 L58 18 M32 32 L58 46 M32 32 L32 60 M32 32 L6 46 M32 32 L6 18" stroke={props.fill} stroke-width="2" stroke-linecap="round" />
     </g>
   )
 }
@@ -21,36 +24,30 @@ export const Mark = (props: { class?: string }) => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <PawMarkShape fill="var(--icon-strong-base)" />
+      <FoloniteMarkShape fill="var(--icon-strong-base)" />
     </svg>
   )
 }
 
-export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => {
+export const Splash = (props: { ref?: (el: HTMLDivElement) => void; class?: string }) => {
   return (
-    <svg
+    <div
       ref={props.ref}
       data-component="logo-splash"
       classList={{ [props.class ?? ""]: !!props.class }}
-      viewBox="0 0 64 64"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
     >
-      <PawMarkShape fill="var(--icon-base)" />
-    </svg>
+      <img src="/Folonite-logo.png" alt="Folonite" class="w-24 h-auto" />
+    </div>
   )
 }
 
 export const Logo = (props: { class?: string }) => {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
+    <img
+      src="/Folonite-logo.png"
+      alt="Folonite"
       data-component="logo"
-      viewBox="0 0 64 64"
-      fill="none"
       classList={{ [props.class ?? ""]: !!props.class }}
-    >
-      <PawMarkShape fill="var(--icon-strong-base)" />
-    </svg>
+    />
   )
 }

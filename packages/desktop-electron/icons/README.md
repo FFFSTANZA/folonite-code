@@ -1,6 +1,6 @@
 # Desktop Icons
 
-`icons/source/icon.svg` is the source artwork for PawWork desktop icons.
+`icons/source/icon.svg` is the source artwork for Folonite desktop icons.
 
 Run this from `packages/desktop-electron` to generate the files consumed by electron-builder:
 

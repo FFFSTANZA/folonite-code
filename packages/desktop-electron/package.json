@@ -4,9 +4,9 @@
   "version": "2026.5.3",
   "type": "module",
   "license": "Apache-2.0",
-  "homepage": "https://pawwork.ai",
+  "homepage": "https://folonite.ai",
   "author": {
-    "name": "PawWork"
+    "name": "Folonite"
   },
   "scripts": {
     "typecheck": "tsgo -b",

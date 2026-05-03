@@ -31,13 +31,13 @@ export const desktopShellSelector = '[data-component="desktop-shell"]'
 export const desktopShellFrameSelector = '[data-component="desktop-shell-frame"]'
 export const desktopShellMainSelector = '[data-component="desktop-shell-main"]'
 export const titlebarShellSelector = '[data-component="titlebar-shell"]'
-export const titlebarLeftSelector = "#pawwork-titlebar-left"
-export const titlebarCenterSelector = "#pawwork-titlebar-center"
+export const titlebarLeftSelector = "#folonite-titlebar-left"
+export const titlebarCenterSelector = "#folonite-titlebar-center"
 
 const sidebarNavSelector = '[data-component="sidebar-nav-desktop"]'
-export const pawworkSidebarSelector = `${sidebarNavSelector} [data-component="pawwork-sidebar"]`
-export const pawworkSessionNewSelector = `${sidebarNavSelector} [data-action="pawwork-session-new"]`
-export const pawworkSessionSearchSelector = `${sidebarNavSelector} [data-action="pawwork-session-search"]`
+export const foloniteSidebarSelector = `${sidebarNavSelector} [data-component="folonite-sidebar"]`
+export const foloniteSessionNewSelector = `${sidebarNavSelector} [data-action="folonite-session-new"]`
+export const foloniteSessionSearchSelector = `${sidebarNavSelector} [data-action="folonite-session-search"]`
 
 export const projectSwitchSelector = (slug: string) =>
   `${sidebarNavSelector} [data-action="project-switch"][data-project="${slug}"]`
@@ -50,7 +50,7 @@ export const projectCloseMenuSelector = (slug: string) => `[data-action="project
 export const projectWorkspacesToggleSelector = (slug: string) =>
   `[data-action="project-workspaces-toggle"][data-project="${slug}"]`
 
-export const titlebarRightSelector = "#pawwork-titlebar-right"
+export const titlebarRightSelector = "#folonite-titlebar-right"
 export const sidebarNavMobileSelector = '[data-component="sidebar-nav-mobile"]'
 
 export const popoverBodySelector = '[data-slot="popover-body"]'

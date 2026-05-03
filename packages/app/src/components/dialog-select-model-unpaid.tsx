@@ -108,22 +108,20 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
                   <div class="w-full flex items-center gap-x-3">
                     <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
                     <span>{i.name}</span>
-                    <Show when={i.id === "opencode"}>
-                      <div class="text-13-regular text-text-weak">{language.t("dialog.provider.opencode.tagline")}</div>
-                    </Show>
-                    <Show when={i.id === "opencode"}>
+                    <Show when={i.id === "anthropic" || i.id === "openai" || i.id === "opencode-go" || i.id === "folonite-ash-2"}>
                       <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
-                    </Show>
-                    <Show when={i.id === "opencode-go"}>
-                      <>
-                        <div class="text-13-regular text-text-weak">
-                          {language.t("dialog.provider.opencodeGo.tagline")}
-                        </div>
-                        <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
-                      </>
                     </Show>
                     <Show when={i.id === "anthropic"}>
                       <div class="text-13-regular text-text-weak">{language.t("dialog.provider.anthropic.note")}</div>
+                    </Show>
+                    <Show when={i.id === "openai"}>
+                      <div class="text-13-regular text-text-weak">{language.t("dialog.provider.openai.note")}</div>
+                    </Show>
+                    <Show when={i.id === "opencode-go"}>
+                      <div class="text-13-regular text-text-weak">{language.t("dialog.provider.opencodeGo.tagline")}</div>
+                    </Show>
+                    <Show when={i.id === "folonite-ash-2"}>
+                      <div class="text-13-regular text-text-weak">{language.t("dialog.provider.foloniteAsh2.tagline")}</div>
                     </Show>
                   </div>
                 )}

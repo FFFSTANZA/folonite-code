@@ -17,15 +17,15 @@ describe("write-app-update-config", () => {
     expect(
       serializeAppUpdateConfig({
         provider: "github",
-        owner: "Astro-Han",
-        repo: "pawwork",
+        owner: "fffstanza",
+        repo: "folonite",
         channel: "latest",
       }),
     ).toBe(
       [
         "provider: github",
-        "owner: Astro-Han",
-        "repo: pawwork",
+        "owner: fffstanza",
+        "repo: folonite",
         "channel: latest",
         `updaterCacheDirName: ${UPDATER_CACHE_DIR_NAME}`,
         "",
@@ -37,8 +37,8 @@ describe("write-app-update-config", () => {
     expect(
       serializeAppUpdateConfig({
         provider: "github",
-        owner: "Astro-Han",
-        repo: "pawwork",
+        owner: "fffstanza",
+        repo: "folonite",
         channel: "latest",
       }),
     ).toContain(`updaterCacheDirName: ${UPDATER_CACHE_DIR_NAME}`)
@@ -48,15 +48,15 @@ describe("write-app-update-config", () => {
     expect(
       serializeAppUpdateConfig({
         provider: "github",
-        owner: "Astro-Han",
-        repo: "pawwork-beta",
+        owner: "fffstanza",
+        repo: "folonite-beta",
         channel: "latest",
       }),
-    ).toContain("repo: pawwork-beta")
+    ).toContain("repo: folonite-beta")
   })
 
   test("does not write updater config without publish config", async () => {
-    const root = mkdtempSync(join(tmpdir(), "pawwork-app-update-"))
+    const root = mkdtempSync(join(tmpdir(), "folonite-app-update-"))
     roots.push(root)
 
     expect(await writeAppUpdateConfig(join(root, "Resources"), undefined)).toBe(false)
@@ -64,21 +64,21 @@ describe("write-app-update-config", () => {
   })
 
   test("writes updater config inside macOS app resources", async () => {
-    const root = mkdtempSync(join(tmpdir(), "pawwork-app-update-"))
+    const root = mkdtempSync(join(tmpdir(), "folonite-app-update-"))
     roots.push(root)
 
     expect(
-      await writeAppUpdateConfig(join(root, "PawWork.app", "Contents", "Resources"), {
+      await writeAppUpdateConfig(join(root, "Folonite.app", "Contents", "Resources"), {
         provider: "github",
-        owner: "Astro-Han",
-        repo: "pawwork",
+        owner: "fffstanza",
+        repo: "folonite",
         channel: "latest",
       }),
     ).toBe(true)
 
-    const configPath = join(root, "PawWork.app", "Contents", "Resources", "app-update.yml")
+    const configPath = join(root, "Folonite.app", "Contents", "Resources", "app-update.yml")
     const config = readFileSync(configPath, "utf8")
-    expect(config).toContain("repo: pawwork")
+    expect(config).toContain("repo: folonite")
     expect(config).toContain(`updaterCacheDirName: ${UPDATER_CACHE_DIR_NAME}`)
   })
 })

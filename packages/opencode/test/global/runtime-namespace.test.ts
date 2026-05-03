@@ -25,9 +25,9 @@ function readGlobalPath(roots: Roots, namespace?: string) {
     process.env.XDG_CONFIG_HOME = ${JSON.stringify(roots.config)}
     process.env.XDG_STATE_HOME = ${JSON.stringify(roots.state)}
     if (${JSON.stringify(namespace)} !== undefined) {
-      process.env.PAWWORK_RUNTIME_NAMESPACE = ${JSON.stringify(namespace)}
+      process.env.FOLONITE_RUNTIME_NAMESPACE = ${JSON.stringify(namespace)}
     } else {
-      delete process.env.PAWWORK_RUNTIME_NAMESPACE
+      delete process.env.FOLONITE_RUNTIME_NAMESPACE
     }
     const { Global } = await import("./src/global/index.ts")
     console.log(JSON.stringify(Global.Path))

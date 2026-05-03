@@ -32,7 +32,7 @@ function setup(overrides: Partial<Parameters<typeof createFeedbackHandler>[0]> =
     calls,
     handler: createFeedbackHandler({
       feedbackUrl: "https://example.com/form",
-      reportRoot: "/tmp/pawwork/problem-reports",
+      reportRoot: "/tmp/folonite/problem-reports",
       context: () => "active",
       confirm: async () => true,
       copy: async (value) => {
@@ -53,9 +53,9 @@ function setup(overrides: Partial<Parameters<typeof createFeedbackHandler>[0]> =
       saveReport: async ({ markdown, reportId }) => {
         calls.savedMarkdown = markdown
         return {
-          path: `/tmp/pawwork/problem-reports/pawwork-problem-report-${reportId}.md`,
-          fileName: `pawwork-problem-report-${reportId}.md`,
-          locationHint: `PawWork app data/.../problem-reports/pawwork-problem-report-${reportId}.md`,
+          path: `/tmp/folonite/problem-reports/folonite-problem-report-${reportId}.md`,
+          fileName: `folonite-problem-report-${reportId}.md`,
+          locationHint: `Folonite app data/.../problem-reports/folonite-problem-report-${reportId}.md`,
         }
       },
       cleanupReports: async () => undefined,
@@ -81,8 +81,8 @@ describe("feedback handler", () => {
     expect(feedbackDialogLabels("zh").message).toContain("简短摘要")
     expect(feedbackDialogLabels("zh").message).toContain("完整问题报告文件")
     expect(feedbackDialogLabels("zh").message).toContain("提交后可以删除")
-    expect(feedbackDialogLabels("zh").message).not.toContain("PawWork")
-    expect(feedbackDialogLabels("zh").formOpenFailedMessage).not.toContain("PawWork")
+    expect(feedbackDialogLabels("zh").message).not.toContain("Folonite")
+    expect(feedbackDialogLabels("zh").formOpenFailedMessage).not.toContain("Folonite")
   })
 
   test("has English confirmation labels", () => {
@@ -109,11 +109,11 @@ describe("feedback handler", () => {
   test("confirm copies a short summary, saves the full report, reveals the file, and opens form", async () => {
     const subject = setup()
     const result = await subject.handler()
-    expect(subject.calls.copied).toContain("PawWork Problem Report Summary")
+    expect(subject.calls.copied).toContain("Folonite Problem Report Summary")
     expect(subject.calls.copied).toContain("Full report: ready for manual upload")
     expect(subject.calls.copied).not.toContain("```json")
-    expect(subject.calls.savedMarkdown).toContain("# PawWork Problem Report")
-    expect(subject.calls.shown).toContain("/tmp/pawwork/problem-reports/")
+    expect(subject.calls.savedMarkdown).toContain("# Folonite Problem Report")
+    expect(subject.calls.shown).toContain("/tmp/folonite/problem-reports/")
     expect(subject.calls.opened).toBe("https://example.com/form")
     expect(result).toEqual({
       status: "ready",
@@ -121,7 +121,7 @@ describe("feedback handler", () => {
       feedbackOpened: true,
       fullReport: {
         status: "ready",
-        fileName: expect.stringContaining("pawwork-problem-report-"),
+        fileName: expect.stringContaining("folonite-problem-report-"),
         locationHint: expect.stringContaining("problem-reports"),
       },
     })
@@ -138,13 +138,13 @@ describe("feedback handler", () => {
     const result = await subject.handler({
       confirm: false,
       rendererError: {
-        summary: "PawWork had trouble reading local state.",
+        summary: "Folonite had trouble reading local state.",
         details: "ChildStoreError: Failed to create persisted cache\nCaused by:\nTypeError: storage init failed",
       },
     })
 
     expect(confirms).toBe(0)
-    expect(subject.calls.copied).toContain("Renderer error: PawWork had trouble reading local state.")
+    expect(subject.calls.copied).toContain("Renderer error: Folonite had trouble reading local state.")
     expect(subject.calls.savedMarkdown).toContain("ChildStoreError: Failed to create persisted cache")
     expect(result.status).toBe("ready")
   })
@@ -208,7 +208,7 @@ describe("feedback handler", () => {
     await subject.handler()
     expect(subject.calls.savedMarkdown).toContain('"status": "failed"')
     expect(subject.calls.savedMarkdown).toContain("session unavailable")
-    expect(subject.calls.copied).toContain("PawWork Problem Report Summary")
+    expect(subject.calls.copied).toContain("Folonite Problem Report Summary")
     expect(subject.calls.opened).toBe("https://example.com/form")
   })
 
@@ -227,7 +227,7 @@ describe("feedback handler", () => {
     await subject.handler()
 
     expect(aborted).toBe(true)
-    expect(subject.calls.copied).toContain("PawWork Problem Report Summary")
+    expect(subject.calls.copied).toContain("Folonite Problem Report Summary")
     expect(subject.calls.savedMarkdown).toContain('"status": "failed"')
     expect(subject.calls.savedMarkdown).toContain("session export timed out")
     expect(subject.calls.opened).toBe("https://example.com/form")
@@ -259,7 +259,7 @@ describe("feedback handler", () => {
 
     await subject.handler()
 
-    expect(subject.calls.copied).toContain("PawWork Problem Report Summary")
+    expect(subject.calls.copied).toContain("Folonite Problem Report Summary")
     expect(subject.calls.copied).toContain("Full report: not generated")
     expect(subject.calls.opened).toBe("https://example.com/form")
   })
@@ -273,8 +273,8 @@ describe("feedback handler", () => {
 
     const result = await subject.handler()
 
-    expect(subject.calls.copied).toContain("PawWork Problem Report Summary")
-    expect(subject.calls.savedMarkdown).toContain("# PawWork Problem Report")
+    expect(subject.calls.copied).toContain("Folonite Problem Report Summary")
+    expect(subject.calls.savedMarkdown).toContain("# Folonite Problem Report")
     expect(subject.calls.fallbackUrl).toBe("https://example.com/form")
     expect(subject.calls.handledErrors).toContain("feedback form open failed")
     expect(subject.calls.errors).toHaveLength(0)
@@ -292,7 +292,7 @@ describe("feedback handler", () => {
     await subject.handler()
 
     expect(subject.calls.copied).toContain("problem-reports")
-    expect(subject.calls.openedPath).toBe("/tmp/pawwork/problem-reports")
+    expect(subject.calls.openedPath).toBe("/tmp/folonite/problem-reports")
     expect(subject.calls.opened).toBe("https://example.com/form")
     expect(subject.calls.handledErrors).toContain("problem report reveal failed")
   })
@@ -310,7 +310,7 @@ describe("feedback handler", () => {
 
     await subject.handler()
 
-    expect(subject.calls.openedPath).toBe("/tmp/pawwork/problem-reports")
+    expect(subject.calls.openedPath).toBe("/tmp/folonite/problem-reports")
     expect(subject.calls.opened).toBe("https://example.com/form")
     expect(subject.calls.handledErrors).toContain("problem report directory open failed")
   })
@@ -324,8 +324,8 @@ describe("feedback handler", () => {
 
     await subject.handler()
 
-    expect(subject.calls.copied).toContain("PawWork Problem Report Summary")
-    expect(subject.calls.shown).toContain("/tmp/pawwork/problem-reports/")
+    expect(subject.calls.copied).toContain("Folonite Problem Report Summary")
+    expect(subject.calls.shown).toContain("/tmp/folonite/problem-reports/")
     expect(subject.calls.opened).toBe("https://example.com/form")
     expect(subject.calls.errors).toHaveLength(0)
     expect(subject.calls.handledErrors).toContain("problem report cleanup failed")

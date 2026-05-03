@@ -12,7 +12,7 @@ import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Filesystem } from "../../src/util/filesystem"
 
 const originalFetch = globalThis.fetch
-const originalModelsPath = process.env.OPENCODE_MODELS_PATH
+const originalModelsPath = process.env.FOLONITE_MODELS_PATH
 const originalWrite = Filesystem.write
 const env = makeRuntime(Env.Service, Env.defaultLayer)
 const setEnv = (key: string, value: string) => env.runSync((svc) => svc.set(key, value))
@@ -20,8 +20,8 @@ const setEnv = (key: string, value: string) => env.runSync((svc) => svc.set(key,
 afterEach(async () => {
   globalThis.fetch = originalFetch
   ;(Filesystem as { write: typeof Filesystem.write }).write = originalWrite
-  if (originalModelsPath === undefined) delete process.env.OPENCODE_MODELS_PATH
-  else process.env.OPENCODE_MODELS_PATH = originalModelsPath
+  if (originalModelsPath === undefined) delete process.env.FOLONITE_MODELS_PATH
+  else process.env.FOLONITE_MODELS_PATH = originalModelsPath
   ModelsDev.Data.reset()
   await rm(cachePath(), { force: true })
 })
@@ -89,7 +89,7 @@ const moonshotProviderID = ProviderID.make("moonshotai-cn")
 const kimi26ModelID = ModelID.make("kimi-k2.6")
 
 test("refresh publishes a valid candidate catalog", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   mockFetchWithCatalog(catalogWithModels(["kimi-k2.5", "kimi-k2.6"]))
 
@@ -101,7 +101,7 @@ test("refresh publishes a valid candidate catalog", async () => {
 })
 
 test("refresh keeps existing cache when candidate JSON is invalid", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   const beforeCache = await readCacheText()
   const beforeVersion = ModelsDev.version()
@@ -114,7 +114,7 @@ test("refresh keeps existing cache when candidate JSON is invalid", async () => 
 })
 
 test("refresh keeps existing cache when candidate catalog cannot become runtime providers", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   const beforeCache = await readCacheText()
   const beforeVersion = ModelsDev.version()
@@ -129,7 +129,7 @@ test("refresh keeps existing cache when candidate catalog cannot become runtime 
 })
 
 test("refresh keeps existing cache when candidate catalog has invalid field types", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   const beforeCache = await readCacheText()
   const beforeVersion = ModelsDev.version()
@@ -144,7 +144,7 @@ test("refresh keeps existing cache when candidate catalog has invalid field type
 })
 
 test("refresh keeps existing cache when network fetch fails", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   const beforeCache = await readCacheText()
   const beforeVersion = ModelsDev.version()
@@ -159,7 +159,7 @@ test("refresh keeps existing cache when network fetch fails", async () => {
 })
 
 test("refresh keeps existing cache when HTTP response is not successful", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   const beforeCache = await readCacheText()
   const beforeVersion = ModelsDev.version()
@@ -172,7 +172,7 @@ test("refresh keeps existing cache when HTTP response is not successful", async 
 })
 
 test("refresh keeps existing cache when atomic publish write fails", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   const beforeCache = await readCacheText()
   const beforeVersion = ModelsDev.version()
@@ -192,7 +192,7 @@ test("refresh does not publish to normal cache when models path override is set"
   await using tmp = await tmpdir()
   const overridePath = path.join(tmp.path, "models.json")
   await writeFile(overridePath, JSON.stringify(catalogWithModels(["kimi-k2.5"])))
-  process.env.OPENCODE_MODELS_PATH = overridePath
+  process.env.FOLONITE_MODELS_PATH = overridePath
   mockFetchWithCatalog(catalogWithModels(["kimi-k2.5", "kimi-k2.6"]))
   const beforeVersion = ModelsDev.version()
 
@@ -206,7 +206,7 @@ test("provider state rebuilds after models path override refresh", async () => {
   await using tmp = await tmpdir()
   const overridePath = path.join(tmp.path, "models.json")
   await writeFile(overridePath, JSON.stringify(catalogWithModels(["kimi-k2.5"])))
-  process.env.OPENCODE_MODELS_PATH = overridePath
+  process.env.FOLONITE_MODELS_PATH = overridePath
   ModelsDev.Data.reset()
 
   await withTestInstance(async () => {
@@ -222,7 +222,7 @@ test("provider state rebuilds after models path override refresh", async () => {
 })
 
 test("provider state rebuilds after a successful catalog refresh", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   ModelsDev.Data.reset()
 
@@ -242,7 +242,7 @@ test("provider state rebuilds after a successful catalog refresh", async () => {
 })
 
 test("provider state rebuilds when refresh observes an already fresh cache from another process", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   ModelsDev.Data.reset()
 
@@ -259,7 +259,7 @@ test("provider state rebuilds when refresh observes an already fresh cache from 
 })
 
 test("getLanguage reports ModelNotFoundError when refreshed catalog removes the provider", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   ModelsDev.Data.reset()
 
@@ -274,7 +274,7 @@ test("getLanguage reports ModelNotFoundError when refreshed catalog removes the 
 })
 
 test("getLanguage reports provider suggestions after refreshed catalog replaces the provider", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   ModelsDev.Data.reset()
 
@@ -305,7 +305,7 @@ test("getLanguage reports provider suggestions after refreshed catalog replaces 
 })
 
 test("connected provider overlay uses refreshed provider state", async () => {
-  delete process.env.OPENCODE_MODELS_PATH
+  delete process.env.FOLONITE_MODELS_PATH
   await writeCache(catalogWithModels(["kimi-k2.5"]))
   ModelsDev.Data.reset()
 

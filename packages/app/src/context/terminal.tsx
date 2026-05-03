@@ -513,7 +513,7 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
         legacy: getLegacyTerminalStorageKeys(dir, params.id),
         at: new Date().toISOString(),
       })
-      const store = platform.storage?.("pawwork.global.dat")
+      const store = platform.storage?.("folonite.global.dat")
       if (!store) return
       void Promise.resolve(store.setItem("debug:terminal-invalid-all", payload)).catch(() => undefined)
     })

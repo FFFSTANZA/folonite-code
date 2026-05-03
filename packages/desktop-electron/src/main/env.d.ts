@@ -1,14 +1,14 @@
 interface ImportMetaEnv {
-  readonly OPENCODE_CHANNEL: string
-  readonly PAWWORK_FEEDBACK_FORM_URL?: string
-  readonly PAWWORK_BUILD_SHA?: string
+  readonly FOLONITE_CHANNEL: string
+  readonly FOLONITE_FEEDBACK_FORM_URL?: string
+  readonly FOLONITE_BUILD_SHA?: string
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
-declare module "virtual:opencode-server" {
+declare module "virtual:folonite-server" {
   export namespace Server {
     export type Listener = {
       hostname: string

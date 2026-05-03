@@ -7,7 +7,7 @@ const serverPort = process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"
 const command = `bun run dev -- --host 0.0.0.0 --port ${port}`
 const reuse = !process.env.CI
 const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? (process.env.CI ? 5 : 0)) || undefined
-const reporter = [["html", { outputFolder: "e2e/playwright-report", open: "never" }], ["line"]] as const
+const reporter = [["html", { outputFolder: "e2e/playwright-report", open: "never" }], ["line"]]
 
 if (process.env.PLAYWRIGHT_JUNIT_OUTPUT) {
   reporter.push(["junit", { outputFile: process.env.PLAYWRIGHT_JUNIT_OUTPUT }])
@@ -31,8 +31,8 @@ export default defineConfig({
     reuseExistingServer: reuse,
     timeout: 120_000,
     env: {
-      VITE_OPENCODE_SERVER_HOST: serverHost,
-      VITE_OPENCODE_SERVER_PORT: serverPort,
+      VITE_FOLONITE_SERVER_HOST: serverHost,
+      VITE_FOLONITE_SERVER_PORT: serverPort,
     },
   },
   use: {

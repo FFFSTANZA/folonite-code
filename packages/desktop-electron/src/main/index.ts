@@ -20,28 +20,28 @@ if (process.platform === "darwin") {
   } catch {}
 }
 
-process.env.OPENCODE_DISABLE_EMBEDDED_WEB_UI = "true"
+process.env.FOLONITE_DISABLE_EMBEDDED_WEB_UI = "true"
 
 const APP_NAMES: Record<string, string> = {
-  dev: "PawWork Dev",
-  beta: "PawWork Beta",
-  prod: "PawWork",
+  dev: "Folonite Dev",
+  beta: "Folonite Beta",
+  prod: "Folonite",
 }
 const APP_IDS: Record<string, string> = {
-  dev: "ai.pawwork.desktop.dev",
-  beta: "ai.pawwork.desktop.beta",
-  prod: "ai.pawwork.desktop",
+  dev: "ai.folonite.desktop.dev",
+  beta: "ai.folonite.desktop.beta",
+  prod: "ai.folonite.desktop",
 }
-const CI_SMOKE_HOME = process.env.PAWWORK_CI_SMOKE_HOME
-const CI_SMOKE_ENABLED = process.env.PAWWORK_CI_SMOKE === "true"
+const CI_SMOKE_HOME = process.env.FOLONITE_CI_SMOKE_HOME
+const CI_SMOKE_ENABLED = process.env.FOLONITE_CI_SMOKE === "true"
 const FEEDBACK_SESSION_EXPORT_TIMEOUT_MS = 3_000
 const userDataRoot = CI_SMOKE_HOME ?? app.getPath("appData")
 
-app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "PawWork Dev")
+app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "Folonite Dev")
 if (CI_SMOKE_HOME) {
   app.setPath("appData", CI_SMOKE_HOME)
 }
-app.setPath("userData", join(userDataRoot, app.isPackaged ? APP_IDS[CHANNEL] : "ai.pawwork.desktop.dev"))
+app.setPath("userData", join(userDataRoot, app.isPackaged ? APP_IDS[CHANNEL] : "ai.folonite.desktop.dev"))
 if (CI_SMOKE_HOME) {
   // Keep smoke logs inside the isolated profile so release checks cannot read stale user logs.
   app.setPath("logs", join(app.getPath("userData"), "logs"))
@@ -64,7 +64,7 @@ import { type MenuLocale } from "./menu-labels"
 import { readStoredMenuLocale, writeStoredMenuLocale } from "./menu-i18n"
 import { cleanupProblemReports, problemReportsRoot, writeProblemReportFile } from "./problem-report-files"
 import { getDefaultServerUrl, getWslConfig, setDefaultServerUrl, setWslConfig, spawnLocalServer } from "./server"
-import { PAWWORK_RUNTIME } from "./runtime-namespace"
+import { FOLONITE_RUNTIME } from "./runtime-namespace"
 import { createUpdaterController } from "./updater"
 import { pendingUpdateCacheDir } from "./updater-cache"
 import { updaterDialogLabels } from "./updater-dialog-labels"
@@ -84,7 +84,7 @@ import {
   shouldQueueDeepLinks,
   takeQueuedDeepLinksForReadyWindow,
 } from "./window-lifecycle"
-import type { Server } from "virtual:opencode-server"
+import type { Server } from "virtual:folonite-server"
 
 const initEmitter = new EventEmitter()
 let initStep: InitStep = { phase: "server_waiting" }
@@ -92,7 +92,7 @@ let initStep: InitStep = { phase: "server_waiting" }
 let mainWindow: BrowserWindow | null = null
 let currentProgress: number | null = null
 
-const LATEST_RELEASE_URL = "https://github.com/Astro-Han/pawwork/releases/latest"
+const LATEST_RELEASE_URL = "https://github.com/fffstanza/folonite-code/releases/latest"
 
 async function openLatestReleasePage() {
   try {
@@ -167,7 +167,7 @@ async function sessionExport(context = currentDesktopContext(), signal?: AbortSi
   const url = new URL(`/session/${sessionID}/message`, ready.url)
   const headers: Record<string, string> = {}
   if (ready.username || ready.password) {
-    headers.authorization = `Basic ${Buffer.from(`${ready.username ?? "opencode"}:${ready.password ?? ""}`).toString("base64")}`
+    headers.authorization = `Basic ${Buffer.from(`${ready.username ?? "Folonite"}:${ready.password ?? ""}`).toString("base64")}`
   }
   const controller = new AbortController()
   const abort = () => controller.abort()
@@ -272,7 +272,7 @@ function setupApp() {
   }
 
   app.on("second-instance", (_event: Event, argv: string[]) => {
-    const urls = argv.filter((arg: string) => arg.startsWith("opencode://"))
+    const urls = argv.filter((arg: string) => arg.startsWith("folonite://"))
     if (urls.length) {
       logger.log("deep link received via second-instance", { urls })
       emitDeepLinks(urls)
@@ -314,7 +314,7 @@ function setupApp() {
   }
 
   void app.whenReady().then(async () => {
-    app.setAsDefaultProtocolClient("opencode")
+    app.setAsDefaultProtocolClient("folonite")
     registerRendererProtocol()
     setDockIcon()
     setupAutoUpdater()
@@ -396,7 +396,7 @@ async function initialize() {
   server = listener
   serverReady.resolve({
     url,
-    username: PAWWORK_RUNTIME.serverUsername,
+    username: FOLONITE_RUNTIME.serverUsername,
     password,
   })
 
@@ -570,7 +570,7 @@ function ensureLoopbackNoProxy() {
 }
 
 async function getSidecarPort() {
-  const fromEnv = process.env.OPENCODE_PORT
+  const fromEnv = process.env.FOLONITE_PORT
   if (fromEnv) {
     const parsed = Number.parseInt(fromEnv, 10)
     if (!Number.isNaN(parsed)) return parsed

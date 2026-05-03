@@ -62,14 +62,14 @@ const ready = () =>
   Effect.runPromise(Config.Service.use((svc) => svc.waitForDependencies()).pipe(Effect.scoped, Effect.provide(layer)))
 
 async function withPawWorkRuntime(fn: () => Promise<void>) {
-  const previous = process.env.PAWWORK_RUNTIME_NAMESPACE
-  process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
+  const previous = process.env.FOLONITE_RUNTIME_NAMESPACE
+  process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
   await clear(true)
   try {
     await fn()
   } finally {
-    if (previous === undefined) delete process.env.PAWWORK_RUNTIME_NAMESPACE
-    else process.env.PAWWORK_RUNTIME_NAMESPACE = previous
+    if (previous === undefined) delete process.env.FOLONITE_RUNTIME_NAMESPACE
+    else process.env.FOLONITE_RUNTIME_NAMESPACE = previous
     await clear(true)
   }
 }
@@ -83,7 +83,7 @@ async function waitFor(fn: () => Promise<boolean>, timeout = 2000) {
 }
 
 // Get managed config directory from environment (set in preload.ts)
-const managedConfigDir = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR!
+const managedConfigDir = process.env.FOLONITE_TEST_MANAGED_CONFIG_DIR!
 
 beforeEach(async () => {
   await clear(true)
@@ -640,7 +640,7 @@ test("preserves env variables when adding $schema to config", async () => {
 })
 
 test("resolves env templates in account config with account token", async () => {
-  const originalControlToken = process.env["OPENCODE_CONSOLE_TOKEN"]
+  const originalControlToken = process.env["FOLONITE_CONSOLE_TOKEN"]
 
   const fakeAccount = Layer.mock(Account.Service)({
     active: () =>
@@ -670,7 +670,7 @@ test("resolves env templates in account config with account token", async () => 
     config: () =>
       Effect.succeed(
         Option.some({
-          provider: { opencode: { options: { apiKey: "{env:OPENCODE_CONSOLE_TOKEN}" } } },
+          provider: { opencode: { options: { apiKey: "{env:FOLONITE_CONSOLE_TOKEN}" } } },
         }),
       ),
     token: () => Effect.succeed(Option.some(AccessToken.make("st_test_token"))),
@@ -696,9 +696,9 @@ test("resolves env templates in account config with account token", async () => 
     ).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise)
   } finally {
     if (originalControlToken !== undefined) {
-      process.env["OPENCODE_CONSOLE_TOKEN"] = originalControlToken
+      process.env["FOLONITE_CONSOLE_TOKEN"] = originalControlToken
     } else {
-      delete process.env["OPENCODE_CONSOLE_TOKEN"]
+      delete process.env["FOLONITE_CONSOLE_TOKEN"]
     }
   }
 })
@@ -1297,7 +1297,7 @@ test("gets config directories", async () => {
   })
 })
 
-test("does not try to install dependencies in read-only OPENCODE_CONFIG_DIR", async () => {
+test("does not try to install dependencies in read-only FOLONITE_CONFIG_DIR", async () => {
   if (process.platform === "win32") return
 
   await using tmp = await tmpdir<string>({
@@ -1314,8 +1314,8 @@ test("does not try to install dependencies in read-only OPENCODE_CONFIG_DIR", as
     },
   })
 
-  const prev = process.env.OPENCODE_CONFIG_DIR
-  process.env.OPENCODE_CONFIG_DIR = tmp.extra
+  const prev = process.env.FOLONITE_CONFIG_DIR
+  process.env.FOLONITE_CONFIG_DIR = tmp.extra
 
   try {
     await Instance.provide({
@@ -1325,13 +1325,13 @@ test("does not try to install dependencies in read-only OPENCODE_CONFIG_DIR", as
       },
     })
   } finally {
-    if (prev === undefined) delete process.env.OPENCODE_CONFIG_DIR
-    else process.env.OPENCODE_CONFIG_DIR = prev
+    if (prev === undefined) delete process.env.FOLONITE_CONFIG_DIR
+    else process.env.FOLONITE_CONFIG_DIR = prev
   }
 })
 
 it.live(
-  "installs dependencies in writable OPENCODE_CONFIG_DIR",
+  "installs dependencies in writable FOLONITE_CONFIG_DIR",
   Effect.promise(async () => {
     await using tmp = await tmpdir<string>({
       init: async (dir) => {
@@ -1341,7 +1341,7 @@ it.live(
       },
     })
 
-    const prev = process.env.OPENCODE_CONFIG_DIR
+    const prev = process.env.FOLONITE_CONFIG_DIR
     const gitignorePath = path.join(tmp.extra, ".gitignore")
     const install = spyOn(Npm, "install").mockResolvedValue(undefined)
 
@@ -1354,7 +1354,7 @@ it.live(
 
     try {
       await withConfigDepsLock(async () => {
-        process.env.OPENCODE_CONFIG_DIR = tmp.extra
+        process.env.FOLONITE_CONFIG_DIR = tmp.extra
         try {
           await Instance.provide({
             directory: tmp.path,
@@ -1368,8 +1368,8 @@ it.live(
             },
           })
         } finally {
-          if (prev === undefined) delete process.env.OPENCODE_CONFIG_DIR
-          else process.env.OPENCODE_CONFIG_DIR = prev
+          if (prev === undefined) delete process.env.FOLONITE_CONFIG_DIR
+          else process.env.FOLONITE_CONFIG_DIR = prev
         }
       })
     } finally {
@@ -1416,11 +1416,11 @@ test("service dependency loading uses config plugin package metadata", async () 
       return cfg
     },
   })
-  const prev = process.env.OPENCODE_CONFIG_DIR
+  const prev = process.env.FOLONITE_CONFIG_DIR
   const install = spyOn(Npm, "install").mockResolvedValue(undefined)
 
   await withConfigDepsLock(async () => {
-    process.env.OPENCODE_CONFIG_DIR = tmp.extra
+    process.env.FOLONITE_CONFIG_DIR = tmp.extra
     try {
       await Instance.provide({
         directory: tmp.path,
@@ -1436,8 +1436,8 @@ test("service dependency loading uses config plugin package metadata", async () 
       expect(pkg.dependencies?.["@opencode-ai/plugin"]).toBe(target)
       expect(install).toHaveBeenCalledWith(tmp.extra)
     } finally {
-      if (prev === undefined) delete process.env.OPENCODE_CONFIG_DIR
-      else process.env.OPENCODE_CONFIG_DIR = prev
+      if (prev === undefined) delete process.env.FOLONITE_CONFIG_DIR
+      else process.env.FOLONITE_CONFIG_DIR = prev
       install.mockRestore()
     }
   })
@@ -1841,7 +1841,7 @@ test("migrates legacy write tool to edit permission", async () => {
 })
 
 // Managed settings tests
-// Note: preload.ts sets OPENCODE_TEST_MANAGED_CONFIG which Global.Path.managedConfig uses
+// Note: preload.ts sets FOLONITE_TEST_MANAGED_CONFIG which Global.Path.managedConfig uses
 
 test("managed settings override user settings", async () => {
   await using tmp = await tmpdir({
@@ -2664,10 +2664,10 @@ describe("deduplicatePluginOrigins", () => {
   })
 })
 
-describe("OPENCODE_DISABLE_PROJECT_CONFIG", () => {
+describe("FOLONITE_DISABLE_PROJECT_CONFIG", () => {
   test("skips project config files when flag is set", async () => {
-    const originalEnv = process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
-    process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true"
+    const originalEnv = process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
+    process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = "true"
 
     try {
       await using tmp = await tmpdir({
@@ -2694,16 +2694,16 @@ describe("OPENCODE_DISABLE_PROJECT_CONFIG", () => {
       })
     } finally {
       if (originalEnv === undefined) {
-        delete process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
+        delete process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
       } else {
-        process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = originalEnv
+        process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = originalEnv
       }
     }
   })
 
   test("skips project .opencode/ directories when flag is set", async () => {
-    const originalEnv = process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
-    process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true"
+    const originalEnv = process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
+    process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = "true"
 
     try {
       await using tmp = await tmpdir({
@@ -2725,16 +2725,16 @@ describe("OPENCODE_DISABLE_PROJECT_CONFIG", () => {
       })
     } finally {
       if (originalEnv === undefined) {
-        delete process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
+        delete process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
       } else {
-        process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = originalEnv
+        process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = originalEnv
       }
     }
   })
 
   test("still loads global config when flag is set", async () => {
-    const originalEnv = process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
-    process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true"
+    const originalEnv = process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
+    process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = "true"
 
     try {
       await using tmp = await tmpdir()
@@ -2749,21 +2749,21 @@ describe("OPENCODE_DISABLE_PROJECT_CONFIG", () => {
       })
     } finally {
       if (originalEnv === undefined) {
-        delete process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
+        delete process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
       } else {
-        process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = originalEnv
+        process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = originalEnv
       }
     }
   })
 
   test("skips relative instructions with warning when flag is set but no config dir", async () => {
-    const originalDisable = process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
-    const originalConfigDir = process.env["OPENCODE_CONFIG_DIR"]
+    const originalDisable = process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
+    const originalConfigDir = process.env["FOLONITE_CONFIG_DIR"]
 
     try {
       // Ensure no config dir is set
-      delete process.env["OPENCODE_CONFIG_DIR"]
-      process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true"
+      delete process.env["FOLONITE_CONFIG_DIR"]
+      process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = "true"
 
       await using tmp = await tmpdir({
         init: async (dir) => {
@@ -2794,21 +2794,21 @@ describe("OPENCODE_DISABLE_PROJECT_CONFIG", () => {
       })
     } finally {
       if (originalDisable === undefined) {
-        delete process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
+        delete process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
       } else {
-        process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = originalDisable
+        process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = originalDisable
       }
       if (originalConfigDir === undefined) {
-        delete process.env["OPENCODE_CONFIG_DIR"]
+        delete process.env["FOLONITE_CONFIG_DIR"]
       } else {
-        process.env["OPENCODE_CONFIG_DIR"] = originalConfigDir
+        process.env["FOLONITE_CONFIG_DIR"] = originalConfigDir
       }
     }
   })
 
-  test("OPENCODE_CONFIG_DIR still works when flag is set", async () => {
-    const originalDisable = process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
-    const originalConfigDir = process.env["OPENCODE_CONFIG_DIR"]
+  test("FOLONITE_CONFIG_DIR still works when flag is set", async () => {
+    const originalDisable = process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
+    const originalConfigDir = process.env["FOLONITE_CONFIG_DIR"]
 
     try {
       await using configDirTmp = await tmpdir({
@@ -2837,38 +2837,38 @@ describe("OPENCODE_DISABLE_PROJECT_CONFIG", () => {
         },
       })
 
-      process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true"
-      process.env["OPENCODE_CONFIG_DIR"] = configDirTmp.path
+      process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = "true"
+      process.env["FOLONITE_CONFIG_DIR"] = configDirTmp.path
 
       await Instance.provide({
         directory: projectTmp.path,
         fn: async () => {
           const config = await load()
-          // Should load from OPENCODE_CONFIG_DIR, not project
+          // Should load from FOLONITE_CONFIG_DIR, not project
           expect(config.model).toBe("configdir/model")
         },
       })
     } finally {
       if (originalDisable === undefined) {
-        delete process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]
+        delete process.env["FOLONITE_DISABLE_PROJECT_CONFIG"]
       } else {
-        process.env["OPENCODE_DISABLE_PROJECT_CONFIG"] = originalDisable
+        process.env["FOLONITE_DISABLE_PROJECT_CONFIG"] = originalDisable
       }
       if (originalConfigDir === undefined) {
-        delete process.env["OPENCODE_CONFIG_DIR"]
+        delete process.env["FOLONITE_CONFIG_DIR"]
       } else {
-        process.env["OPENCODE_CONFIG_DIR"] = originalConfigDir
+        process.env["FOLONITE_CONFIG_DIR"] = originalConfigDir
       }
     }
   })
 })
 
-describe("OPENCODE_CONFIG_CONTENT token substitution", () => {
-  test("substitutes {env:} tokens in OPENCODE_CONFIG_CONTENT", async () => {
-    const originalEnv = process.env["OPENCODE_CONFIG_CONTENT"]
+describe("FOLONITE_CONFIG_CONTENT token substitution", () => {
+  test("substitutes {env:} tokens in FOLONITE_CONFIG_CONTENT", async () => {
+    const originalEnv = process.env["FOLONITE_CONFIG_CONTENT"]
     const originalTestVar = process.env["TEST_CONFIG_VAR"]
     process.env["TEST_CONFIG_VAR"] = "test_api_key_12345"
-    process.env["OPENCODE_CONFIG_CONTENT"] = JSON.stringify({
+    process.env["FOLONITE_CONFIG_CONTENT"] = JSON.stringify({
       $schema: "https://opencode.ai/config.json",
       username: "{env:TEST_CONFIG_VAR}",
     })
@@ -2884,9 +2884,9 @@ describe("OPENCODE_CONFIG_CONTENT token substitution", () => {
       })
     } finally {
       if (originalEnv !== undefined) {
-        process.env["OPENCODE_CONFIG_CONTENT"] = originalEnv
+        process.env["FOLONITE_CONFIG_CONTENT"] = originalEnv
       } else {
-        delete process.env["OPENCODE_CONFIG_CONTENT"]
+        delete process.env["FOLONITE_CONFIG_CONTENT"]
       }
       if (originalTestVar !== undefined) {
         process.env["TEST_CONFIG_VAR"] = originalTestVar
@@ -2896,14 +2896,14 @@ describe("OPENCODE_CONFIG_CONTENT token substitution", () => {
     }
   })
 
-  test("substitutes {file:} tokens in OPENCODE_CONFIG_CONTENT", async () => {
-    const originalEnv = process.env["OPENCODE_CONFIG_CONTENT"]
+  test("substitutes {file:} tokens in FOLONITE_CONFIG_CONTENT", async () => {
+    const originalEnv = process.env["FOLONITE_CONFIG_CONTENT"]
 
     try {
       await using tmp = await tmpdir({
         init: async (dir) => {
           await Filesystem.write(path.join(dir, "api_key.txt"), "secret_key_from_file")
-          process.env["OPENCODE_CONFIG_CONTENT"] = JSON.stringify({
+          process.env["FOLONITE_CONFIG_CONTENT"] = JSON.stringify({
             $schema: "https://opencode.ai/config.json",
             username: "{file:./api_key.txt}",
           })
@@ -2918,21 +2918,21 @@ describe("OPENCODE_CONFIG_CONTENT token substitution", () => {
       })
     } finally {
       if (originalEnv !== undefined) {
-        process.env["OPENCODE_CONFIG_CONTENT"] = originalEnv
+        process.env["FOLONITE_CONFIG_CONTENT"] = originalEnv
       } else {
-        delete process.env["OPENCODE_CONFIG_CONTENT"]
+        delete process.env["FOLONITE_CONFIG_CONTENT"]
       }
     }
   })
 
-  test("resolves relative plugin paths in OPENCODE_CONFIG_CONTENT", async () => {
-    const originalEnv = process.env["OPENCODE_CONFIG_CONTENT"]
+  test("resolves relative plugin paths in FOLONITE_CONFIG_CONTENT", async () => {
+    const originalEnv = process.env["FOLONITE_CONFIG_CONTENT"]
 
     try {
       await using tmp = await tmpdir({
         init: async (dir) => {
           await Filesystem.write(path.join(dir, "plugin.ts"), "export default {}")
-          process.env["OPENCODE_CONFIG_CONTENT"] = JSON.stringify({
+          process.env["FOLONITE_CONFIG_CONTENT"] = JSON.stringify({
             $schema: "https://opencode.ai/config.json",
             plugin: ["./plugin.ts"],
           })
@@ -2949,9 +2949,9 @@ describe("OPENCODE_CONFIG_CONTENT token substitution", () => {
       })
     } finally {
       if (originalEnv !== undefined) {
-        process.env["OPENCODE_CONFIG_CONTENT"] = originalEnv
+        process.env["FOLONITE_CONFIG_CONTENT"] = originalEnv
       } else {
-        delete process.env["OPENCODE_CONFIG_CONTENT"]
+        delete process.env["FOLONITE_CONFIG_CONTENT"]
       }
     }
   })

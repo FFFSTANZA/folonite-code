@@ -59,7 +59,7 @@ import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
-import type { PawworkSkillName } from "@/components/session/pawwork-skill-meta"
+import type { FoloniteSkillName } from "@/components/session/folonite-skill-meta"
 
 interface PromptInputProps {
   class?: string
@@ -76,7 +76,7 @@ interface PromptInputProps {
   onModeChange?: (mode: "normal" | "shell") => void
   sessionID?: string
   sessionIDControlled?: boolean
-  selectedSkill?: () => PawworkSkillName | undefined
+  selectedSkill?: () => FoloniteSkillName | undefined
 }
 
 const EXAMPLES = [

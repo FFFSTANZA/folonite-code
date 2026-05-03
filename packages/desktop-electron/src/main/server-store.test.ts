@@ -2,7 +2,7 @@ import { afterAll, describe, expect, mock, test } from "bun:test"
 
 mock.module("electron", () => ({
   app: {
-    getPath: (name: string) => (name === "userData" ? "/tmp/pawwork-user-data" : `/tmp/${name}`),
+    getPath: (name: string) => (name === "userData" ? "/tmp/folonite-user-data" : `/tmp/${name}`),
     isPackaged: false,
   },
 }))

@@ -11,7 +11,7 @@ test("desktop shell shares titlebar height across titlebar and narrow sidebar ge
   const layout = read("./pages/layout.tsx")
   const titlebar = read("./components/titlebar.tsx")
   const sessionHeader = read("./components/session/session-header.tsx")
-  const pawworkTitlebar = read("./pages/layout/pawwork-titlebar.tsx")
+  const foloniteTitlebar = read("./pages/layout/folonite-titlebar.tsx")
   const wideDesktopQuery = css.indexOf("@media (min-width: 1280px)")
   const macMainSeamRule = css.indexOf(
     '[data-component="desktop-shell-main"][data-platform="desktop"][data-os="macos"] {',
@@ -37,12 +37,12 @@ test("desktop shell shares titlebar height across titlebar and narrow sidebar ge
   expect(titlebar).toContain('style={{ height: currentTitlebarHeight(), "min-height": currentTitlebarHeight() }}')
   expect(titlebar).toContain("--sidebar-width")
   expect(titlebar).toContain("--right-panel-width")
-  expect(titlebar).toMatch(/id=["']pawwork-titlebar-left["']/)
-  expect(titlebar).toMatch(/id=["']pawwork-titlebar-center["']/)
-  expect(titlebar).toMatch(/id=["']pawwork-titlebar-right["']/)
-  expect(sessionHeader).toMatch(/document\.getElementById\(["']pawwork-titlebar-left["']\)/)
-  expect(sessionHeader).toMatch(/document\.getElementById\(["']pawwork-titlebar-right["']\)/)
-  expect(pawworkTitlebar).toMatch(/document\.getElementById\(["']pawwork-titlebar-center["']\)/)
+  expect(titlebar).toMatch(/id=["']folonite-titlebar-left["']/)
+  expect(titlebar).toMatch(/id=["']folonite-titlebar-center["']/)
+  expect(titlebar).toMatch(/id=["']folonite-titlebar-right["']/)
+  expect(sessionHeader).toMatch(/document\.getElementById\(["']folonite-titlebar-left["']\)/)
+  expect(sessionHeader).toMatch(/document\.getElementById\(["']folonite-titlebar-right["']\)/)
+  expect(foloniteTitlebar).toMatch(/document\.getElementById\(["']folonite-titlebar-center["']\)/)
 })
 
 test("session composer is docked outside the scroll-clipped timeline region", () => {

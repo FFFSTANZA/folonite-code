@@ -5,7 +5,7 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useLanguage } from "@/context/language"
 
-const COLLAPSE_KEY = "pawwork-debug-bar-collapsed"
+const COLLAPSE_KEY = "folonite-debug-bar-collapsed"
 
 function readCollapsed() {
   if (typeof localStorage !== "object") return false

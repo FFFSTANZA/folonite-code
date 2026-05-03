@@ -1,7 +1,7 @@
 import type { ElectronAPI, WindowConfig } from "../preload/types"
 
 type DeepLinkWindow = Window & {
-  __OPENCODE__?: {
+  __FOLONITE__?: {
     deepLinks?: string[]
   }
 }
@@ -49,10 +49,10 @@ export function createStartupState(api: Pick<ElectronAPI, "getWindowConfig" | "c
 
 export function pushPendingDeepLinks(target: DeepLinkWindow, urls: string[]) {
   if (urls.length === 0) return
-  target.__OPENCODE__ ??= {}
-  const pending = target.__OPENCODE__.deepLinks ?? []
+  target.__FOLONITE__ ??= {}
+  const pending = target.__FOLONITE__.deepLinks ?? []
   pending.push(...urls)
-  target.__OPENCODE__.deepLinks = pending
+  target.__FOLONITE__.deepLinks = pending
 }
 
 let startupState: ReturnType<typeof createStartupState> | undefined

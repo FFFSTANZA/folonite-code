@@ -17,7 +17,7 @@ import { ShareRuntime } from "./runtime"
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
-  const disabled = process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"
+  const disabled = process.env["FOLONITE_DISABLE_SHARE"] === "true" || process.env["FOLONITE_DISABLE_SHARE"] === "1"
 
   export type Api = {
     create: string
@@ -290,7 +290,7 @@ export namespace ShareNext {
       })
 
       const create = Effect.fn("ShareNext.create")(function* (sessionID: SessionID) {
-        // OPENCODE_DISABLE_SHARE keeps a benign empty stub for opencode users who opt out;
+        // FOLONITE_DISABLE_SHARE keeps a benign empty stub for opencode users who opt out;
         // the gate (PawWork runtime) raises a typed failure so direct callers can't mistake the
         // disabled return for a successful share with a blank URL.
         if (disabled) return { id: "", url: "", secret: "" }

@@ -1,6 +1,6 @@
-# PawWork Desktop
+# Folonite Desktop
 
-Native PawWork desktop app, built with Electron.
+Native Folonite desktop app, built with Electron.
 
 ## Development
 

@@ -7,7 +7,7 @@ const context: DesktopContext = {
   sessionID: "ses_1",
   route: "/repo/session/ses_1",
   locale: "en",
-  title: "PawWork",
+  title: "Folonite",
 }
 
 describe("desktop context sync", () => {

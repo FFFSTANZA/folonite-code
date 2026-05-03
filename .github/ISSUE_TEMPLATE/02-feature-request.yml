@@ -9,7 +9,7 @@ body:
       value: |
         Thanks for the suggestion.
 
-        PawWork is built for non-technical knowledge workers, so the most useful requests describe the real task and why the current workflow is not enough.
+        Folonite is built for non-technical knowledge workers, so the most useful requests describe the real task and why the current workflow is not enough.
   - type: textarea
     id: problem
     attributes:
@@ -55,7 +55,7 @@ body:
       label: What would count as done?
       description: List the observable acceptance criteria. Keep this about user-visible behavior and verification, not only implementation details.
       placeholder: |
-        - I can open a spreadsheet and ask PawWork to summarize it.
+        - I can open a spreadsheet and ask Folonite to summarize it.
         - The report is created in the same workspace.
         - There is a clear way to check that the result works.
     validations:

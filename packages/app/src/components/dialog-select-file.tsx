@@ -16,7 +16,7 @@ import { useLayoutPage } from "@/context/layout-page"
 import { useFile } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useSessionLayout } from "@/pages/session/session-layout"
-import { pawworkSessionDirectories } from "@/pages/layout/pawwork-session-source"
+import { foloniteSessionDirectories } from "@/pages/layout/folonite-session-source"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { decode64 } from "@/utils/base64"
 import { getRelativeTime } from "@/utils/time"
@@ -308,7 +308,7 @@ export function DialogSelectFile(props: { mode?: DialogSelectFileMode; onOpenFil
     const directory = projectDirectory()
     const current = project()
     if (!current) return directory ? [directory] : []
-    return pawworkSessionDirectories({
+    return foloniteSessionDirectories({
       project: current,
       activeProjectWorktree: current.worktree,
       currentDirectory: directory,

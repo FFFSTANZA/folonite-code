@@ -69,12 +69,12 @@ describe("desktop renderer startup state", () => {
   })
 
   test("buffers deep links for the app layout to drain after mount", () => {
-    const target = {} as Window & { __OPENCODE__?: { deepLinks?: string[] } }
+    const target = {} as Window & { __FOLONITE__?: { deepLinks?: string[] } }
 
     pushPendingDeepLinks(target, ["opencode://open-project?directory=/a"])
     pushPendingDeepLinks(target, ["opencode://new-session?directory=/b"])
 
-    expect(target.__OPENCODE__?.deepLinks).toEqual([
+    expect(target.__FOLONITE__?.deepLinks).toEqual([
       "opencode://open-project?directory=/a",
       "opencode://new-session?directory=/b",
     ])

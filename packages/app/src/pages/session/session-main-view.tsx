@@ -1,7 +1,7 @@
 import { Match, Show, Switch, type ComponentProps, type JSX } from "solid-js"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { NewSessionView, SessionHeader } from "@/components/session"
-import type { PawworkSkillName } from "@/components/session/pawwork-skill-meta"
+import type { FoloniteSkillName } from "@/components/session/folonite-skill-meta"
 import type { useLanguage } from "@/context/language"
 import type { createSizing } from "@/pages/session/helpers"
 import { MessageTimeline } from "@/pages/session/message-timeline"
@@ -42,7 +42,7 @@ export function SessionMainView(props: {
   composerSession: JSX.Element
   composerHome: (ctx: {
     onModeChange: (mode: "normal" | "shell") => void
-    selectedSkill: () => PawworkSkillName | undefined
+    selectedSkill: () => FoloniteSkillName | undefined
   }) => JSX.Element
   canReview: () => boolean
   reviewDiffs: ReturnType<typeof createSessionReviewState>["reviewDiffs"]

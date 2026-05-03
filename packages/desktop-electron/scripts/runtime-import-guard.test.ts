@@ -118,7 +118,7 @@ describe("runtime import guard", () => {
   })
 
   test("findWorkspacePackageJsonPath discovers the workspace root from nested directories", async () => {
-    const repo = mkdtempSync(path.join(tmpdir(), "pawwork-runtime-guard-repo-"))
+    const repo = mkdtempSync(path.join(tmpdir(), "folonite-runtime-guard-repo-"))
     try {
       await Bun.write(path.join(repo, "package.json"), JSON.stringify({ workspaces: { packages: ["packages/*"] } }))
       mkdirSync(path.join(repo, "packages/util"), { recursive: true })
@@ -134,7 +134,7 @@ describe("runtime import guard", () => {
   })
 
   test("readBuiltRuntimeFiles fails when no runtime JavaScript files were scanned", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "pawwork-runtime-guard-"))
+    const dir = mkdtempSync(path.join(tmpdir(), "folonite-runtime-guard-"))
     try {
       expect(() => readBuiltRuntimeFiles(dir)).toThrow("No Electron main/preload JavaScript output files found")
     } finally {
@@ -143,7 +143,7 @@ describe("runtime import guard", () => {
   })
 
   test("readBuiltRuntimeFiles reads main and preload JavaScript output", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "pawwork-runtime-guard-"))
+    const dir = mkdtempSync(path.join(tmpdir(), "folonite-runtime-guard-"))
     try {
       mkdirSync(path.join(dir, "out/main"), { recursive: true })
       mkdirSync(path.join(dir, "out/preload"), { recursive: true })
@@ -191,7 +191,7 @@ describe("runtime import guard", () => {
   })
 
   test("runRuntimeImportGuard fails closed when an opencode package cannot be resolved", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "pawwork-runtime-guard-"))
+    const dir = mkdtempSync(path.join(tmpdir(), "folonite-runtime-guard-"))
     try {
       await Bun.write(path.join(dir, "package.json"), JSON.stringify({ workspaces: { packages: [] } }))
       mkdirSync(path.join(dir, "out/main"), { recursive: true })

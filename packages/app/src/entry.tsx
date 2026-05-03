@@ -10,7 +10,7 @@ import { showToast } from "@opencode-ai/ui/toast"
 import pkg from "../package.json"
 import { ServerConnection } from "./context/server"
 
-const DEFAULT_SERVER_URL_KEY = "pawwork.settings.dat:defaultServerUrl"
+const DEFAULT_SERVER_URL_KEY = "folonite.settings.dat:defaultServerUrl"
 
 const getLocale = () => {
   if (typeof navigator !== "object") return "en" as const
@@ -107,9 +107,9 @@ if (!(root instanceof HTMLElement) && import.meta.env.DEV) {
 }
 
 const getCurrentUrl = () => {
-  if (location.hostname.includes("opencode.ai")) return "http://localhost:4096"
+  if (location.hostname.includes("folonite.ai")) return "http://localhost:4096"
   if (import.meta.env.DEV)
-    return `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
+    return `http://${import.meta.env.VITE_FOLONITE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_FOLONITE_SERVER_PORT ?? "4096"}`
   return location.origin
 }
 

@@ -2,7 +2,7 @@ import { createEffect, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createSimpleContext } from "../context/helper"
-import pawworkThemeJson from "./themes/pawwork.json"
+import foloniteThemeJson from "./themes/folonite.json"
 import { resolveThemeVariant, themeToCss } from "./resolve"
 import type { DesktopTheme } from "./types"
 
@@ -16,14 +16,14 @@ export type ThemeStorageKeys = {
 }
 
 const DEFAULT_STORAGE_KEYS: ThemeStorageKeys = {
-  themeId: "opencode-theme-id",
-  colorScheme: "opencode-color-scheme",
-  cssLight: "opencode-theme-css-light",
-  cssDark: "opencode-theme-css-dark",
+  themeId: "folonite-theme-id",
+  colorScheme: "folonite-color-scheme",
+  cssLight: "folonite-theme-css-light",
+  cssDark: "folonite-theme-css-dark",
 } as const
 
-const THEME_STYLE_ID = "oc-theme"
-const DEFAULT_THEME_ID = "pawwork"
+const THEME_STYLE_ID = "folonite-theme"
+const DEFAULT_THEME_ID = "folonite"
 let files: Record<string, () => Promise<{ default: DesktopTheme }>> | undefined
 let ids: string[] | undefined
 let known: Set<string> | undefined
@@ -49,9 +49,9 @@ function knownThemes() {
 }
 
 const names: Record<string, string> = {
-  pawwork: "PawWork",
+  folonite: "Folonite",
 }
-const pawworkTheme = pawworkThemeJson as DesktopTheme
+const foloniteTheme = foloniteThemeJson as DesktopTheme
 
 function read(key: string) {
   if (typeof localStorage !== "object") return null
@@ -91,7 +91,7 @@ function ensureThemeStyleElement(): HTMLStyleElement {
 }
 
 function getSystemMode(): "light" | "dark" {
-  if (typeof window !== "object") return "light"
+  if (typeof window !== "object") return "dark"
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
 }
 
@@ -113,7 +113,7 @@ function applyThemeCss(theme: DesktopTheme, themeId: string, mode: "light" | "da
   ${css}
 }`
 
-  document.getElementById("oc-theme-preload")?.remove()
+  document.getElementById("folonite-theme-preload-script")?.remove()
   ensureThemeStyleElement().textContent = fullCss
   document.documentElement.dataset.theme = themeId
   document.documentElement.dataset.colorScheme = mode
@@ -144,11 +144,11 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
     const fallbackDefault =
       props.defaultTheme && knownThemes().has(props.defaultTheme) ? props.defaultTheme : DEFAULT_THEME_ID
     const themeId = storedTheme ?? fallbackDefault
-    const colorScheme = (storedScheme ?? (firstInstall ? "light" : "system")) as ColorScheme
+    const colorScheme = (storedScheme ?? (firstInstall ? "dark" : "system")) as ColorScheme
     const mode = resolveMode(themeId, colorScheme)
     const [store, setStore] = createStore({
       themes: {
-        [DEFAULT_THEME_ID]: pawworkTheme,
+        [DEFAULT_THEME_ID]: foloniteTheme,
       } as Record<string, DesktopTheme>,
       themeId,
       colorScheme,
@@ -228,7 +228,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       const firstInstall = !rawTheme && !rawScheme
       const candidate = rawTheme ?? props.defaultTheme
       const savedTheme = candidate && knownThemes().has(candidate) ? candidate : DEFAULT_THEME_ID
-      const savedScheme = (rawScheme ?? (firstInstall ? "light" : "system")) as ColorScheme
+      const savedScheme = (rawScheme ?? (firstInstall ? "dark" : "system")) as ColorScheme
       if (rawTheme && rawTheme !== savedTheme) {
         write(storageKeys.themeId, savedTheme)
         clear(storageKeys)

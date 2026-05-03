@@ -9,7 +9,7 @@ import { Runtime } from "@opencode-ai/core/runtime"
 const log = Log.create({ service: "config" })
 
 function managedPlistDomain() {
-  return Runtime.isPawWork() ? "ai.pawwork.managed" : "ai.opencode.managed"
+  return "ai.folonite.managed"
 }
 
 // Keys injected by macOS/MDM into the managed plist that are not OpenCode config
@@ -35,7 +35,7 @@ function systemManagedConfigDir(): string {
 }
 
 export function managedConfigDir() {
-  return process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR || systemManagedConfigDir()
+  return process.env.FOLONITE_TEST_MANAGED_CONFIG_DIR || systemManagedConfigDir()
 }
 
 export function parseManagedPlist(json: string): string {

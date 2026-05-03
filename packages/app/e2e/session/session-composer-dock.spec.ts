@@ -120,10 +120,10 @@ async function expectPermissionOpen(page: any) {
 async function todoDock(page: any, sessionID: string) {
   await page.addInitScript(() => {
     const win = window as ComposerWindow
-    const saved = window.sessionStorage.getItem("__opencode_e2e_composer_sessions")
+    const saved = window.sessionStorage.getItem("__folonite_e2e_composer_sessions")
     const sessions = saved ? JSON.parse(saved) : {}
-    win.__opencode_e2e = {
-      ...win.__opencode_e2e,
+    win.__folonite_e2e = {
+      ...win.__folonite_e2e,
       composer: {
         enabled: true,
         sessions,
@@ -135,7 +135,7 @@ async function todoDock(page: any, sessionID: string) {
     await page.evaluate(
       (input: { event: string; sessionID: string; driver: ComposerDriverState | undefined }) => {
         const win = window as ComposerWindow
-        const composer = win.__opencode_e2e?.composer
+        const composer = win.__folonite_e2e?.composer
         if (!composer?.enabled) throw new Error("Composer e2e driver is not enabled")
         composer.sessions ??= {}
         const prev = composer.sessions[input.sessionID] ?? {}
@@ -161,7 +161,7 @@ async function todoDock(page: any, sessionID: string) {
             driver: input.driver,
           }
         }
-        window.sessionStorage.setItem("__opencode_e2e_composer_sessions", JSON.stringify(composer.sessions))
+        window.sessionStorage.setItem("__folonite_e2e_composer_sessions", JSON.stringify(composer.sessions))
         window.dispatchEvent(new CustomEvent(input.event, { detail: { sessionID: input.sessionID } }))
       },
       { event: composerEvent, sessionID, driver },
@@ -171,13 +171,13 @@ async function todoDock(page: any, sessionID: string) {
   const readUi = () =>
     page.evaluate((sessionID: string) => {
       const win = window as ComposerWindow
-      return win.__opencode_e2e?.composer?.sessions?.[sessionID]?.probe ?? null
+      return win.__folonite_e2e?.composer?.sessions?.[sessionID]?.probe ?? null
     }, sessionID) as Promise<ComposerProbeState | null>
 
   const readState = () =>
     page.evaluate((sessionID: string) => {
       const win = window as ComposerWindow
-      return win.__opencode_e2e?.composer?.sessions?.[sessionID]?.stateProbe ?? null
+      return win.__folonite_e2e?.composer?.sessions?.[sessionID]?.stateProbe ?? null
     }, sessionID) as Promise<ComposerStateProbeState | null>
 
   const api = {

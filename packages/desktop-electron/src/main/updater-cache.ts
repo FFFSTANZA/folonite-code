@@ -1,7 +1,7 @@
 import { homedir as currentHomedir } from "node:os"
 import path from "node:path"
 
-export const UPDATER_CACHE_DIR_NAME = "pawwork-updater"
+export const UPDATER_CACHE_DIR_NAME = "folonite-updater"
 
 type CacheInput = {
   platform?: NodeJS.Platform

@@ -69,7 +69,7 @@ describe("createChildStoreManager", () => {
       expect((error as ChildStoreError).context.kind).toBe("vcs")
       expect((error as ChildStoreError).context.directory).toBe("/tmp/project")
       expect((error as ChildStoreError).context.key).toBe("workspace:vcs")
-      expect((error as ChildStoreError).context.storage).toStartWith("pawwork.workspace.-tmp-project.")
+      expect((error as ChildStoreError).context.storage).toStartWith("folonite.workspace.-tmp-project.")
       return
     }
 

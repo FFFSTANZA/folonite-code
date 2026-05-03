@@ -422,13 +422,25 @@ export function DialogConnectProvider(props: { provider: string }) {
     return (
       <div class="flex flex-col gap-6">
         <Switch>
+          <Match when={provider().id === "folonite-ash-2"}>
+            <div class="flex flex-col gap-4">
+              <div class="text-13-regular text-text-base">{language.t("provider.connect.foloniteAsh2.description")}</div>
+              <div class="text-13-regular text-text-base">
+                {language.t("provider.connect.opencodeZen.visit.prefix")}
+                <Link href="https://folonite.in" tabIndex={-1}>
+                  {language.t("provider.connect.foloniteAsh2.visit.link")}
+                </Link>
+                {language.t("provider.connect.opencodeZen.visit.suffix")}
+              </div>
+            </div>
+          </Match>
           <Match when={provider().id === "opencode"}>
             <div class="flex flex-col gap-4">
               <div class="text-13-regular text-text-base">{language.t("provider.connect.opencodeZen.line1")}</div>
               <div class="text-13-regular text-text-base">{language.t("provider.connect.opencodeZen.line2")}</div>
               <div class="text-13-regular text-text-base">
                 {language.t("provider.connect.opencodeZen.visit.prefix")}
-                <Link href="https://opencode.ai/zen" tabIndex={-1}>
+                <Link href="https://folonite.ai/zen" tabIndex={-1}>
                   {language.t("provider.connect.opencodeZen.visit.link")}
                 </Link>
                 {language.t("provider.connect.opencodeZen.visit.suffix")}

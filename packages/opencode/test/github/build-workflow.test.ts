@@ -76,7 +76,7 @@ describe("release workflow", () => {
       expect(result.summary).toContain("- Source run ID: `123456`")
       expect(result.summary).toContain("- Source sha: `0123456789abcdef0123456789abcdef01234567`")
       expect(result.summary).toContain(
-        "`gh workflow run build.yml --repo Astro-Han/pawwork --ref workflow-snapshot-123",
+        "`gh workflow run build.yml --repo fffstanza/folonite-code --ref workflow-snapshot-123",
       )
       expect(result.summary).not.toContain("\\`gh workflow run")
     }),
@@ -159,9 +159,9 @@ describe("release workflow", () => {
         SELECTED_ARCH: "${{ needs.select-build-target.outputs.arch }}",
       })
       expect(buildElectronAppStep?.env).toEqual({
-        OPENCODE_CHANNEL: "${{ inputs.channel || 'dev' }}",
-        PAWWORK_FEEDBACK_FORM_URL: "${{ vars.PAWWORK_FEEDBACK_FORM_URL || '' }}",
-        PAWWORK_BUILD_SHA: "${{ github.sha }}",
+        FOLONITE_CHANNEL: "${{ inputs.channel || 'dev' }}",
+        FOLONITE_FEEDBACK_FORM_URL: "${{ vars.FOLONITE_FEEDBACK_FORM_URL || '' }}",
+        FOLONITE_BUILD_SHA: "${{ github.sha }}",
       })
       expect(runtimeImportGuardStep?.if).toBe("${{ inputs.phase != 'finalize' }}")
       expect(runtimeImportGuardStep?.run).toBe("bun ./scripts/runtime-import-guard.ts")
@@ -170,8 +170,8 @@ describe("release workflow", () => {
       expect(steps.indexOf(runtimeImportGuardStep!)).toBeLessThan(steps.indexOf(setupAppleApiKeyStep!))
       expect(packageAppStep?.shell).toBe("bash")
       expect(packageAppStep?.env).toEqual({
-        OPENCODE_CHANNEL: "${{ inputs.channel || 'dev' }}",
-        PAWWORK_FEEDBACK_FORM_URL: "${{ vars.PAWWORK_FEEDBACK_FORM_URL || '' }}",
+        FOLONITE_CHANNEL: "${{ inputs.channel || 'dev' }}",
+        FOLONITE_FEEDBACK_FORM_URL: "${{ vars.FOLONITE_FEEDBACK_FORM_URL || '' }}",
         GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}",
       })
       expect(packageAppStep?.run).toContain('publish_flag="never"')
@@ -182,12 +182,12 @@ describe("release workflow", () => {
       )
       expect(smokeSignedAppStep?.["working-directory"]).toBe("packages/desktop-electron")
       expect(smokeSignedAppStep?.env).toEqual({
-        OPENCODE_CHANNEL: "${{ inputs.channel || 'dev' }}",
+        FOLONITE_CHANNEL: "${{ inputs.channel || 'dev' }}",
       })
-      expect(smokeSignedAppStep?.run).toContain('case "$OPENCODE_CHANNEL" in')
+      expect(smokeSignedAppStep?.run).toContain('case "$FOLONITE_CHANNEL" in')
       expect(smokeSignedAppStep?.run).toContain('EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/$APP_NAME"')
       expect(smokeSignedAppStep?.run).toContain(
-        'bun ./scripts/ci-smoke.ts packaged "$OPENCODE_CHANNEL" "$EXECUTABLE_PATH"',
+        'bun ./scripts/ci-smoke.ts packaged "$FOLONITE_CHANNEL" "$EXECUTABLE_PATH"',
       )
       expect(packageSignedAppStep).toBeDefined()
       expect(steps.indexOf(smokeSignedAppStep!)).toBeGreaterThan(steps.indexOf(packageSignedAppStep!))
@@ -200,8 +200,8 @@ describe("release workflow", () => {
       expect(steps.indexOf(downloadExistingMetadataStep!)).toBeLessThan(steps.indexOf(packageNotarizedStep!))
       expect(steps.indexOf(downloadExistingMetadataStep!)).toBeLessThan(steps.indexOf(packageAppStep!))
       expect(packageNotarizedStep?.env).toEqual({
-        OPENCODE_CHANNEL: "${{ inputs.channel || 'dev' }}",
-        PAWWORK_FEEDBACK_FORM_URL: "${{ vars.PAWWORK_FEEDBACK_FORM_URL || '' }}",
+        FOLONITE_CHANNEL: "${{ inputs.channel || 'dev' }}",
+        FOLONITE_FEEDBACK_FORM_URL: "${{ vars.FOLONITE_FEEDBACK_FORM_URL || '' }}",
         GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}",
       })
       expect(collectLatestYmlStep?.run).toContain("latest-yml-x86_64-apple-darwin")
@@ -214,7 +214,7 @@ describe("release workflow", () => {
         GH_REPO: "${{ github.repository }}",
         EXISTING_LATEST_YML_DIR: "${{ runner.temp }}/existing-latest-yml",
         LATEST_YML_DIR: "${{ runner.temp }}/latest-yml",
-        OPENCODE_VERSION: "${{ steps.package_version.outputs.version }}",
+        FOLONITE_VERSION: "${{ steps.package_version.outputs.version }}",
       })
 
       expect(workflow).not.toContain("persist-credentials: true")
@@ -293,7 +293,7 @@ function replaceGithubExpressions(script: string) {
     "needs.create-snapshot-tag.outputs.workflow_ref": "workflow-snapshot-123",
     "needs.create-snapshot-tag.outputs.workflow_sha": "abcdef0123456789abcdef0123456789abcdef01",
     "inputs.channel || 'dev'": "prod",
-    "github.repository": "Astro-Han/pawwork",
+    "github.repository": "fffstanza/folonite-code",
   }
 
   const result = script.replace(/\$\{\{\s*(.*?)\s*\}\}/g, (match, expression) => {

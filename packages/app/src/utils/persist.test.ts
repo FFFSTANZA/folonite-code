@@ -28,7 +28,7 @@ class MemoryStorage implements Storage {
   getItem(key: string) {
     this.calls.get += 1
     this.events.push(`get:${key}`)
-    if (key.startsWith("pawwork.throw")) throw new Error("storage get failed")
+    if (key.startsWith("folonite.throw")) throw new Error("storage get failed")
     return this.values.get(key) ?? null
   }
 
@@ -40,15 +40,15 @@ class MemoryStorage implements Storage {
       this.failingSets.set(key, remaining - 1)
       throw new DOMException("quota", "QuotaExceededError")
     }
-    if (key.startsWith("pawwork.quota")) throw new DOMException("quota", "QuotaExceededError")
-    if (key.startsWith("pawwork.throw")) throw new Error("storage set failed")
+    if (key.startsWith("folonite.quota")) throw new DOMException("quota", "QuotaExceededError")
+    if (key.startsWith("folonite.throw")) throw new Error("storage set failed")
     this.values.set(key, value)
   }
 
   removeItem(key: string) {
     this.calls.remove += 1
     this.events.push(`remove:${key}`)
-    if (key.startsWith("pawwork.throw")) throw new Error("storage remove failed")
+    if (key.startsWith("folonite.throw")) throw new Error("storage remove failed")
     this.values.delete(key)
   }
 }
@@ -80,15 +80,15 @@ beforeEach(() => {
 
 describe("persist localStorage resilience", () => {
   test("does not cache values as persisted when quota write and eviction fail", () => {
-    const storageApi = persistTesting.localStorageWithPrefix("pawwork.quota.scope")
+    const storageApi = persistTesting.localStorageWithPrefix("folonite.quota.scope")
     storageApi.setItem("value", '{"value":1}')
 
-    expect(storage.getItem("pawwork.quota.scope:value")).toBeNull()
+    expect(storage.getItem("folonite.quota.scope:value")).toBeNull()
     expect(storageApi.getItem("value")).toBeNull()
   })
 
   test("disables only the failing scope when storage throws", () => {
-    const bad = persistTesting.localStorageWithPrefix("pawwork.throw.scope")
+    const bad = persistTesting.localStorageWithPrefix("folonite.throw.scope")
     bad.setItem("value", '{"value":1}')
 
     const before = storage.calls.set
@@ -96,13 +96,13 @@ describe("persist localStorage resilience", () => {
     expect(storage.calls.set).toBe(before)
     expect(bad.getItem("value")).toBeNull()
 
-    const healthy = persistTesting.localStorageWithPrefix("pawwork.safe.scope")
+    const healthy = persistTesting.localStorageWithPrefix("folonite.safe.scope")
     healthy.setItem("value", '{"value":3}')
-    expect(storage.getItem("pawwork.safe.scope:value")).toBe('{"value":3}')
+    expect(storage.getItem("folonite.safe.scope:value")).toBe('{"value":3}')
   })
 
   test("failing fallback scope does not poison direct storage scope", () => {
-    const broken = persistTesting.localStorageWithPrefix("pawwork.throw.scope2")
+    const broken = persistTesting.localStorageWithPrefix("folonite.throw.scope2")
     broken.setItem("value", '{"value":1}')
 
     const direct = persistTesting.localStorageDirect()
@@ -115,15 +115,15 @@ describe("persist localStorage resilience", () => {
     storage.setItem("opencode.workspace.old.dat:value", "old workspace")
     storage.setItem("opencode.global.dat:value", "old global")
     storage.setItem("opencode.settings.dat:value", "old settings")
-    storage.failSet("pawwork.workspace.new.dat:value", 4)
+    storage.failSet("folonite.workspace.new.dat:value", 4)
 
-    const storageApi = persistTesting.localStorageWithPrefix("pawwork.workspace.new.dat")
+    const storageApi = persistTesting.localStorageWithPrefix("folonite.workspace.new.dat")
     storageApi.setItem("value", '{"value":1}')
 
     expect(storage.getItem("opencode.workspace.old.dat:value")).toBeNull()
     expect(storage.getItem("opencode.global.dat:value")).toBeNull()
     expect(storage.getItem("opencode.settings.dat:value")).toBeNull()
-    expect(storage.getItem("pawwork.workspace.new.dat:value")).toBe('{"value":1}')
+    expect(storage.getItem("folonite.workspace.new.dat:value")).toBe('{"value":1}')
   })
 
   test("normalizer rejects malformed JSON payloads", () => {
@@ -134,7 +134,7 @@ describe("persist localStorage resilience", () => {
   test("workspace storage sanitizes Windows filename characters", () => {
     const result = persistTesting.workspaceStorage("C:\\Users\\foo")
 
-    expect(result).toStartWith("pawwork.workspace.")
+    expect(result).toStartWith("folonite.workspace.")
     expect(result.endsWith(".dat")).toBeTrue()
     expect(/[:\\/]/.test(result)).toBeFalse()
   })

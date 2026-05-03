@@ -17,7 +17,7 @@ import { iife } from "@/util/iife"
 import { Runtime } from "@opencode-ai/core/runtime"
 import { init } from "#db"
 
-declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
+declare const FOLONITE_MIGRATIONS: { sql: string; timestamp: number; name: string }[] | undefined
 
 export const NotFoundError = NamedError.create(
   "NotFoundError",
@@ -31,16 +31,16 @@ const log = Log.create({ service: "db" })
 export namespace Database {
   export function getChannelPath() {
     const database = Runtime.appName()
-    if (["latest", "beta", "prod"].includes(CHANNEL) || Flag.OPENCODE_DISABLE_CHANNEL_DB)
+    if (["latest", "beta", "prod"].includes(CHANNEL) || Flag.FOLONITE_DISABLE_CHANNEL_DB)
       return path.join(Global.Path.data, `${database}.db`)
     const safe = CHANNEL.replace(/[^a-zA-Z0-9._-]/g, "-")
     return path.join(Global.Path.data, `${database}-${safe}.db`)
   }
 
   export const Path = iife(() => {
-    if (Flag.OPENCODE_DB) {
-      if (Flag.OPENCODE_DB === ":memory:" || path.isAbsolute(Flag.OPENCODE_DB)) return Flag.OPENCODE_DB
-      return path.join(Global.Path.data, Flag.OPENCODE_DB)
+    if (Flag.FOLONITE_DB) {
+      if (Flag.FOLONITE_DB === ":memory:" || path.isAbsolute(Flag.FOLONITE_DB)) return Flag.FOLONITE_DB
+      return path.join(Global.Path.data, Flag.FOLONITE_DB)
     }
     return getChannelPath()
   })
@@ -98,15 +98,15 @@ export namespace Database {
 
     // Apply schema migrations
     const entries =
-      typeof OPENCODE_MIGRATIONS !== "undefined"
-        ? OPENCODE_MIGRATIONS
+      typeof FOLONITE_MIGRATIONS !== "undefined"
+        ? FOLONITE_MIGRATIONS
         : migrations(path.join(import.meta.dirname, "../../migration"))
     if (entries.length > 0) {
       log.info("applying migrations", {
         count: entries.length,
-        mode: typeof OPENCODE_MIGRATIONS !== "undefined" ? "bundled" : "dev",
+        mode: typeof FOLONITE_MIGRATIONS !== "undefined" ? "bundled" : "dev",
       })
-      if (Flag.OPENCODE_SKIP_MIGRATIONS) {
+      if (Flag.FOLONITE_SKIP_MIGRATIONS) {
         for (const item of entries) {
           item.sql = "select 1;"
         }

@@ -31,35 +31,22 @@ export const files = Effect.fn("ConfigPaths.projectFiles")(function* (
 /** Return every config directory that can contribute files, commands, agents, plugins, or config dependencies. */
 export const directories = Effect.fn("ConfigPaths.directories")(function* (directory: string, worktree?: string) {
   const afs = yield* AppFileSystem.Service
-  if (Runtime.isPawWork()) {
-    return unique([
-      Global.Path.config,
-      ...(!Flag.OPENCODE_DISABLE_PROJECT_CONFIG
-        ? yield* afs.up({
-            targets: [".opencode", ".pawwork"],
-            start: directory,
-            stop: worktree,
-          })
-        : []),
-      ...(Flag.PAWWORK_CONFIG_DIR ? [Flag.PAWWORK_CONFIG_DIR] : []),
-    ])
-  }
-
+  const targets = [".folonite", ".opencode", ".pawwork"]
   return unique([
     Global.Path.config,
-    ...(!Flag.OPENCODE_DISABLE_PROJECT_CONFIG
+    ...(!Flag.FOLONITE_DISABLE_PROJECT_CONFIG
       ? yield* afs.up({
-          targets: [".opencode"],
+          targets,
           start: directory,
           stop: worktree,
         })
       : []),
     ...(yield* afs.up({
-      targets: [".opencode"],
+      targets,
       start: Global.Path.home,
       stop: Global.Path.home,
     })),
-    ...(Flag.OPENCODE_CONFIG_DIR ? [Flag.OPENCODE_CONFIG_DIR] : []),
+    ...(Flag.FOLONITE_CONFIG_DIR ? [Flag.FOLONITE_CONFIG_DIR] : []),
   ])
 })
 

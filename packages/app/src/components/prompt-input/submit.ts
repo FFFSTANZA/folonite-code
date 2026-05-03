@@ -5,7 +5,7 @@ import { Binary } from "@opencode-ai/util/binary"
 import { useNavigate, useParams } from "@solidjs/router"
 import { batch, type Accessor } from "solid-js"
 import type { FileSelection } from "@/context/file"
-import type { PawworkSkillName } from "@/components/session/pawwork-skill-meta"
+import type { FoloniteSkillName } from "@/components/session/folonite-skill-meta"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
@@ -192,7 +192,7 @@ type PromptSubmitInput = {
   addToHistory: (prompt: Prompt, mode: "normal" | "shell") => void
   resetHistoryNavigation: () => void
   setMode: (mode: "normal" | "shell") => void
-  selectedSkill?: () => PawworkSkillName | undefined
+  selectedSkill?: () => FoloniteSkillName | undefined
   setPopover: (popover: "at" | "slash" | null) => void
   newSessionWorktree?: Accessor<string | undefined>
   onNewSessionWorktreeReset?: () => void

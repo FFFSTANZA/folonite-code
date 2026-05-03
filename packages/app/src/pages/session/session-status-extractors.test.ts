@@ -117,7 +117,7 @@ describe("extractSources", () => {
 })
 
 describe("tool name sanity", () => {
-  const OPENCODE_TOOL_DIR = join(import.meta.dirname, "../../../../opencode/src/tool")
+  const FOLONITE_TOOL_DIR = join(import.meta.dirname, "../../../../opencode/src/tool")
   const cases: Array<[string, string]> = [
     [TOOL_TODOWRITE, "todo.ts"],
     [TOOL_WEBFETCH, "webfetch.ts"],
@@ -125,7 +125,7 @@ describe("tool name sanity", () => {
   ]
   for (const [tool, filename] of cases) {
     it(`"${tool}" literal appears in packages/opencode/src/tool/${filename}`, () => {
-      const source = readFileSync(join(OPENCODE_TOOL_DIR, filename), "utf8")
+      const source = readFileSync(join(FOLONITE_TOOL_DIR, filename), "utf8")
       expect(source.includes(`"${tool}"`)).toBe(true)
     })
   }

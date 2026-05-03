@@ -8,7 +8,7 @@ export type AboutInfo = {
 }
 
 function readBuildSha(): string {
-  const sha = import.meta.env.PAWWORK_BUILD_SHA
+  const sha = import.meta.env.FOLONITE_BUILD_SHA
   return sha && sha.length > 0 ? sha : "unknown"
 }
 

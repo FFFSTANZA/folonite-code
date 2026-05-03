@@ -2,7 +2,7 @@
 
 ## OfficeCLI
 
-PawWork bundles OfficeCLI by iOfficeAI to read and edit Word, Excel, and PowerPoint files locally.
+Folonite bundles OfficeCLI by iOfficeAI to read and edit Word, Excel, and PowerPoint files locally.
 
 - Project: https://github.com/iOfficeAI/OfficeCLI
 - License: Apache License 2.0

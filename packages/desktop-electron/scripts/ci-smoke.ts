@@ -24,9 +24,9 @@ type LaunchedApp = {
 }
 
 const APP_ID_BY_CHANNEL: Record<SmokeChannel, string> = {
-  dev: "ai.pawwork.desktop.dev",
-  beta: "ai.pawwork.desktop.beta",
-  prod: "ai.pawwork.desktop",
+  dev: "ai.folonite.desktop.dev",
+  beta: "ai.folonite.desktop.beta",
+  prod: "ai.folonite.desktop",
 }
 
 function parseChannel(raw: string | undefined): SmokeChannel {
@@ -62,13 +62,13 @@ export function buildSmokeEnv(homeDir: string, channel: SmokeChannel = "dev") {
     ...process.env,
     CI: "true",
     HOME: homeDir,
-    PAWWORK_CI_SMOKE: "true",
-    PAWWORK_CI_SMOKE_HOME: homeDir,
+    FOLONITE_CI_SMOKE: "true",
+    FOLONITE_CI_SMOKE_HOME: homeDir,
     XDG_DATA_HOME: homeDir,
     XDG_CACHE_HOME: homeDir,
     XDG_CONFIG_HOME: homeDir,
     XDG_STATE_HOME: homeDir,
-    OPENCODE_CHANNEL: channel,
+    FOLONITE_CHANNEL: channel,
   }
 }
 
@@ -169,7 +169,7 @@ async function stopChild(child: ChildProcessWithoutNullStreams) {
 
 async function main() {
   const target = parseSmokeArgs(Bun.argv.slice(2))
-  const homeDir = mkdtempSync(join(tmpdir(), "pawwork-ci-smoke-"))
+  const homeDir = mkdtempSync(join(tmpdir(), "folonite-ci-smoke-"))
   const { child, spawnError } = launchApp(homeDir, target)
   const logs = watchChildLogs(child)
 

@@ -162,3 +162,30 @@
   line-height: var(--line-height-x-large); /* 120% — tune in dev:desktop if needed */
   letter-spacing: var(--letter-spacing-tightest);
 }
+
+.text-14-semibold {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-hierarchy);
+  font-style: normal;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-large);
+  letter-spacing: var(--letter-spacing-normal);
+}
+
+.text-15-regular {
+  font-family: var(--font-family-sans);
+  font-size: 15px;
+  font-style: normal;
+  font-weight: var(--font-weight-regular);
+  line-height: 1.5;
+  letter-spacing: var(--letter-spacing-normal);
+}
+
+.text-32-semibold {
+  font-family: var(--font-family-sans);
+  font-size: 32px;
+  font-style: normal;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  letter-spacing: var(--letter-spacing-tightest);
+}

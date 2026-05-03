@@ -12,7 +12,7 @@ const canonicalToePatterns = [
 const canonicalPadPattern =
   /<path\b(?=[^>]*\bd="M32\s+29\.2\s+C24\.2\s+29\.2\s+19\.8\s+37\.6\s+19\.8\s+42\.6\s+C19\.8\s+46\.4\s+23\.3\s+47\.9\s+28\.3\s+46\.1\s+C30\.1\s+45\.4\s+33\.9\s+45\.4\s+35\.8\s+46\.1\s+C40\.8\s+47\.9\s+44\.2\s+46\.4\s+44\.2\s+42\.6\s+C44\.2\s+37\.6\s+39\.8\s+29\.2\s+32\s+29\.2\s+Z")[^>]*\/>/
 
-describe("PawWork logo geometry", () => {
+describe("Folonite logo geometry", () => {
   test("logo components use the canonical four-toe paw mark", () => {
     expect(logoSource.match(/<circle\b/g)?.length).toBe(4)
     expect(logoSource.match(/<svg\b(?=[^>]*\bviewBox="0 0 64 64")[^>]*>/g)?.length).toBe(3)

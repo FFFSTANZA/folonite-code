@@ -1,4 +1,6 @@
 import { Dialog } from "@opencode-ai/ui/dialog"
+import { useGlobalSync } from "@/context/global-sync"
+
 import { List } from "@opencode-ai/ui/list"
 import { Switch } from "@opencode-ai/ui/switch"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
@@ -9,16 +11,20 @@ import { popularProviders } from "@/hooks/use-providers"
 import { useLanguage } from "@/context/language"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectProvider } from "./dialog-select-provider"
+import { DialogConnectProvider } from "./dialog-connect-provider"
+
 import { compareModelsForDisplay } from "@/utils/model-order"
 
 export const DialogManageModels: Component = () => {
   const local = useLocal()
+  const sync = useGlobalSync()
   const language = useLanguage()
   const dialog = useDialog()
 
   const handleConnectProvider = () => {
     dialog.show(() => <DialogSelectProvider />)
   }
+
   const providerRank = (id: string) => popularProviders.indexOf(id)
   const providerList = (providerID: string) => local.model.list().filter((x) => x.provider.id === providerID)
   const providerVisible = (providerID: string) =>
@@ -50,8 +56,49 @@ export const DialogManageModels: Component = () => {
         groupHeader={(group) => {
           const provider = group.items[0].provider
           return (
-            <>
-              <span>{provider.name}</span>
+            <div class="flex items-center justify-between w-full pr-1">
+              <div class="flex items-center gap-x-2">
+                <span>{provider.name}</span>
+                <div class="flex items-center gap-x-1">
+                  <Tooltip placement="top" value={language.t("dialog.provider.editKey")}>
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      icon="pencil-line"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        dialog.show(() => <DialogConnectProvider provider={provider.id} />)
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip placement="top" value={language.t("dialog.provider.deleteKey")}>
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      icon="trash"
+                      class="text-text-weak hover:text-text-critical"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const ok = await dialog.confirm({
+                          title: language.t("dialog.provider.deleteKey.confirm.title", {
+                            provider: provider.name,
+                          }),
+                          body: language.t("dialog.provider.deleteKey.confirm.body"),
+                          confirmLabel: language.t("common.delete"),
+                          confirmVariant: "critical",
+                        })
+                        if (!ok) return
+                        await sync.updateConfig({
+                          provider: {
+                            [provider.id]: { options: { apiKey: "" } },
+                          },
+                        })
+
+                      }}
+                    />
+                  </Tooltip>
+                </div>
+              </div>
               <Tooltip
                 placement="top"
                 value={language.t("dialog.model.manage.provider.toggle", { provider: provider.name })}
@@ -65,7 +112,8 @@ export const DialogManageModels: Component = () => {
                   {provider.name}
                 </Switch>
               </Tooltip>
-            </>
+            </div>
+
           )
         }}
         sortGroupsBy={(a, b) => {

@@ -9,7 +9,7 @@ export type DesktopContext = {
 }
 
 export function desktopWindowTitle(locale: Locale) {
-  return locale === "zh" ? "爪印" : "PawWork"
+  return "Folonite"
 }
 
 export function buildDesktopContext(input: {

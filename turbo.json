@@ -1,40 +1,76 @@
 {
   "$schema": "https://v2-8-13.turborepo.dev/schema.json",
-  "globalEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
-  "globalPassThroughEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
+  "globalEnv": [
+    "CI",
+    "OPENCODE_DISABLE_SHARE"
+  ],
+  "globalPassThroughEnv": [
+    "CI",
+    "OPENCODE_DISABLE_SHARE"
+  ],
   "tasks": {
     "typecheck": {},
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "opencode#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": [],
-      "passThroughEnv": ["*"]
+      "passThroughEnv": [
+        "*"
+      ]
     },
     "opencode#test:ci": {
-      "dependsOn": ["^build"],
-      "outputs": [".artifacts/unit/junit.xml"],
-      "passThroughEnv": ["*"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".artifacts/unit/junit.xml"
+      ],
+      "passThroughEnv": [
+        "*"
+      ]
     },
     "@opencode-ai/app#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": []
     },
     "@opencode-ai/app#test:ci": {
-      "dependsOn": ["^build"],
-      "outputs": [".artifacts/unit/junit.xml"],
-      "passThroughEnv": ["*"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".artifacts/unit/junit.xml"
+      ],
+      "passThroughEnv": [
+        "*"
+      ]
     },
     "@opencode-ai/desktop-electron#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": []
     },
     "@opencode-ai/desktop-electron#test:ci": {
-      "dependsOn": ["^build"],
-      "outputs": [".artifacts/unit/junit.xml"],
-      "passThroughEnv": ["*"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".artifacts/unit/junit.xml"
+      ],
+      "passThroughEnv": [
+        "*"
+      ]
     }
   }
 }

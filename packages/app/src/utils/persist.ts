@@ -20,8 +20,8 @@ type PersistTarget = {
 }
 
 const LEGACY_STORAGE = "default.dat"
-const GLOBAL_STORAGE = "pawwork.global.dat"
-const LOCAL_PREFIX = "pawwork."
+const GLOBAL_STORAGE = "folonite.global.dat"
+const LOCAL_PREFIX = "folonite."
 const LEGACY_LOCAL_PREFIX = "opencode."
 // The legacy prefix intentionally covers old workspace, global, and settings keys.
 const EVICT_PREFIXES = [LOCAL_PREFIX, LEGACY_LOCAL_PREFIX]
@@ -214,7 +214,7 @@ function normalize(defaults: unknown, raw: string, migrate?: (value: unknown) =>
 function workspaceStorage(dir: string) {
   const head = (dir.slice(0, 12) || "workspace").replace(/[^a-zA-Z0-9._-]/g, "-")
   const sum = checksum(dir) ?? "0"
-  return `pawwork.workspace.${head}.${sum}.dat`
+  return `folonite.workspace.${head}.${sum}.dat`
 }
 
 function localStorageWithPrefix(prefix: string): SyncStorage {

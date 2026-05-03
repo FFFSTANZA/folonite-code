@@ -11,19 +11,19 @@ import {
 import { createRendererWorkspaceConfig } from "./renderer-workspace-config"
 
 const channel = (() => {
-  const raw = process.env.OPENCODE_CHANNEL
+  const raw = process.env.FOLONITE_CHANNEL
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   return "dev"
 })()
-const feedbackFormUrl = process.env.PAWWORK_FEEDBACK_FORM_URL ?? ""
-const buildSha = process.env.PAWWORK_BUILD_SHA ?? ""
+const feedbackFormUrl = process.env.FOLONITE_FEEDBACK_FORM_URL ?? ""
+const buildSha = process.env.FOLONITE_BUILD_SHA ?? ""
 
-const OPENCODE_ROOT = path.resolve(process.cwd(), "../opencode")
-const { runtimeDir: OPENCODE_SERVER_DIST, runtimeEntry: OPENCODE_SERVER_ENTRY } = embeddedServerArtifacts(OPENCODE_ROOT)
-const missingArtifacts = embeddedServerMissingArtifacts(OPENCODE_ROOT, existsSync)
+const FOLONITE_ROOT = path.resolve(process.cwd(), "../opencode")
+const { runtimeDir: FOLONITE_SERVER_DIST, runtimeEntry: FOLONITE_SERVER_ENTRY } = embeddedServerArtifacts(FOLONITE_ROOT)
+const missingArtifacts = embeddedServerMissingArtifacts(FOLONITE_ROOT, existsSync)
 
 if (missingArtifacts.length > 0) {
-  throw new Error(embeddedServerMissingArtifactsMessage(OPENCODE_ROOT, missingArtifacts))
+  throw new Error(embeddedServerMissingArtifactsMessage(FOLONITE_ROOT, missingArtifacts))
 }
 
 const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
@@ -32,9 +32,9 @@ const rendererWorkspaceConfig = createRendererWorkspaceConfig(process.cwd(), rea
 export default defineConfig({
   main: {
     define: {
-      "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel),
-      "import.meta.env.PAWWORK_FEEDBACK_FORM_URL": JSON.stringify(feedbackFormUrl),
-      "import.meta.env.PAWWORK_BUILD_SHA": JSON.stringify(buildSha),
+      "import.meta.env.FOLONITE_CHANNEL": JSON.stringify(channel),
+      "import.meta.env.FOLONITE_FEEDBACK_FORM_URL": JSON.stringify(feedbackFormUrl),
+      "import.meta.env.FOLONITE_BUILD_SHA": JSON.stringify(buildSha),
     },
     build: {
       rollupOptions: {
@@ -44,25 +44,25 @@ export default defineConfig({
     },
     plugins: [
       {
-        name: "opencode:node-pty-narrower",
+        name: "folonite:node-pty-narrower",
         enforce: "pre",
         resolveId(s) {
           if (s === "@lydell/node-pty") return nodePtyPkg
         },
       },
       {
-        name: "opencode:virtual-server-module",
+        name: "folonite:virtual-server-module",
         enforce: "pre",
         resolveId(id) {
-          if (id === "virtual:opencode-server") return this.resolve(OPENCODE_SERVER_ENTRY)
+          if (id === "virtual:folonite-server") return this.resolve(FOLONITE_SERVER_ENTRY)
         },
       },
       {
-        name: "opencode:copy-server-assets",
+        name: "folonite:copy-server-assets",
         async writeBundle() {
-          for (const l of await fs.readdir(OPENCODE_SERVER_DIST)) {
+          for (const l of await fs.readdir(FOLONITE_SERVER_DIST)) {
             if (!l.endsWith(".wasm")) continue
-            await fs.writeFile(`./out/main/chunks/${l}`, await fs.readFile(path.join(OPENCODE_SERVER_DIST, l)))
+            await fs.writeFile(`./out/main/chunks/${l}`, await fs.readFile(path.join(FOLONITE_SERVER_DIST, l)))
           }
         },
       },
@@ -82,10 +82,10 @@ export default defineConfig({
   },
   renderer: {
     plugins: [appPlugin],
-    publicDir: "../../../app/public",
+    publicDir: "../../app/public",
     root: "src/renderer",
     define: {
-      "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
+      "import.meta.env.VITE_FOLONITE_CHANNEL": JSON.stringify(channel),
     },
     ...rendererWorkspaceConfig,
     build: {

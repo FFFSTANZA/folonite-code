@@ -1132,7 +1132,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     }
 
     if (typeof window !== "undefined" && import.meta.env.DEV) {
-      ;(window as unknown as { __pawworkLayout?: typeof layout }).__pawworkLayout = layout
+      ;(window as unknown as { __foloniteLayout?: typeof layout }).__foloniteLayout = layout
     }
 
     return layout

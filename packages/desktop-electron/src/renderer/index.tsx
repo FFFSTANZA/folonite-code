@@ -42,7 +42,7 @@ void initI18n()
     console.debug("[desktop] initI18n failed", error)
   })
 
-const deepLinkEvent = "opencode:deep-link"
+const deepLinkEvent = "folonite:deep-link"
 const emitDeepLinks = (urls: string[]) => {
   if (urls.length === 0) return
   pushPendingDeepLinks(window, urls)
@@ -50,14 +50,14 @@ const emitDeepLinks = (urls: string[]) => {
 }
 
 async function reportCiSmokeReady(sidecar: { url: string; username?: string | null; password?: string | null }) {
-  if (document.title !== "PawWork") return false
+  if (document.title !== "Folonite") return false
   if (!document.querySelector(titlebarShellSelector)) return false
   if (!document.querySelector(desktopShellMainSelector)) return false
 
   const windowCount = await window.api.getWindowCount().catch(() => 0)
   if (windowCount !== 1) return false
 
-  const auth = btoa(`${sidecar.username ?? "opencode"}:${sidecar.password ?? ""}`)
+  const auth = btoa(`${sidecar.username ?? "Folonite"}:${sidecar.password ?? ""}`)
   const res = await fetch(new URL("/global/health", sidecar.url), {
     headers: {
       authorization: `Basic ${auth}`,
@@ -247,7 +247,7 @@ const createPlatform = (): Platform => {
 
     notify: async (title, description, href) => {
       // Omit `icon`; macOS/Windows fall back to the packaged app icon, which
-      // is the PawWork paw-print. Any explicit URL here would pin us to an
+      // is the Folonite paw-print. Any explicit URL here would pin us to an
       // external asset and reintroduce OpenCode branding in notifications.
       try {
         const notification = new Notification(title, {
@@ -335,7 +335,7 @@ void startupState.ready.then(() => {
   render(() => {
     const platform = createPlatform()
     const loadLocale = async () => {
-      const current = await platform.storage?.("pawwork.global.dat").getItem("language")
+      const current = await platform.storage?.("folonite.global.dat").getItem("language")
       const legacy = current ? undefined : await platform.storage?.().getItem("language.v1")
       const raw = current ?? legacy
       if (!raw) return

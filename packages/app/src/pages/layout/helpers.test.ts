@@ -94,10 +94,10 @@ describe("layout deep links", () => {
 
   test("drains global deep links once", () => {
     const target = {
-      __OPENCODE__: {
+      __FOLONITE__: {
         deepLinks: ["opencode://open-project?directory=/a"],
       },
-    } as unknown as Window & { __OPENCODE__?: { deepLinks?: string[] } }
+    } as unknown as Window & { __FOLONITE__?: { deepLinks?: string[] } }
 
     expect(drainPendingDeepLinks(target)).toEqual(["opencode://open-project?directory=/a"])
     expect(drainPendingDeepLinks(target)).toEqual([])
@@ -107,11 +107,11 @@ describe("layout deep links", () => {
 describe("layout workspace helpers", () => {
   test("uses backend default directory for startup autoselect", () => {
     expect(typeof startupAutoselectDirectory).toBe("function")
-    expect(startupAutoselectDirectory?.(true, "/Users/demo/PawWork")).toBe("/Users/demo/PawWork")
+    expect(startupAutoselectDirectory?.(true, "/Users/demo/Folonite")).toBe("/Users/demo/Folonite")
   })
 
   test("skips startup autoselect when disabled or missing a backend directory", () => {
-    expect(startupAutoselectDirectory?.(false, "/Users/demo/PawWork")).toBeUndefined()
+    expect(startupAutoselectDirectory?.(false, "/Users/demo/Folonite")).toBeUndefined()
     expect(startupAutoselectDirectory?.(true, undefined)).toBeUndefined()
   })
 

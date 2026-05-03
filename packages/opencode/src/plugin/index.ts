@@ -34,7 +34,7 @@ export namespace Plugin {
   const log = Log.create({ service: "plugin" })
 
   function dependencyDir(source: string, projectDir: string) {
-    if (source === "OPENCODE_CONFIG_CONTENT") return projectDir
+    if (source === "FOLONITE_CONFIG_CONTENT") return projectDir
     if (source.endsWith(".json") || source.endsWith(".jsonc")) return path.dirname(source)
     return source
   }
@@ -137,9 +137,9 @@ export namespace Plugin {
           const client = createOpencodeClient({
             baseUrl: "http://localhost:4096",
             directory: ctx.directory,
-            headers: Flag.OPENCODE_SERVER_PASSWORD
+            headers: Flag.FOLONITE_SERVER_PASSWORD
               ? {
-                  Authorization: `Basic ${Buffer.from(`${Flag.OPENCODE_SERVER_USERNAME ?? "opencode"}:${Flag.OPENCODE_SERVER_PASSWORD}`).toString("base64")}`,
+                  Authorization: `Basic ${Buffer.from(`${Flag.FOLONITE_SERVER_USERNAME ?? "opencode"}:${Flag.FOLONITE_SERVER_PASSWORD}`).toString("base64")}`,
                 }
               : undefined,
             fetch: async (...args) => (await Server.Default()).app.fetch(...args),
@@ -174,8 +174,8 @@ export namespace Plugin {
             if (init._tag === "Some") hooks.push(init.value)
           }
 
-          const plugins = Flag.OPENCODE_PURE ? [] : (cfg.plugin_origins ?? [])
-          if (Flag.OPENCODE_PURE && cfg.plugin_origins?.length) {
+          const plugins = Flag.FOLONITE_PURE ? [] : (cfg.plugin_origins ?? [])
+          if (Flag.FOLONITE_PURE && cfg.plugin_origins?.length) {
             log.info("skipping external plugins in pure mode", { count: cfg.plugin_origins.length })
           }
           for (const origin of plugins) {

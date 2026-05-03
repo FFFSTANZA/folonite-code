@@ -6,7 +6,7 @@ import { usePlatform } from "@/context/platform"
 import { useLanguage } from "@/context/language"
 import type { E2EWindow } from "@/testing/terminal"
 import { updateErrorPageState } from "./error-update"
-import { PAWWORK_GITHUB_ISSUE_URL } from "@/utils/support-links"
+import { FOLONITE_GITHUB_ISSUE_URL } from "@/utils/support-links"
 import { buildErrorReportDetails, errorReportStatusMessage, formatError, summarizeKnownError } from "./error-report"
 export type { InitError } from "./error-report"
 
@@ -42,7 +42,7 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
 
   onMount(() => {
     const win = window as E2EWindow
-    if (!win.__opencode_e2e) return
+    if (!win.__folonite_e2e) return
     const detail = errorDetails()
     console.error(`[e2e:error-boundary] ${window.location.pathname}\n${detail}`)
   })
@@ -264,7 +264,7 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
               <button
                 type="button"
                 class="hover:text-text-weak transition-colors"
-                onClick={() => platform.openLink(store.feedbackUrl ?? PAWWORK_GITHUB_ISSUE_URL)}
+                onClick={() => platform.openLink(store.feedbackUrl ?? FOLONITE_GITHUB_ISSUE_URL)}
               >
                 {store.feedbackUrl
                   ? language.t("error.page.report.formFallbackAction")

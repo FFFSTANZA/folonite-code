@@ -175,39 +175,53 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("report-ci-smoke-ready", () => deps.reportCiSmokeReady())
 
   ipcMain.handle("lsp-set-enabled", async (_event: IpcMainInvokeEvent, value: boolean) => {
-    const { Settings, LSP, ToolRegistry, Instance } = await import("virtual:opencode-server")
-    await Settings.setLspEnabled(value)
-    // LSP.invalidate / ToolRegistry.invalidate / LSP.shutdownAll all read
-    // InstanceState.directory, which requires an Instance scope. Process every
-    // active instance with isolation so a single failure does not leave the
-    // remaining projects stuck on stale cache state.
-    const directories = Instance.directories()
-    const results = await Promise.allSettled(
-      directories.map((directory) =>
-        Instance.provide({
-          directory,
-          fn: async () => {
-            if (!value) {
-              await LSP.shutdownAll()
-            }
-            await LSP.invalidate()
-            await ToolRegistry.invalidate()
-          },
-        }),
-      ),
-    )
-    for (const [index, result] of results.entries()) {
-      if (result.status === "rejected") {
-        console.warn("lsp-set-enabled failed for instance", {
-          directory: directories[index],
-          error: result.reason,
-        })
+    console.log("[lsp-set-enabled] starting with value:", value)
+    try {
+      const { Settings, LSP, ToolRegistry, Instance } = await import("virtual:folonite-server")
+      await Settings.setLspEnabled(value)
+      console.log("[lsp-set-enabled] settings updated, directories:", Instance.directories())
+      const directories = Instance.directories()
+      const results = await Promise.allSettled(
+        directories.map((directory) =>
+          Instance.provide({
+            directory,
+            fn: async () => {
+              console.log("[lsp-set-enabled] entered instance context for:", directory, "worktree:", Instance.worktree)
+              try {
+                if (!value) {
+                  console.log("[lsp-set-enabled] calling LSP.shutdownAll for:", directory)
+                  await LSP.shutdownAll()
+                }
+                console.log("[lsp-set-enabled] calling LSP.invalidate for:", directory)
+                await LSP.invalidate()
+                console.log("[lsp-set-enabled] calling ToolRegistry.invalidate for:", directory)
+                await ToolRegistry.invalidate()
+                console.log("[lsp-set-enabled] completed for:", directory)
+              } catch (innerErr) {
+                console.error("[lsp-set-enabled] error inside fn for:", directory, innerErr)
+                throw innerErr
+              }
+            },
+          }),
+        ),
+      )
+      for (const [index, result] of results.entries()) {
+        if (result.status === "rejected") {
+          console.warn("lsp-set-enabled failed for instance", {
+            directory: directories[index],
+            error: result.reason,
+            stack: result.reason?.stack,
+          })
+        }
       }
+    } catch (err) {
+      console.error("[lsp-set-enabled] outer error:", err)
+      throw err
     }
   })
 
   ipcMain.handle("websearch-set-enabled", async (_event: IpcMainInvokeEvent, value: boolean) => {
-    const { Settings, ToolRegistry, Instance } = await import("virtual:opencode-server")
+    const { Settings, ToolRegistry, Instance } = await import("virtual:folonite-server")
     const previous = await Settings.webSearchEnabled()
     await Settings.setWebSearchEnabled(value)
     const invalidateWebSearchTools = (targetDirectories: string[]) =>
@@ -247,17 +261,17 @@ export function registerIpcHandlers(deps: Deps) {
   })
 
   ipcMain.handle("websearch-status", async () => {
-    const { WebSearchAuth } = await import("virtual:opencode-server")
+    const { WebSearchAuth } = await import("virtual:folonite-server")
     return WebSearchAuth.status()
   })
 
   ipcMain.handle("websearch-save-exa-key", async (_event: IpcMainInvokeEvent, key: string) => {
-    const { WebSearchAuth } = await import("virtual:opencode-server")
+    const { WebSearchAuth } = await import("virtual:folonite-server")
     return WebSearchAuth.saveKey(key)
   })
 
   ipcMain.handle("websearch-remove-exa-key", async () => {
-    const { WebSearchAuth } = await import("virtual:opencode-server")
+    const { WebSearchAuth } = await import("virtual:folonite-server")
     return WebSearchAuth.removeKey()
   })
 
@@ -341,7 +355,7 @@ export function registerIpcHandlers(deps: Deps) {
       const fallbackStamp = new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "")
       const result = await dialog.showSaveDialog({
         title: title ?? "Export session",
-        defaultPath: defaultName ?? `pawwork-session-${sessionID.slice(-8)}-${fallbackStamp}.json`,
+        defaultPath: defaultName ?? `folonite-session-${sessionID.slice(-8)}-${fallbackStamp}.json`,
         filters: [{ name: "JSON", extensions: ["json"] }],
       })
       if (result.canceled || !result.filePath) return { ok: false, error: "cancelled" } as const

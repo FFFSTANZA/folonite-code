@@ -6,21 +6,21 @@ describe("createBackendEnv", () => {
     const env = createBackendEnv({
       base: {
         PATH: "/usr/bin",
-        OPENCODE_SERVER_USERNAME: "PawWork",
-        OPENCODE_SERVER_PASSWORD: "secret",
+        FOLONITE_SERVER_USERNAME: "Folonite",
+        FOLONITE_SERVER_PASSWORD: "secret",
         opencode_server_username: "mixed-case-user",
         opencode_server_password: "mixed-case-secret",
         CUSTOM_VALUE: "kept",
       },
-      sandbox: "/tmp/pawwork-e2e",
+      sandbox: "/tmp/folonite-e2e",
     })
 
-    expect(env.OPENCODE_SERVER_USERNAME).toBeUndefined()
-    expect(env.OPENCODE_SERVER_PASSWORD).toBeUndefined()
+    expect(env.FOLONITE_SERVER_USERNAME).toBeUndefined()
+    expect(env.FOLONITE_SERVER_PASSWORD).toBeUndefined()
     expect(env.opencode_server_username).toBeUndefined()
     expect(env.opencode_server_password).toBeUndefined()
     expect(env.PATH).toBe("/usr/bin")
     expect(env.CUSTOM_VALUE).toBe("kept")
-    expect(env.OPENCODE_CLIENT).toBe("app")
+    expect(env.FOLONITE_CLIENT).toBe("app")
   })
 })

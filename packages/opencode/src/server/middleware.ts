@@ -10,6 +10,9 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { basicAuth } from "hono/basic-auth"
 import { cors } from "hono/cors"
 import { compress } from "hono/compress"
+import { getCookie } from "hono/cookie"
+import { verify } from "hono/jwt"
+
 
 const log = Log.create({ service: "server" })
 
@@ -36,13 +39,26 @@ export const ErrorMiddleware: ErrorHandler = (err, c) => {
   })
 }
 
-export const AuthMiddleware: MiddlewareHandler = (c, next) => {
+export const AuthMiddleware: MiddlewareHandler = async (c, next) => {
   // Allow CORS preflight requests to succeed without auth.
   // Browser clients sending Authorization headers will preflight with OPTIONS.
   if (c.req.method === "OPTIONS") return next()
-  const password = Flag.OPENCODE_SERVER_PASSWORD
+
+  // 1. Check for JWT session cookie
+  const sessionToken = getCookie(c, "session_token")
+  if (sessionToken) {
+    try {
+      const secret = process.env.SESSION_SECRET || "default_secret"
+      await verify(sessionToken, secret)
+      return next() // Valid session
+    } catch (e) {
+      // Invalid session token, continue to basic auth
+    }
+  }
+
+  const password = Flag.FOLONITE_SERVER_PASSWORD
   if (!password) return next()
-  const username = Flag.OPENCODE_SERVER_USERNAME ?? "opencode"
+  const username = Flag.FOLONITE_SERVER_USERNAME ?? "Folonite"
 
   if (c.req.query("auth_token")) c.req.raw.headers.set("authorization", `Basic ${c.req.query("auth_token")}`)
 

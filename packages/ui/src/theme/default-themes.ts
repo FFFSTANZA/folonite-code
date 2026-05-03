@@ -1,8 +1,8 @@
 import type { DesktopTheme } from "./types"
-import pawworkThemeJson from "./themes/pawwork.json"
+import foloniteThemeJson from "./themes/folonite.json"
 
-export const pawworkTheme = pawworkThemeJson as DesktopTheme
+export const foloniteTheme = foloniteThemeJson as DesktopTheme
 
 export const DEFAULT_THEMES: Record<string, DesktopTheme> = {
-  pawwork: pawworkTheme,
+  folonite: foloniteTheme,
 }

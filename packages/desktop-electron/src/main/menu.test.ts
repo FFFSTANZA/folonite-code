@@ -123,7 +123,7 @@ function expectWindowMenuRoleLabels(template: MenuItemTemplate[], locale: "en" |
 }
 
 describe("desktop menu template", () => {
-  test("localizes PawWork-controlled labels", () => {
+  test("localizes Folonite-controlled labels", () => {
     const template = buildMacosMenuTemplate({
       deps: deps(),
       appName: "爪印",
@@ -151,7 +151,7 @@ describe("desktop menu template", () => {
   })
 
   test("localizes English labels for role-backed menu items while preserving roles", () => {
-    const appName = "PawWork"
+    const appName = "Folonite"
     const template = buildMacosMenuTemplate({
       deps: deps(),
       appName,
@@ -165,11 +165,11 @@ describe("desktop menu template", () => {
   test("renames stale webview label", () => {
     const template = buildMacosMenuTemplate({
       deps: deps(),
-      appName: "PawWork Dev",
+      appName: "Folonite Dev",
       locale: "en",
       feedbackEnabled: true,
     })
-    const appMenu = submenu(template, "PawWork Dev")
+    const appMenu = submenu(template, "Folonite Dev")
 
     expect(appMenu.some((item) => item.label === "Reload Window")).toBe(true)
     expect(appMenu.some((item) => item.label === "Reload Webview")).toBe(false)
@@ -179,11 +179,11 @@ describe("desktop menu template", () => {
     const menuDeps = deps()
     const template = buildMacosMenuTemplate({
       deps: menuDeps,
-      appName: "PawWork",
+      appName: "Folonite",
       locale: "en",
       feedbackEnabled: true,
     })
-    const appMenu = submenu(template, "PawWork")
+    const appMenu = submenu(template, "Folonite")
     const checkForUpdates = appMenu.find((item) => item.label === "Check for Updates...")
 
     expect(checkForUpdates?.enabled).not.toBe(false)
@@ -196,7 +196,7 @@ describe("desktop menu template", () => {
     const menuDeps = deps()
     const template = buildMacosMenuTemplate({
       deps: menuDeps,
-      appName: "PawWork",
+      appName: "Folonite",
       locale: "en",
       feedbackEnabled: false,
     })
@@ -212,7 +212,7 @@ describe("desktop menu template", () => {
     const menuDeps = deps()
     const template = buildMacosMenuTemplate({
       deps: menuDeps,
-      appName: "PawWork",
+      appName: "Folonite",
       locale: "en",
       feedbackEnabled: true,
     })

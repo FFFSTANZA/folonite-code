@@ -224,10 +224,10 @@ export namespace Workspace {
 
     const env = Object.fromEntries(
       Object.entries({
-        OPENCODE_AUTH_CONTENT:
+        FOLONITE_AUTH_CONTENT:
           scopedAuth && Object.keys(scopedAuth).length > 0 ? JSON.stringify(scopedAuth) : undefined,
-        OPENCODE_WORKSPACE_ID: info.id,
-        OPENCODE_EXPERIMENTAL_WORKSPACES: "true",
+        FOLONITE_WORKSPACE_ID: info.id,
+        FOLONITE_EXPERIMENTAL_WORKSPACES: "true",
         OTEL_EXPORTER_OTLP_HEADERS: process.env.OTEL_EXPORTER_OTLP_HEADERS,
         OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
         OTEL_RESOURCE_ATTRIBUTES: process.env.OTEL_RESOURCE_ATTRIBUTES,

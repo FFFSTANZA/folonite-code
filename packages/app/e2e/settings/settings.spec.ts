@@ -15,15 +15,15 @@ import {
   titlebarCenterSelector,
 } from "../selectors"
 
-test("@smoke new installs start with the PawWork theme", async ({ page, gotoSession }) => {
+test("@smoke new installs start with the Folonite theme", async ({ page, gotoSession }) => {
   await page.addInitScript(() => {
-    localStorage.removeItem("pawwork-theme-id")
-    localStorage.removeItem("pawwork-color-scheme")
+    localStorage.removeItem("folonite-theme-id")
+    localStorage.removeItem("folonite-color-scheme")
   })
 
   await gotoSession()
 
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "pawwork")
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "folonite")
   await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light")
 })
 
@@ -39,7 +39,7 @@ test("@smoke settings dialog opens, switches tabs, closes", async ({ page, gotoS
   await closeSettingsPanel(page, dialog)
 })
 
-test('@smoke PawWork settings opens as a full-pane surface, not a dialog', async ({ page, gotoSession }) => {
+test('@smoke Folonite settings opens as a full-pane surface, not a dialog', async ({ page, gotoSession }) => {
   await gotoSession()
 
   await openSettings(page)
@@ -52,7 +52,7 @@ test('@smoke PawWork settings opens as a full-pane surface, not a dialog', async
 
 test("changing language updates settings labels", async ({ page, gotoSession }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("pawwork.global.dat:language", JSON.stringify({ locale: "en" }))
+    localStorage.setItem("folonite.global.dat:language", JSON.stringify({ locale: "en" }))
   })
 
   await gotoSession()
@@ -76,39 +76,39 @@ test("changing language updates settings labels", async ({ page, gotoSession }) 
 })
 
 test.skip("changing color scheme persists in localStorage", async () => {
-  // Phase-1 ships a single pawwork theme that is locked to light mode, so the
+  // Phase-1 ships a single folonite theme that is locked to light mode, so the
   // color-scheme select cannot exercise dark ↔ light switching. Revisit when a
   // real dark palette or a second theme lands.
 })
 
 test.skip("changing theme persists in localStorage", async () => {
-  // Phase-1 only bundles the pawwork theme; the theme select has a single entry
+  // Phase-1 only bundles the folonite theme; the theme select has a single entry
   // and cannot exercise switching. Revisit once a second theme is added.
 })
 
-test("unknown theme ids migrate to pawwork and clear cached css", async ({ page, gotoSession }) => {
+test("unknown theme ids migrate to folonite and clear cached css", async ({ page, gotoSession }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("pawwork-theme-id", "dracula")
-    localStorage.setItem("pawwork-theme-css-light", "--background-base:#fff;")
-    localStorage.setItem("pawwork-theme-css-dark", "--background-base:#000;")
+    localStorage.setItem("folonite-theme-id", "dracula")
+    localStorage.setItem("folonite-theme-css-light", "--background-base:#fff;")
+    localStorage.setItem("folonite-theme-css-dark", "--background-base:#000;")
   })
 
   await gotoSession()
 
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "pawwork")
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "folonite")
 
   await expect
     .poll(async () => {
       return await page.evaluate(() => {
-        return localStorage.getItem("pawwork-theme-id")
+        return localStorage.getItem("folonite-theme-id")
       })
     })
-    .toBe("pawwork")
+    .toBe("folonite")
 
   await expect
     .poll(async () => {
       return await page.evaluate(() => {
-        return localStorage.getItem("pawwork-theme-css-light")
+        return localStorage.getItem("folonite-theme-css-light")
       })
     })
     .toBeNull()
@@ -116,7 +116,7 @@ test("unknown theme ids migrate to pawwork and clear cached css", async ({ page,
   await expect
     .poll(async () => {
       return await page.evaluate(() => {
-        return localStorage.getItem("pawwork-theme-css-dark")
+        return localStorage.getItem("folonite-theme-css-dark")
       })
     })
     .toBeNull()
@@ -317,8 +317,8 @@ test("clearing the UI font field restores the default placeholder and stack", as
 test("code font and UI font rehydrate after reload", async ({ page, gotoSession }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem("settings-rehydrate-init")) return
-    localStorage.setItem("pawwork-theme-id", "pawwork")
-    localStorage.setItem("pawwork-color-scheme", "light")
+    localStorage.setItem("folonite-theme-id", "folonite")
+    localStorage.setItem("folonite-color-scheme", "light")
     sessionStorage.setItem("settings-rehydrate-init", "1")
   })
 

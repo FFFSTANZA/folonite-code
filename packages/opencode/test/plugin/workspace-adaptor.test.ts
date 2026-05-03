@@ -12,27 +12,27 @@ import { tmpdir } from "../fixture/fixture"
 import { WorkspaceTable } from "../../src/control-plane/workspace.sql"
 import { Database } from "../../src/storage/db"
 
-const disableDefault = process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS
-process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = "1"
+const disableDefault = process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS
+process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS = "1"
 
 const { Flag } = await import("@opencode-ai/core/flag/flag")
 const { Plugin } = await import("../../src/plugin/index")
 const { Workspace } = await import("../../src/control-plane/workspace")
 const { Instance } = await import("../../src/project/instance")
 
-const experimental = Flag.OPENCODE_EXPERIMENTAL_WORKSPACES
+const experimental = Flag.FOLONITE_EXPERIMENTAL_WORKSPACES
 // @ts-expect-error test-only flag override
-Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+Flag.FOLONITE_EXPERIMENTAL_WORKSPACES = true
 
 afterEach(async () => {
   await Instance.disposeAll()
 })
 
 afterAll(() => {
-  if (disableDefault === undefined) delete process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS
-  else process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = disableDefault
+  if (disableDefault === undefined) delete process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS
+  else process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS = disableDefault
   // @ts-expect-error test-only flag override
-  Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = experimental
+  Flag.FOLONITE_EXPERIMENTAL_WORKSPACES = experimental
 })
 
 function wait(ms = 50) {
@@ -178,15 +178,15 @@ describe("plugin.workspace", () => {
       directory: tmp.extra.space,
       extra: { key: "value" },
     })
-    expect(created.env.OPENCODE_WORKSPACE_ID).toBe(info.id)
-    expect(created.env.OPENCODE_EXPERIMENTAL_WORKSPACES).toBe("true")
+    expect(created.env.FOLONITE_WORKSPACE_ID).toBe(info.id)
+    expect(created.env.FOLONITE_EXPERIMENTAL_WORKSPACES).toBe("true")
     const otelKeys = ["OTEL_EXPORTER_OTLP_HEADERS", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_RESOURCE_ATTRIBUTES"] as const
     for (const key of otelKeys) {
       const expected = process.env[key]
       if (expected === undefined) expect(created.env).not.toHaveProperty(key)
       else expect(created.env[key]).toBe(expected)
     }
-    expect(created.env).not.toHaveProperty("OPENCODE_AUTH_CONTENT")
+    expect(created.env).not.toHaveProperty("FOLONITE_AUTH_CONTENT")
     await waitFor(() => {
       const status = Workspace.status().find((item) => item.workspaceID === info.id)
       return status !== undefined && status.status !== "connecting"
@@ -277,7 +277,7 @@ describe("plugin.workspace", () => {
         expect(info.directory).toBe(tmp.extra.space)
 
         const created = JSON.parse(await Bun.file(tmp.extra.mark).text())
-        expect(JSON.parse(created.env.OPENCODE_AUTH_CONTENT)).toEqual({
+        expect(JSON.parse(created.env.FOLONITE_AUTH_CONTENT)).toEqual({
           openai: {
             type: "api",
             key: "sk-openai",

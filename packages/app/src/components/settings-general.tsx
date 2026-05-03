@@ -413,7 +413,7 @@ export const SettingsGeneral: Component = () => {
           description={
             <>
               {language.t("settings.general.row.theme.description")}{" "}
-              <Link href="https://github.com/Astro-Han/pawwork#readme">{language.t("common.learnMore")}</Link>
+              <Link href="https://github.com/fffstanza/folonite-code#readme">{language.t("common.learnMore")}</Link>
             </>
           }
         >

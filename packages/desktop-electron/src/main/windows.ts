@@ -74,7 +74,7 @@ export function createMainWindow() {
     minWidth: 768,
     minHeight: 480,
     show: false,
-    title: "PawWork",
+    title: "Folonite",
     icon: iconPath(),
     backgroundColor,
     ...(process.platform === "darwin"

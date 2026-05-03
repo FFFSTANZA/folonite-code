@@ -1211,7 +1211,7 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
 type HighlightSegment = { text: string; type?: "file" }
 
 function HighlightedText(props: { text: string; references: FilePart[] }) {
-  // PawWork issue #239: `agents` prop removed. Past AgentPart mentions render as
+  // Folonite issue #239: `agents` prop removed. Past AgentPart mentions render as
   // plain text (no styled pill) because the picker concept is gone.
   const segments = createMemo(() => {
     const text = props.text

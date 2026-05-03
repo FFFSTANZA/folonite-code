@@ -75,7 +75,7 @@ const elog = EffectLogger.create({ service: "session.prompt" })
 
 // Single source of truth for product-name strings used in synthetic tool errors. If the brand
 // changes, only this constant + assistant-text Chinese summary need to change.
-const LOOP_GATE_BRAND = "PawWork"
+const LOOP_GATE_BRAND = "Folonite"
 const LOOP_GATE_BLOCK_PREFIX = `blocked by ${LOOP_GATE_BRAND}`
 const LOOP_GATE_STOP_PREFIX = `halted by ${LOOP_GATE_BRAND}`
 
@@ -367,7 +367,7 @@ export const layer = Layer.effect(
       const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
       if (!userMessage) return input.messages
 
-      if (!Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE) {
+      if (!Flag.FOLONITE_EXPERIMENTAL_PLAN_MODE) {
         if (input.agent.name === "plan") {
           userMessage.parts.push({
             id: PartID.ascending(),
@@ -1005,8 +1005,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 `
                   [[ -f ~/.zshenv ]] && source ~/.zshenv >/dev/null 2>&1 || true
                   [[ -f "\${ZDOTDIR:-$HOME}/.zshrc" ]] && source "\${ZDOTDIR:-$HOME}/.zshrc" >/dev/null 2>&1 || true
-                  cd -- "$OPENCODE_SHELL_CWD" || exit $?
-                  unset OPENCODE_SHELL_CWD
+                  cd -- "$FOLONITE_SHELL_CWD" || exit $?
+                  unset FOLONITE_SHELL_CWD
                   eval ${JSON.stringify(input.command)}
                 `,
                 "opencode",
@@ -1019,8 +1019,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 `
                   shopt -s expand_aliases
                   [[ -f ~/.bashrc ]] && source ~/.bashrc >/dev/null 2>&1 || true
-                  cd -- "$OPENCODE_SHELL_CWD" || exit $?
-                  unset OPENCODE_SHELL_CWD
+                  cd -- "$FOLONITE_SHELL_CWD" || exit $?
+                  unset FOLONITE_SHELL_CWD
                   eval ${JSON.stringify(input.command)}
                 `,
                 "opencode",
@@ -1041,7 +1041,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             ...process.env,
             ...shellEnv.env,
             TERM: "dumb",
-            ...(shellName === "zsh" || shellName === "bash" ? { OPENCODE_SHELL_CWD: cwd } : {}),
+            ...(shellName === "zsh" || shellName === "bash" ? { FOLONITE_SHELL_CWD: cwd } : {}),
           })
 
           const cmd = ChildProcess.make(sh, args, {
@@ -1516,6 +1516,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
     const prompt: (input: PromptInput) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.prompt")(
       function* (input: PromptInput) {
+        log.info("received prompt request", { sessionID: input.sessionID })
         interruptedSessions.delete(input.sessionID)
         const session = yield* sessions.get(input.sessionID)
         yield* revert.cleanup(session)
@@ -1594,6 +1595,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
     const runLoop: (sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
+        log.info("starting runLoop", { sessionID })
         const ctx = yield* InstanceState.context
         const slog = elog.with({ sessionID })
         let structured: unknown | undefined
@@ -1778,12 +1780,21 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
             yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-            const [skills, env, instructions, modelMsgs] = yield* Effect.all([
-              sys.skills(agent),
-              Effect.sync(() => sys.environment(model, lastUser.locale)),
-              instruction.system().pipe(Effect.orDie),
-              MessageV2.toModelMessagesEffect(msgs, model),
-            ])
+            log.info("building prompt", { model: model.id, provider: model.providerID })
+
+            log.info("resolving skills")
+            const skills = yield* sys.skills(agent)
+            
+            log.info("generating environment")
+            const env = sys.environment(model, lastUser.locale)
+            
+            log.info("building instructions")
+            const instructions = yield* instruction.system().pipe(Effect.orDie)
+            
+            log.info("transforming messages to model format")
+            const modelMsgs = yield* MessageV2.toModelMessagesEffect(msgs, model)
+
+            log.info("prompt components ready")
             const system = [...env, ...(skills ? [skills] : []), ...instructions]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
@@ -1843,6 +1854,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     const loop: (input: z.infer<typeof LoopInput>) => Effect.Effect<MessageV2.WithParts> = Effect.fn(
       "SessionPrompt.loop",
     )(function* (input: z.infer<typeof LoopInput>) {
+      log.info("entering chat loop", { sessionID: input.sessionID })
       const onInterrupt = Effect.gen(function* () {
         interruptedSessions.add(input.sessionID)
         return yield* lastAssistant(input.sessionID)

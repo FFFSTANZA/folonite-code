@@ -3,14 +3,14 @@ import { deriveArtifactFiles, nextFilesPanelAutoOpen } from "./files-tab-state"
 
 describe("files tab state", () => {
   test("maps cumulative artifact history into Files-tab entries", () => {
-    const files = deriveArtifactFiles("/Users/yuhan/PawWork", [
+    const files = deriveArtifactFiles("/Users/yuhan/Folonite", [
       { file: "report.docx", kind: "added" },
       { file: "notes.md", kind: "modified" },
     ] as any)
 
     expect(files.map((item) => item.path)).toEqual([
-      "/Users/yuhan/PawWork/report.docx",
-      "/Users/yuhan/PawWork/notes.md",
+      "/Users/yuhan/Folonite/report.docx",
+      "/Users/yuhan/Folonite/notes.md",
     ])
   })
 

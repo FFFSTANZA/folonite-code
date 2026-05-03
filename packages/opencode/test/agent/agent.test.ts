@@ -575,8 +575,8 @@ description: Permission skill.
     },
   })
 
-  const home = process.env.OPENCODE_TEST_HOME
-  process.env.OPENCODE_TEST_HOME = tmp.path
+  const home = process.env.FOLONITE_TEST_HOME
+  process.env.FOLONITE_TEST_HOME = tmp.path
 
   try {
     await Instance.provide({
@@ -589,7 +589,7 @@ description: Permission skill.
       },
     })
   } finally {
-    process.env.OPENCODE_TEST_HOME = home
+    process.env.FOLONITE_TEST_HOME = home
   }
 })
 

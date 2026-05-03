@@ -25,7 +25,7 @@ export function Titlebar() {
   const web = createMemo(() => platform.platform === "web")
   const zoom = () => platform.webviewZoom?.() ?? 1
   const currentTitlebarHeight = () =>
-    mac() ? "var(--shell-titlebar-current-height, var(--shell-titlebar-height, 40px))" : undefined
+    mac() ? "var(--shell-titlebar-current-height, var(--shell-titlebar-height, 48px))" : undefined
   const leftPortalStyle = () => ({
     left: "max(172px, calc(var(--sidebar-width, 0px) + 16px))",
     right: "calc(var(--right-panel-width, 0px) + 52px)",
@@ -86,7 +86,7 @@ export function Titlebar() {
       data-platform={platform.platform}
       data-os={platform.os}
       class="shrink-0 relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center"
-      classList={{ "h-11": platform.platform === "desktop" && !mac() }}
+      classList={{ "h-12": platform.platform === "desktop" && !mac() }}
       style={{ height: currentTitlebarHeight(), "min-height": currentTitlebarHeight() }}
       data-shell-drag-region={!windows() || undefined}
     >
@@ -108,12 +108,12 @@ export function Titlebar() {
           >
             <Button
               variant="ghost"
-              class="group/sidebar-toggle titlebar-icon w-8 h-6 p-0 box-border"
+              class="group/sidebar-toggle titlebar-icon w-8 h-7 p-0 box-border"
               onClick={layout.sidebar.toggle}
               aria-label={language.t("command.sidebar.toggle")}
               aria-expanded={layout.sidebar.opened()}
             >
-              <Icon size="small" name={layout.sidebar.opened() ? "sidebar-active" : "sidebar"} />
+              <Icon size="normal" name={layout.sidebar.opened() ? "sidebar-active" : "sidebar"} />
             </Button>
           </TooltipKeybind>
           <Show when={params.dir && !layout.sidebar.opened()}>
@@ -126,7 +126,7 @@ export function Titlebar() {
               <Button
                 variant="ghost"
                 icon="new-session"
-                class="titlebar-icon w-8 h-6 p-0 box-border"
+                class="titlebar-icon w-8 h-7 p-0 box-border"
                 onClick={() => {
                   if (!params.dir) return
                   navigate(`/${params.dir}/session`)
@@ -139,14 +139,14 @@ export function Titlebar() {
       </div>
 
       <div
-        id="pawwork-titlebar-left"
+        id="folonite-titlebar-left"
         data-shell-slot="left-portal"
         class="@container pointer-events-none absolute inset-y-0 z-10 flex min-w-0 items-center gap-3 overflow-hidden"
         style={leftPortalStyle()}
       />
 
-      <div class="min-w-0 flex items-center justify-center pointer-events-none">
-        <div id="pawwork-titlebar-center" class="pointer-events-auto min-w-0 flex justify-center w-fit max-w-full" />
+      <div class="min-w-0 flex items-center justify-center pointer-events-none px-4">
+        <div id="folonite-titlebar-center" class="pointer-events-auto min-w-0 flex justify-center items-center w-fit max-w-full" />
       </div>
 
       <div
@@ -156,7 +156,7 @@ export function Titlebar() {
         }}
       >
         <div
-          id="pawwork-titlebar-right"
+          id="folonite-titlebar-right"
           data-shell-slot="right-portal"
           class="flex items-center gap-1 shrink-0 justify-end"
         />

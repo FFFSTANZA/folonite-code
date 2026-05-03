@@ -13,14 +13,14 @@ const t: ErrorReportTranslator = (key, vars) => {
   const dict: Record<string, string> = {
     "error.page.known.localState.title": "Local state problem",
     "error.page.known.localState.description":
-      "PawWork had trouble reading local state for this workspace. Your original project files are usually not affected.",
+      "Folonite had trouble reading local state for this workspace. Your original project files are usually not affected.",
     "error.page.report.success":
       "The feedback form is open. A short summary was copied, and the full report was saved locally for manual upload.",
     "error.page.report.summaryOnly": "The current error summary was copied. Paste it into the feedback form.",
     "error.page.report.formFallback":
       "The feedback form did not open automatically. Open the link manually, then paste the copied summary.",
     "error.page.report.failed":
-      "PawWork could not prepare the report. Use the technical details below when reporting this.",
+      "Folonite could not prepare the report. Use the technical details below when reporting this.",
     "error.page.report.unavailable":
       "Problem reporting is not available in this build. Use the GitHub link or the technical details below.",
     "error.chain.causedBy": "Caused by",
@@ -34,14 +34,14 @@ describe("error page reporting helpers", () => {
     const error = new ChildStoreError("Failed to create persisted cache", {
       kind: "vcs",
       directory: "/Users/test/project",
-      storage: "pawwork.workspace.project.abc123.dat",
+      storage: "folonite.workspace.project.abc123.dat",
       key: "workspace:vcs",
     })
 
     expect(summarizeKnownError(error, t)).toEqual({
       title: "Local state problem",
       description:
-        "PawWork had trouble reading local state for this workspace. Your original project files are usually not affected.",
+        "Folonite had trouble reading local state for this workspace. Your original project files are usually not affected.",
     })
   })
 
@@ -49,20 +49,20 @@ describe("error page reporting helpers", () => {
     const error = new ChildStoreError("Failed to create persisted cache", {
       kind: "vcs",
       directory: "/Users/test/project",
-      storage: "pawwork.workspace.project.abc123.dat",
+      storage: "folonite.workspace.project.abc123.dat",
       key: "workspace:vcs",
     })
 
     const details = buildErrorReportDetails(error, t)
 
     expect(details.summary).toBe(
-      "PawWork had trouble reading local state for this workspace. Your original project files are usually not affected.",
+      "Folonite had trouble reading local state for this workspace. Your original project files are usually not affected.",
     )
     expect(details.details).toContain("ChildStoreError: Failed to create persisted cache")
     expect(details.details).toContain("Context")
     expect(details.details).toContain('"kind": "vcs"')
     expect(details.details).toContain('"directory": "/Users/test/project"')
-    expect(details.details).toContain('"storage": "pawwork.workspace.project.abc123.dat"')
+    expect(details.details).toContain('"storage": "folonite.workspace.project.abc123.dat"')
     expect(details.details).toContain('"key": "workspace:vcs"')
   })
 
@@ -120,8 +120,8 @@ describe("error page reporting helpers", () => {
       feedbackOpened: true,
       fullReport: {
         status: "ready",
-        fileName: "pawwork-problem-report.md",
-        locationHint: "PawWork app data/.../problem-reports/pawwork-problem-report.md",
+        fileName: "folonite-problem-report.md",
+        locationHint: "Folonite app data/.../problem-reports/folonite-problem-report.md",
       },
     }
     const summaryOnly: ReportProblemResult = {
@@ -137,8 +137,8 @@ describe("error page reporting helpers", () => {
       feedbackUrl: "https://example.com/form",
       fullReport: {
         status: "ready",
-        fileName: "pawwork-problem-report.md",
-        locationHint: "PawWork app data/.../problem-reports/pawwork-problem-report.md",
+        fileName: "folonite-problem-report.md",
+        locationHint: "Folonite app data/.../problem-reports/folonite-problem-report.md",
       },
     }
     const failed: ReportProblemResult = {
@@ -170,7 +170,7 @@ describe("error page reporting helpers", () => {
       "The feedback form did not open automatically. Open the link manually, then paste the copied summary.",
     )
     expect(errorReportStatusMessage(failed, t)).toBe(
-      "PawWork could not prepare the report. Use the technical details below when reporting this.",
+      "Folonite could not prepare the report. Use the technical details below when reporting this.",
     )
     expect(errorReportStatusMessage(cancelled, t)).toBeUndefined()
     expect(errorReportStatusMessage(unavailable, t)).toBe(

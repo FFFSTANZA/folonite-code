@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
 import path from "node:path"
 import { rendererOrigin } from "./renderer-protocol"
 
-const userData = "/tmp/pawwork-user-data"
+const userData = "/tmp/folonite-user-data"
 const serverRoots = {
   data: path.join(userData, "data"),
   cache: path.join(userData, "cache"),
@@ -68,15 +68,15 @@ afterAll(() => {
 describe("desktop server runtime namespace", () => {
   const nonWindowsTest = process.platform === "win32" ? test.skip : test
 
-  test("prepares PawWork-owned server environment before embedded server import", async () => {
+  test("prepares Folonite-owned server environment before embedded server import", async () => {
     const { buildServerEnvForTest } = await import("./server")
 
     const env = buildServerEnvForTest("secret")
 
-    expect(env.OPENCODE_CLIENT).toBe("desktop")
-    expect(env.OPENCODE_SERVER_USERNAME).toBe("PawWork")
-    expect(env.OPENCODE_SERVER_PASSWORD).toBe("secret")
-    expect(env.PAWWORK_RUNTIME_NAMESPACE).toBe("pawwork")
+    expect(env.FOLONITE_CLIENT).toBe("desktop")
+    expect(env.FOLONITE_SERVER_USERNAME).toBe("Folonite")
+    expect(env.FOLONITE_SERVER_PASSWORD).toBe("secret")
+    expect(env.FOLONITE_RUNTIME_NAMESPACE).toBe("folonite")
     expect(env.XDG_DATA_HOME).toBe(serverRoots.data)
     expect(env.XDG_CACHE_HOME).toBe(serverRoots.cache)
     expect(env.XDG_CONFIG_HOME).toBe(serverRoots.config)
@@ -94,7 +94,7 @@ describe("desktop server runtime namespace", () => {
     expect(env.GH_CONFIG_DIR).toBe("/process/gh")
   })
 
-  test("keeps explicit GitHub CLI config directory while isolating PawWork config", async () => {
+  test("keeps explicit GitHub CLI config directory while isolating Folonite config", async () => {
     process.env.GH_CONFIG_DIR = "/custom/gh"
     process.env.XDG_CONFIG_HOME = "/user/config"
     process.env.HOME = "/Users/example"
@@ -107,13 +107,13 @@ describe("desktop server runtime namespace", () => {
   })
 
   test("keeps process env values before shell env values", async () => {
-    process.env.PAWWORK_TEST_ENV = "process"
-    mockShellEnv = { PAWWORK_TEST_ENV: "shell" }
+    process.env.FOLONITE_TEST_ENV = "process"
+    mockShellEnv = { FOLONITE_TEST_ENV: "shell" }
     const { buildServerEnvForTest } = await import("./server")
 
     const env = buildServerEnvForTest("secret")
 
-    expect(env.PAWWORK_TEST_ENV).toBe("process")
+    expect(env.FOLONITE_TEST_ENV).toBe("process")
   })
 
   nonWindowsTest("keeps login shell PATH so Homebrew commands remain discoverable", async () => {
@@ -261,9 +261,9 @@ describe("desktop server runtime namespace", () => {
     ).toBe(path.join("C:\\Users\\example", ".config", "gh"))
   })
 
-  test("runtime roots keep Windows-shaped user data under PawWork", async () => {
+  test("runtime roots keep Windows-shaped user data under Folonite", async () => {
     const { databasePathForUserData, runtimeRoots } = await import("./runtime-namespace")
-    const root = "C:\\Users\\u\\AppData\\Roaming\\ai.pawwork.desktop.dev"
+    const root = "C:\\Users\\u\\AppData\\Roaming\\ai.folonite.desktop.dev"
     const roots = runtimeRoots(root)
 
     expect(roots).toEqual({
@@ -272,10 +272,10 @@ describe("desktop server runtime namespace", () => {
       config: path.join(root, "config"),
       state: path.join(root, "state"),
     })
-    expect(databasePathForUserData(root)).toBe(path.join(root, "data", "pawwork", "pawwork.db"))
+    expect(databasePathForUserData(root)).toBe(path.join(root, "data", "folonite", "folonite.db"))
   })
 
-  test("health check uses PawWork Basic Auth username", async () => {
+  test("health check uses Folonite Basic Auth username", async () => {
     let authorization = ""
     const previousFetch = globalThis.fetch
     globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
@@ -286,7 +286,7 @@ describe("desktop server runtime namespace", () => {
     try {
       const { checkHealth } = await import("./server")
       expect(await checkHealth("http://127.0.0.1:4096", "secret")).toBeTrue()
-      expect(Buffer.from(authorization.replace("Basic ", ""), "base64").toString("utf8")).toBe("PawWork:secret")
+      expect(Buffer.from(authorization.replace("Basic ", ""), "base64").toString("utf8")).toBe("Folonite:secret")
     } finally {
       globalThis.fetch = previousFetch
     }
@@ -302,9 +302,9 @@ describe("desktop server runtime namespace", () => {
         XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
         XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
         XDG_STATE_HOME: process.env.XDG_STATE_HOME,
-        PAWWORK_RUNTIME_NAMESPACE: process.env.PAWWORK_RUNTIME_NAMESPACE,
-        OPENCODE_CLIENT: process.env.OPENCODE_CLIENT,
-        OPENCODE_SERVER_USERNAME: process.env.OPENCODE_SERVER_USERNAME,
+        FOLONITE_RUNTIME_NAMESPACE: process.env.FOLONITE_RUNTIME_NAMESPACE,
+        FOLONITE_CLIENT: process.env.FOLONITE_CLIENT,
+        FOLONITE_SERVER_USERNAME: process.env.FOLONITE_SERVER_USERNAME,
       }
       return {
         Log: { init: async () => undefined },
@@ -328,9 +328,9 @@ describe("desktop server runtime namespace", () => {
         XDG_CACHE_HOME: serverRoots.cache,
         XDG_CONFIG_HOME: serverRoots.config,
         XDG_STATE_HOME: serverRoots.state,
-        PAWWORK_RUNTIME_NAMESPACE: "pawwork",
-        OPENCODE_CLIENT: "desktop",
-        OPENCODE_SERVER_USERNAME: "PawWork",
+        FOLONITE_RUNTIME_NAMESPACE: "folonite",
+        FOLONITE_CLIENT: "desktop",
+        FOLONITE_SERVER_USERNAME: "Folonite",
       })
       expect(listenOptions).toMatchObject({
         cors: [rendererOrigin],

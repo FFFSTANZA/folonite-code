@@ -7,7 +7,7 @@ export namespace ShareRuntime {
   ) {}
 
   export const cloudShareGateDefaultLayer = Layer.succeed(CloudShareGate, {
-    isEnabled: () => !Runtime.isPawWork(),
+    isEnabled: () => false,
   })
 
   // Typed Effect failure (NOT a thrown Error). Using Data.TaggedError + Effect.fail produces
@@ -19,7 +19,7 @@ export namespace ShareRuntime {
 
   export const cloudShareDisabled = () =>
     new CloudShareDisabled({
-      message: "Cloud share is disabled in PawWork. Use Export session log instead.",
+      message: "Cloud share is disabled in Folonite. Use Export session log instead.",
     })
 
   // Returns an Effect; callers `yield* ensureEnabled` to surface the typed failure.

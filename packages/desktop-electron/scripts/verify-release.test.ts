@@ -29,36 +29,36 @@ const baseRelease: GithubRelease = {
   prerelease: false,
   assets: [
     {
-      name: "pawwork-mac-arm64-2026.4.28.dmg",
-      browser_download_url: "https://example.com/pawwork-mac-arm64-2026.4.28.dmg",
+      name: "folonite-mac-arm64-2026.4.28.dmg",
+      browser_download_url: "https://example.com/folonite-mac-arm64-2026.4.28.dmg",
     },
     {
-      name: "pawwork-mac-arm64-2026.4.28.zip",
-      browser_download_url: "https://example.com/pawwork-mac-arm64-2026.4.28.zip",
+      name: "folonite-mac-arm64-2026.4.28.zip",
+      browser_download_url: "https://example.com/folonite-mac-arm64-2026.4.28.zip",
     },
     {
-      name: "pawwork-mac-arm64-2026.4.28.zip.blockmap",
-      browser_download_url: "https://example.com/pawwork-mac-arm64-2026.4.28.zip.blockmap",
+      name: "folonite-mac-arm64-2026.4.28.zip.blockmap",
+      browser_download_url: "https://example.com/folonite-mac-arm64-2026.4.28.zip.blockmap",
     },
     {
-      name: "pawwork-mac-x64-2026.4.28.dmg",
-      browser_download_url: "https://example.com/pawwork-mac-x64-2026.4.28.dmg",
+      name: "folonite-mac-x64-2026.4.28.dmg",
+      browser_download_url: "https://example.com/folonite-mac-x64-2026.4.28.dmg",
     },
     {
-      name: "pawwork-mac-x64-2026.4.28.zip",
-      browser_download_url: "https://example.com/pawwork-mac-x64-2026.4.28.zip",
+      name: "folonite-mac-x64-2026.4.28.zip",
+      browser_download_url: "https://example.com/folonite-mac-x64-2026.4.28.zip",
     },
     {
-      name: "pawwork-mac-x64-2026.4.28.zip.blockmap",
-      browser_download_url: "https://example.com/pawwork-mac-x64-2026.4.28.zip.blockmap",
+      name: "folonite-mac-x64-2026.4.28.zip.blockmap",
+      browser_download_url: "https://example.com/folonite-mac-x64-2026.4.28.zip.blockmap",
     },
     {
-      name: "pawwork-win-x64-2026.4.28.exe",
-      browser_download_url: "https://example.com/pawwork-win-x64-2026.4.28.exe",
+      name: "folonite-win-x64-2026.4.28.exe",
+      browser_download_url: "https://example.com/folonite-win-x64-2026.4.28.exe",
     },
     {
-      name: "pawwork-win-x64-2026.4.28.exe.blockmap",
-      browser_download_url: "https://example.com/pawwork-win-x64-2026.4.28.exe.blockmap",
+      name: "folonite-win-x64-2026.4.28.exe.blockmap",
+      browser_download_url: "https://example.com/folonite-win-x64-2026.4.28.exe.blockmap",
     },
     {
       name: "latest.yml",
@@ -85,20 +85,20 @@ describe("verify-release", () => {
 
   test("derives release and updater asset names from the CalVer version", () => {
     expect(releaseAssetNames("2026.4.28")).toEqual([
-      "pawwork-mac-arm64-2026.4.28.dmg",
-      "pawwork-mac-arm64-2026.4.28.zip",
-      "pawwork-mac-arm64-2026.4.28.zip.blockmap",
-      "pawwork-mac-x64-2026.4.28.dmg",
-      "pawwork-mac-x64-2026.4.28.zip",
-      "pawwork-mac-x64-2026.4.28.zip.blockmap",
-      "pawwork-win-x64-2026.4.28.exe",
-      "pawwork-win-x64-2026.4.28.exe.blockmap",
+      "folonite-mac-arm64-2026.4.28.dmg",
+      "folonite-mac-arm64-2026.4.28.zip",
+      "folonite-mac-arm64-2026.4.28.zip.blockmap",
+      "folonite-mac-x64-2026.4.28.dmg",
+      "folonite-mac-x64-2026.4.28.zip",
+      "folonite-mac-x64-2026.4.28.zip.blockmap",
+      "folonite-win-x64-2026.4.28.exe",
+      "folonite-win-x64-2026.4.28.exe.blockmap",
       "latest.yml",
       "latest-mac.yml",
     ])
     expect(releaseUpdaterAssetNames("2026.4.28")).toEqual({
-      "latest.yml": ["pawwork-win-x64-2026.4.28.exe"],
-      "latest-mac.yml": ["pawwork-mac-arm64-2026.4.28.zip", "pawwork-mac-x64-2026.4.28.zip"],
+      "latest.yml": ["folonite-win-x64-2026.4.28.exe"],
+      "latest-mac.yml": ["folonite-mac-arm64-2026.4.28.zip", "folonite-mac-x64-2026.4.28.zip"],
     })
   })
 
@@ -106,47 +106,47 @@ describe("verify-release", () => {
     expect(
       parseUpdaterFileUrls(`version: 2026.4.28
 files:
-  - url: pawwork-mac-arm64-2026.4.28.zip
+  - url: folonite-mac-arm64-2026.4.28.zip
     size: 1
-  - url: pawwork-mac-x64-2026.4.28.zip
+  - url: folonite-mac-x64-2026.4.28.zip
     size: 2
-path: pawwork-mac-arm64-2026.4.28.zip
+path: folonite-mac-arm64-2026.4.28.zip
 `),
-    ).toEqual(["pawwork-mac-arm64-2026.4.28.zip", "pawwork-mac-x64-2026.4.28.zip", "pawwork-mac-arm64-2026.4.28.zip"])
+    ).toEqual(["folonite-mac-arm64-2026.4.28.zip", "folonite-mac-x64-2026.4.28.zip", "folonite-mac-arm64-2026.4.28.zip"])
   })
 
   test("parses quoted updater file urls and path entries", () => {
     expect(
       parseUpdaterFileUrls(`files:
-  - url: "pawwork-mac-arm64-2026.4.28.zip"
-  - url: 'pawwork-mac-x64-2026.4.28.zip' # Intel macOS updater asset
-  - url: "pawwork-mac#arm64.zip"
-    path: "pawwork-win-x64-2026.4.28.exe" # Windows updater asset
+  - url: "folonite-mac-arm64-2026.4.28.zip"
+  - url: 'folonite-mac-x64-2026.4.28.zip' # Intel macOS updater asset
+  - url: "folonite-mac#arm64.zip"
+    path: "folonite-win-x64-2026.4.28.exe" # Windows updater asset
 `),
     ).toEqual([
-      "pawwork-mac-arm64-2026.4.28.zip",
-      "pawwork-mac-x64-2026.4.28.zip",
-      "pawwork-mac#arm64.zip",
-      "pawwork-win-x64-2026.4.28.exe",
+      "folonite-mac-arm64-2026.4.28.zip",
+      "folonite-mac-x64-2026.4.28.zip",
+      "folonite-mac#arm64.zip",
+      "folonite-win-x64-2026.4.28.exe",
     ])
   })
 
   test("keeps inline comments outside escaped quoted values", () => {
     expect(
       parseUpdaterFileUrls(String.raw`files:
-  - url: "pawwork-mac\"arm64.zip" # comment
-  - url: "pawwork-mac\\"
-path: pawwork-win-x64-2026.4.28.exe
+  - url: "folonite-mac\"arm64.zip" # comment
+  - url: "folonite-mac\\"
+path: folonite-win-x64-2026.4.28.exe
 `),
-    ).toEqual([String.raw`pawwork-mac\"arm64.zip`, String.raw`pawwork-mac\\`, "pawwork-win-x64-2026.4.28.exe"])
+    ).toEqual([String.raw`folonite-mac\"arm64.zip`, String.raw`folonite-mac\\`, "folonite-win-x64-2026.4.28.exe"])
   })
 
   test("accepts a stable release with expected assets and updater metadata", () => {
     expect(
       verifyReleasePayload({
         release: baseRelease,
-        latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-        latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+        latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+        latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       }),
     ).toEqual([])
   })
@@ -156,9 +156,9 @@ path: pawwork-win-x64-2026.4.28.exe
       verifyReleasePayload({
         release: baseRelease,
         latestYml:
-          "files:\n  - url: https://github.com/Astro-Han/pawwork/releases/download/v2026.4.28/pawwork-win-x64-2026.4.28.exe\n",
+          "files:\n  - url: https://github.com/fffstanza/folonite-code/releases/download/v2026.4.28/folonite-win-x64-2026.4.28.exe\n",
         latestMacYml:
-          "files:\n  - url: https://github.com/Astro-Han/pawwork/releases/download/v2026.4.28/pawwork-mac-arm64-2026.4.28.zip\n  - url: https://github.com/Astro-Han/pawwork/releases/download/v2026.4.28/pawwork-mac-x64-2026.4.28.zip\n",
+          "files:\n  - url: https://github.com/fffstanza/folonite-code/releases/download/v2026.4.28/folonite-mac-arm64-2026.4.28.zip\n  - url: https://github.com/fffstanza/folonite-code/releases/download/v2026.4.28/folonite-mac-x64-2026.4.28.zip\n",
       }),
     ).toEqual([])
   })
@@ -167,10 +167,10 @@ path: pawwork-win-x64-2026.4.28.exe
     expect(
       verifyReleasePayload({
         release: baseRelease,
-        latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-        latestMacYml: "files:\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+        latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+        latestMacYml: "files:\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       }),
-    ).toContain("latest-mac.yml does not include pawwork-mac-arm64-2026.4.28.zip")
+    ).toContain("latest-mac.yml does not include folonite-mac-arm64-2026.4.28.zip")
   })
 
   test("reports updater metadata that points to a missing asset", () => {
@@ -178,12 +178,12 @@ path: pawwork-win-x64-2026.4.28.exe
       verifyReleasePayload({
         release: {
           ...baseRelease,
-          assets: baseRelease.assets.filter((asset) => asset.name !== "pawwork-mac-arm64-2026.4.28.zip"),
+          assets: baseRelease.assets.filter((asset) => asset.name !== "folonite-mac-arm64-2026.4.28.zip"),
         },
-        latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-        latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+        latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+        latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       }),
-    ).toContain("latest-mac.yml references missing release asset: pawwork-mac-arm64-2026.4.28.zip")
+    ).toContain("latest-mac.yml references missing release asset: folonite-mac-arm64-2026.4.28.zip")
   })
 
   test("reports missing installer and updater sidecar assets", () => {
@@ -192,15 +192,15 @@ path: pawwork-win-x64-2026.4.28.exe
         ...baseRelease,
         assets: baseRelease.assets.filter(
           (asset) =>
-            asset.name !== "pawwork-mac-arm64-2026.4.28.dmg" && asset.name !== "pawwork-win-x64-2026.4.28.exe.blockmap",
+            asset.name !== "folonite-mac-arm64-2026.4.28.dmg" && asset.name !== "folonite-win-x64-2026.4.28.exe.blockmap",
         ),
       },
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
     })
 
-    expect(failures).toContain("Missing release asset: pawwork-mac-arm64-2026.4.28.dmg")
-    expect(failures).toContain("Missing release asset: pawwork-win-x64-2026.4.28.exe.blockmap")
+    expect(failures).toContain("Missing release asset: folonite-mac-arm64-2026.4.28.dmg")
+    expect(failures).toContain("Missing release asset: folonite-win-x64-2026.4.28.exe.blockmap")
   })
 
   test("reports missing updater metadata assets without requiring metadata downloads", () => {
@@ -215,17 +215,17 @@ path: pawwork-win-x64-2026.4.28.exe
 
     expect(failures).toContain("Missing release asset: latest.yml")
     expect(failures).toContain("Missing release asset: latest-mac.yml")
-    expect(failures).toContain("latest.yml does not include pawwork-win-x64-2026.4.28.exe")
-    expect(failures).toContain("latest-mac.yml does not include pawwork-mac-arm64-2026.4.28.zip")
-    expect(failures).toContain("latest-mac.yml does not include pawwork-mac-x64-2026.4.28.zip")
+    expect(failures).toContain("latest.yml does not include folonite-win-x64-2026.4.28.exe")
+    expect(failures).toContain("latest-mac.yml does not include folonite-mac-arm64-2026.4.28.zip")
+    expect(failures).toContain("latest-mac.yml does not include folonite-mac-x64-2026.4.28.zip")
   })
 
   test("reports draft releases", () => {
     expect(
       verifyReleasePayload({
         release: { ...baseRelease, draft: true },
-        latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-        latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+        latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+        latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       }),
     ).toContain("Release v2026.4.28 is still a draft")
   })
@@ -234,8 +234,8 @@ path: pawwork-win-x64-2026.4.28.exe
     expect(
       verifyReleasePayload({
         release: { ...baseRelease, prerelease: true },
-        latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-        latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+        latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+        latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       }),
     ).toContain("Release v2026.4.28 is marked as a prerelease")
   })
@@ -243,13 +243,13 @@ path: pawwork-win-x64-2026.4.28.exe
   test("reports malformed updater metadata as missing required updater entries", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - broken: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - broken: pawwork-mac-arm64-2026.4.28.zip\n",
+      latestYml: "files:\n  - broken: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - broken: folonite-mac-arm64-2026.4.28.zip\n",
     })
 
-    expect(failures).toContain("latest.yml does not include pawwork-win-x64-2026.4.28.exe")
-    expect(failures).toContain("latest-mac.yml does not include pawwork-mac-arm64-2026.4.28.zip")
-    expect(failures).toContain("latest-mac.yml does not include pawwork-mac-x64-2026.4.28.zip")
+    expect(failures).toContain("latest.yml does not include folonite-win-x64-2026.4.28.exe")
+    expect(failures).toContain("latest-mac.yml does not include folonite-mac-arm64-2026.4.28.zip")
+    expect(failures).toContain("latest-mac.yml does not include folonite-mac-x64-2026.4.28.zip")
   })
 
   test("reports invalid release tags in release payloads without throwing", () => {
@@ -266,8 +266,8 @@ path: pawwork-win-x64-2026.4.28.exe
     expect(
       verifyReleasePayload({
         release: baseRelease,
-        latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-        latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+        latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+        latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
         startupLog: `[2026-04-22 21:26:16.088] [info]  app starting { version: '2026.4.28', packaged: true }
 [2026-04-22 21:26:18.129] [info]  server ready { url: 'http://127.0.0.1:59635' }
 [2026-04-22 21:26:18.130] [info]  loading task finished
@@ -281,8 +281,8 @@ path: pawwork-win-x64-2026.4.28.exe
     expect(
       verifyReleasePayload({
         release: baseRelease,
-        latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-        latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+        latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+        latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
         startupLog: "",
       }),
     ).toEqual(["Latest startup log does not include any app starting entry"])
@@ -291,8 +291,8 @@ path: pawwork-win-x64-2026.4.28.exe
   test("reports a fresh startup log stuck after sidecar readiness", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       startupLog: `[2026-04-22 21:26:16.088] [info]  app starting { version: '2026.4.28', packaged: true }
 [2026-04-22 21:26:16.300] [info]  spawning sidecar { url: 'http://127.0.0.1:59635' }
 [2026-04-22 21:26:16.767] [info]  sidecar connection started { url: 'http://127.0.0.1:59635' }
@@ -309,8 +309,8 @@ path: pawwork-win-x64-2026.4.28.exe
   test("does not accept awaiting server ready as server ready", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       startupLog: `[2026-04-22 21:26:16.088] [info]  app starting { version: '2026.4.28', packaged: true }
 [2026-04-22 21:26:18.129] [info]  awaiting server ready
 [2026-04-22 21:26:18.130] [info]  loading task finished
@@ -324,8 +324,8 @@ path: pawwork-win-x64-2026.4.28.exe
   test("checks the latest startup attempt instead of an older successful launch", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       startupLog: `[2026-04-22 20:00:00.000] [info]  app starting { version: '2026.4.28', packaged: true }
 [2026-04-22 20:00:01.000] [info]  loading task finished
 [2026-04-22 20:00:01.001] [info]  init done
@@ -343,8 +343,8 @@ path: pawwork-win-x64-2026.4.28.exe
   test("reports release version mismatches in the startup log", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       startupLog: `[2026-04-22 21:26:16.088] [info]  app starting { version: '0.2.5', packaged: true }
 [2026-04-22 21:26:18.129] [info]  server ready { url: 'http://127.0.0.1:59635' }
 [2026-04-22 21:26:18.130] [info]  loading task finished
@@ -358,8 +358,8 @@ path: pawwork-win-x64-2026.4.28.exe
   test("reports startup logs from unpackaged desktop runs", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       startupLog: `[2026-04-22 21:26:16.088] [info]  app starting { version: '2026.4.28', packaged: false }
 [2026-04-22 21:26:18.129] [info]  server ready { url: 'http://127.0.0.1:59635' }
 [2026-04-22 21:26:18.130] [info]  loading task finished
@@ -401,8 +401,8 @@ path: pawwork-win-x64-2026.4.28.exe
   test("does not accept 'phase: done' in a non-init-step log line", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       startupLog: `[2026-04-22 21:26:16.088] [info]  app starting { version: '2026.4.28', packaged: true }
 [2026-04-22 21:26:18.129] [info]  server ready { url: 'http://127.0.0.1:59635' }
 [2026-04-22 21:26:18.130] [info]  loading task finished
@@ -417,8 +417,8 @@ path: pawwork-win-x64-2026.4.28.exe
   test("does not accept legacy init step done without the dedicated marker", () => {
     const failures = verifyReleasePayload({
       release: baseRelease,
-      latestYml: "files:\n  - url: pawwork-win-x64-2026.4.28.exe\n",
-      latestMacYml: "files:\n  - url: pawwork-mac-arm64-2026.4.28.zip\n  - url: pawwork-mac-x64-2026.4.28.zip\n",
+      latestYml: "files:\n  - url: folonite-win-x64-2026.4.28.exe\n",
+      latestMacYml: "files:\n  - url: folonite-mac-arm64-2026.4.28.zip\n  - url: folonite-mac-x64-2026.4.28.zip\n",
       startupLog: `[2026-04-22 21:26:16.088] [info]  app starting { version: '2026.4.28', packaged: true }
 [2026-04-22 21:26:18.129] [info]  server ready { url: 'http://127.0.0.1:59635' }
 [2026-04-22 21:26:18.130] [info]  loading task finished
@@ -430,7 +430,7 @@ path: pawwork-win-x64-2026.4.28.exe
   })
 
   test("reads startup log files", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "pawwork-release-log-"))
+    const dir = await mkdtemp(join(tmpdir(), "folonite-release-log-"))
     const logPath = join(dir, "main.log")
 
     try {
@@ -442,7 +442,7 @@ path: pawwork-win-x64-2026.4.28.exe
   })
 
   test("reports unreadable startup log files with the path", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "pawwork-release-log-"))
+    const dir = await mkdtemp(join(tmpdir(), "folonite-release-log-"))
     const missingPath = join(dir, "missing-main.log")
 
     try {

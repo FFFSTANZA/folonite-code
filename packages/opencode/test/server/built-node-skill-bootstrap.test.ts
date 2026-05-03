@@ -26,10 +26,10 @@ describe("built node server skill bootstrap", () => {
         XDG_CACHE_HOME: path.join(runtimeRoot, "cache"),
         XDG_CONFIG_HOME: path.join(runtimeRoot, "config"),
         XDG_STATE_HOME: path.join(runtimeRoot, "state"),
-        OPENCODE_TEST_HOME: runtimeHome,
-        OPENCODE_TEST_MANAGED_CONFIG_DIR: path.join(runtimeRoot, "managed"),
-        OPENCODE_DISABLE_DEFAULT_PLUGINS: "true",
-        OPENCODE_DB: ":memory:",
+        FOLONITE_TEST_HOME: runtimeHome,
+        FOLONITE_TEST_MANAGED_CONFIG_DIR: path.join(runtimeRoot, "managed"),
+        FOLONITE_DISABLE_DEFAULT_PLUGINS: "true",
+        FOLONITE_DB: ":memory:",
       }
 
       await Promise.all(
@@ -39,7 +39,7 @@ describe("built node server skill bootstrap", () => {
           isolatedEnv.XDG_CACHE_HOME,
           isolatedEnv.XDG_CONFIG_HOME,
           isolatedEnv.XDG_STATE_HOME,
-          isolatedEnv.OPENCODE_TEST_MANAGED_CONFIG_DIR,
+          isolatedEnv.FOLONITE_TEST_MANAGED_CONFIG_DIR,
         ].map((dir) => fs.mkdir(dir, { recursive: true })),
       )
 
@@ -52,9 +52,9 @@ describe("built node server skill bootstrap", () => {
       const script = `
       import { Server, Log } from ${JSON.stringify(pathToFileURL(distEntry).href)}
 
-      const password = process.env.OPENCODE_SERVER_PASSWORD
+      const password = process.env.FOLONITE_SERVER_PASSWORD
       const directory = process.env.TEST_DIRECTORY
-      if (!password) throw new Error("missing OPENCODE_SERVER_PASSWORD")
+      if (!password) throw new Error("missing FOLONITE_SERVER_PASSWORD")
       if (!directory) throw new Error("missing TEST_DIRECTORY")
 
       await Log.init({ level: "DEBUG", print: false })
@@ -98,8 +98,8 @@ describe("built node server skill bootstrap", () => {
         cwd: root,
         env: {
           ...isolatedEnv,
-          OPENCODE_SERVER_USERNAME: "opencode",
-          OPENCODE_SERVER_PASSWORD: "testpass",
+          FOLONITE_SERVER_USERNAME: "opencode",
+          FOLONITE_SERVER_PASSWORD: "testpass",
           TEST_DIRECTORY: tmp.path,
         },
       })

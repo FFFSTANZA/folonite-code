@@ -245,7 +245,7 @@ export namespace ToolRegistry {
             }
           }
           const questionEnabled =
-            ["app", "cli", "desktop"].includes(Flag.OPENCODE_CLIENT) || Flag.OPENCODE_ENABLE_QUESTION_TOOL
+            ["app", "cli", "desktop"].includes(Flag.FOLONITE_CLIENT) || Flag.FOLONITE_ENABLE_QUESTION_TOOL
 
           const tool = yield* Effect.all({
             invalid: Tool.init(invalid),
@@ -292,7 +292,7 @@ export namespace ToolRegistry {
               tool.skill,
               tool.patch,
               ...(lspEnabled ? [tool.lsp] : []),
-              ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [tool.plan] : []),
+              ...(Flag.FOLONITE_EXPERIMENTAL_PLAN_MODE && Flag.FOLONITE_CLIENT === "cli" ? [tool.plan] : []),
               tool.enterWorktree,
               tool.exitWorktree,
             ],
@@ -350,11 +350,11 @@ export namespace ToolRegistry {
         const filtered = (yield* all()).filter((tool) => {
           if (tool.id === WebSearchTool.id) return webSearchEnabled
           if (tool.id === CodeSearchTool.id) {
-            return input.providerID === ProviderID.opencode || Flag.OPENCODE_ENABLE_EXA
+            return input.providerID === ProviderID.opencode || Flag.FOLONITE_ENABLE_EXA
           }
 
           const usePatch =
-            !!Env.get("OPENCODE_E2E_LLM_URL") ||
+            !!Env.get("FOLONITE_E2E_LLM_URL") ||
             (input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4"))
           if (tool.id === ApplyPatchTool.id) return usePatch
           if (tool.id === EditTool.id || tool.id === WriteTool.id) return !usePatch

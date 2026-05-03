@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { updateErrorPageState } from "./error-update"
 
 const t = (key: string, vars?: Record<string, string | number | boolean>) => {
-  if (key === "error.page.action.upToDate") return "PawWork is up to date."
-  if (key === "error.page.action.busy") return "PawWork is already checking for updates."
+  if (key === "error.page.action.upToDate") return "Folonite is up to date."
+  if (key === "error.page.action.busy") return "Folonite is already checking for updates."
   if (key === "error.page.action.checkFailed") return "Failed to check for updates."
   if (key === "error.page.action.disabled") return "Updates are not available in this build."
   if (key === "error.page.action.updateTo") return `Update to ${vars?.version ?? ""}`
@@ -23,7 +23,7 @@ describe("error page update state", () => {
     expect(updateErrorPageState({ updateAvailable: false, status: "none" }, t)).toEqual({
       version: undefined,
       actionError: undefined,
-      actionMessage: "PawWork is up to date.",
+      actionMessage: "Folonite is up to date.",
     })
   })
 
@@ -31,7 +31,7 @@ describe("error page update state", () => {
     expect(updateErrorPageState({ updateAvailable: false, status: "busy" }, t)).toEqual({
       version: undefined,
       actionError: undefined,
-      actionMessage: "PawWork is already checking for updates.",
+      actionMessage: "Folonite is already checking for updates.",
     })
   })
 

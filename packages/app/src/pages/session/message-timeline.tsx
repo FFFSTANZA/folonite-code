@@ -437,7 +437,7 @@ export function MessageTimeline(props: {
     const sanitized = slugSource.replace(/[\\/:*?"<>|]/g, "-").slice(0, 32)
     const slug = /[\p{L}\p{N}]/u.test(sanitized) ? sanitized : id.slice(-8)
     const stamp = new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "")
-    const defaultName = `pawwork-session-${slug}-${stamp}.json`
+    const defaultName = `folonite-session-${slug}-${stamp}.json`
 
     let result: { ok: true; path: string } | { ok: false; error: string }
     try {

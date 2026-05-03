@@ -112,7 +112,7 @@ export function extractPromptFromParts(parts: Part[], opts?: { directory?: strin
       }
     }
 
-    // PawWork issue #239: AgentPart records from history are intentionally NOT
+    // Folonite issue #239: AgentPart records from history are intentionally NOT
     // converted to inline agent pills. The original `@<name>` substring is
     // already in the surrounding text part, so it restores as plain text.
     // This single point also defuses buildRequestParts (no AgentPartInput

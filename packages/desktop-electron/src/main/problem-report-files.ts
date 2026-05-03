@@ -1,7 +1,7 @@
 import { link, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 
-const REPORT_FILE_PATTERN = /^pawwork-problem-report-\d{8}-\d{6}-\d{3}-[a-zA-Z0-9_]+\.md$/
+const REPORT_FILE_PATTERN = /^folonite-problem-report-\d{8}-\d{6}-\d{3}-[a-zA-Z0-9_]+\.md$/
 const REPORT_ID_PATTERN = /^[a-zA-Z0-9_]+$/
 
 function isCanonicalIsoTimestamp(value: string) {
@@ -24,7 +24,7 @@ export function problemReportFileName(input: { reportId: string; generatedAt: st
     "-",
     String(date.getMilliseconds()).padStart(3, "0"),
   ].join("")
-  return `pawwork-problem-report-${stamp}-${input.reportId}.md`
+  return `folonite-problem-report-${stamp}-${input.reportId}.md`
 }
 
 export function problemReportsRoot(userDataPath: string) {
@@ -32,7 +32,7 @@ export function problemReportsRoot(userDataPath: string) {
 }
 
 export function reportLocationHint(input: { fileName: string; platform: NodeJS.Platform | string }) {
-  const root = input.platform === "win32" ? "%APPDATA%" : "PawWork app data"
+  const root = input.platform === "win32" ? "%APPDATA%" : "Folonite app data"
   return `${root}/.../problem-reports/${input.fileName}`
 }
 

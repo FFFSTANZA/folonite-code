@@ -1254,12 +1254,12 @@ unix("shell does not expose internal server auth env", () =>
   provideTmpdirInstance(
     (_dir) =>
       Effect.gen(function* () {
-        const previousUsername = process.env.OPENCODE_SERVER_USERNAME
-        const previousPassword = process.env.OPENCODE_SERVER_PASSWORD
-        const previousCustom = process.env.PAWWORK_E2E_CUSTOM_ENV
-        process.env.OPENCODE_SERVER_USERNAME = "PawWork"
-        process.env.OPENCODE_SERVER_PASSWORD = "secret"
-        process.env.PAWWORK_E2E_CUSTOM_ENV = "kept"
+        const previousUsername = process.env.FOLONITE_SERVER_USERNAME
+        const previousPassword = process.env.FOLONITE_SERVER_PASSWORD
+        const previousCustom = process.env.FOLONITE_E2E_CUSTOM_ENV
+        process.env.FOLONITE_SERVER_USERNAME = "PawWork"
+        process.env.FOLONITE_SERVER_PASSWORD = "secret"
+        process.env.FOLONITE_E2E_CUSTOM_ENV = "kept"
 
         try {
           const { prompt, chat } = yield* boot()
@@ -1267,7 +1267,7 @@ unix("shell does not expose internal server auth env", () =>
             sessionID: chat.id,
             agent: "build",
             command:
-              'printf "username=%s\\n" "${OPENCODE_SERVER_USERNAME-unset}" && printf "password=%s\\n" "${OPENCODE_SERVER_PASSWORD-unset}" && printf "custom=%s\\n" "${PAWWORK_E2E_CUSTOM_ENV-unset}"',
+              'printf "username=%s\\n" "${FOLONITE_SERVER_USERNAME-unset}" && printf "password=%s\\n" "${FOLONITE_SERVER_PASSWORD-unset}" && printf "custom=%s\\n" "${FOLONITE_E2E_CUSTOM_ENV-unset}"',
           })
           const tool = completedTool(result.parts)
           if (!tool) return
@@ -1277,12 +1277,12 @@ unix("shell does not expose internal server auth env", () =>
           expect(tool.state.output).toContain("custom=kept")
           expect(tool.state.output).not.toContain("secret")
         } finally {
-          if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME
-          else process.env.OPENCODE_SERVER_USERNAME = previousUsername
-          if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
-          else process.env.OPENCODE_SERVER_PASSWORD = previousPassword
-          if (previousCustom === undefined) delete process.env.PAWWORK_E2E_CUSTOM_ENV
-          else process.env.PAWWORK_E2E_CUSTOM_ENV = previousCustom
+          if (previousUsername === undefined) delete process.env.FOLONITE_SERVER_USERNAME
+          else process.env.FOLONITE_SERVER_USERNAME = previousUsername
+          if (previousPassword === undefined) delete process.env.FOLONITE_SERVER_PASSWORD
+          else process.env.FOLONITE_SERVER_PASSWORD = previousPassword
+          if (previousCustom === undefined) delete process.env.FOLONITE_E2E_CUSTOM_ENV
+          else process.env.FOLONITE_E2E_CUSTOM_ENV = previousCustom
         }
       }),
     { git: true, config: cfg },

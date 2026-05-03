@@ -1,7 +1,7 @@
-import type { PawworkSkillName } from "@/components/session/pawwork-skill-meta"
+import type { FoloniteSkillName } from "@/components/session/folonite-skill-meta"
 
 export function buildHomeOverride(
-  homeSkill: PawworkSkillName | undefined,
+  homeSkill: FoloniteSkillName | undefined,
   text: string,
 ): string | undefined {
   if (!homeSkill) return undefined

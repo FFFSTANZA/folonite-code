@@ -53,7 +53,7 @@ describe("child store diagnostics", () => {
   test("preserves the original persisted cache setup cause and context", () => {
     const cause = new TypeError("storage init failed")
     const target = {
-      storage: "pawwork.workspace.-tmp-project.abc123.dat",
+      storage: "folonite.workspace.-tmp-project.abc123.dat",
       key: "workspace:vcs",
       legacy: ["vcs.v1"],
     }
@@ -81,12 +81,12 @@ describe("child store diagnostics", () => {
         expect(error).toHaveProperty("cause", cause)
         expect((error as ChildStoreError).message).toContain("Failed to create persisted cache")
         expect((error as ChildStoreError).message).toContain("cache=vcs")
-        expect((error as ChildStoreError).message).toContain("storage=pawwork.workspace.-tmp-project.abc123.dat")
+        expect((error as ChildStoreError).message).toContain("storage=folonite.workspace.-tmp-project.abc123.dat")
         expect((error as ChildStoreError).message).toContain("key=workspace:vcs")
         expect((error as ChildStoreError).context).toEqual({
           kind: "vcs",
           directory: "/tmp/project",
-          storage: "pawwork.workspace.-tmp-project.abc123.dat",
+          storage: "folonite.workspace.-tmp-project.abc123.dat",
           key: "workspace:vcs",
         })
         return
@@ -114,7 +114,7 @@ describe("child store diagnostics", () => {
               kind: "vcs",
               messageKey: "error.childStore.persistedCacheCreateFailed",
               target: {
-                storage: "pawwork.workspace.-tmp-project.abc123.dat",
+                storage: "folonite.workspace.-tmp-project.abc123.dat",
                 key: "workspace:vcs",
               },
               store: createStore({ value: undefined as string | undefined }),

@@ -51,34 +51,42 @@ import { Installation } from "@/installation"
 import { Runtime } from "@opencode-ai/core/runtime"
 
 const log = Log.create({ service: "config" })
-const OPENCODE_PROJECT_CONFIG_NAMES = ["config", "opencode"] as const
-const PAWWORK_PROJECT_CONFIG_NAMES = ["config", "opencode", "pawwork"] as const
-const OPENCODE_PROJECT_CONFIG_FILES = OPENCODE_PROJECT_CONFIG_NAMES.flatMap((name) => [`${name}.json`, `${name}.jsonc`])
-const PAWWORK_PROJECT_CONFIG_FILES = PAWWORK_PROJECT_CONFIG_NAMES.flatMap((name) => [`${name}.json`, `${name}.jsonc`])
-const PAWWORK_GLOBAL_CONFIG_FILES = ["pawwork.json", "pawwork.jsonc"] as const
-const OPENCODE_GLOBAL_CONFIG_FILES = OPENCODE_PROJECT_CONFIG_FILES
+const FOLONITE_PROJECT_CONFIG_NAMES = ["config", "opencode", "pawwork", "folonite"] as const
+const FOLONITE_PROJECT_CONFIG_FILES = FOLONITE_PROJECT_CONFIG_NAMES.flatMap((name) => [
+  `${name}.json`,
+  `${name}.jsonc`,
+])
+const FOLONITE_GLOBAL_CONFIG_FILES = [
+  ...FOLONITE_PROJECT_CONFIG_FILES,
+  "pawwork.json",
+  "pawwork.jsonc",
+  "opencode.json",
+  "opencode.jsonc",
+  "folonite.json",
+  "folonite.jsonc",
+]
 
 function globalConfigFiles() {
-  return Runtime.isPawWork() ? PAWWORK_GLOBAL_CONFIG_FILES : OPENCODE_GLOBAL_CONFIG_FILES
+  return FOLONITE_GLOBAL_CONFIG_FILES
 }
 
 function projectConfigNames() {
-  return Runtime.isPawWork() ? PAWWORK_PROJECT_CONFIG_NAMES : OPENCODE_PROJECT_CONFIG_NAMES
+  return FOLONITE_PROJECT_CONFIG_NAMES
 }
 
 function projectConfigFilesForDirectory(dir: string) {
   const base = path.basename(dir)
-  if (base === ".pawwork") return Runtime.isPawWork() ? PAWWORK_PROJECT_CONFIG_FILES : []
-  if (base === ".opencode" || dir === Flag.OPENCODE_CONFIG_DIR) {
-    return Runtime.isPawWork() ? PAWWORK_PROJECT_CONFIG_FILES : OPENCODE_PROJECT_CONFIG_FILES
+  if (base === ".pawwork") return FOLONITE_PROJECT_CONFIG_FILES
+  if (base === ".opencode" || dir === Flag.FOLONITE_CONFIG_DIR) {
+    return FOLONITE_PROJECT_CONFIG_FILES
   }
   return []
 }
 
 function shouldGenerateInDirectory(dir: string) {
   const base = path.basename(dir)
-  if (Runtime.isPawWork() && base === ".opencode") return false
-  if (!Runtime.isPawWork() && base === ".pawwork") return false
+  // Allow all branded directories now, or decide on a primary one.
+  // For now, we allow all to avoid blocking users with existing setups.
   return true
 }
 
@@ -368,21 +376,26 @@ function globalConfigFile() {
   for (const file of [...candidates].reverse()) {
     if (existsSync(file)) return file
   }
-  return path.join(Global.Path.config, Runtime.isPawWork() ? "pawwork.json" : "opencode.json")
+  return path.join(Global.Path.config, "folonite.json")
 }
 
 function projectConfigFile(dir: string) {
   // OpenCode still writes existing legacy `config.*` files, but new project config uses `opencode.json`.
   // PawWork writes only PawWork project filenames; shared project loading above preserves read compatibility.
-  const candidates = (
-    Runtime.isPawWork()
-      ? ["pawwork.json", "pawwork.jsonc"]
-      : ["config.json", "config.jsonc", "opencode.json", "opencode.jsonc"]
-  ).map((file) => path.join(dir, file))
+  const candidates = [
+    "config.json",
+    "config.jsonc",
+    "opencode.json",
+    "opencode.jsonc",
+    "pawwork.json",
+    "pawwork.jsonc",
+    "folonite.json",
+    "folonite.jsonc",
+  ].map((file) => path.join(dir, file))
   for (const file of [...candidates].reverse()) {
     if (existsSync(file)) return file
   }
-  return path.join(dir, Runtime.isPawWork() ? "pawwork.json" : "opencode.json")
+  return path.join(dir, "folonite.json")
 }
 
 function patchJsonc(input: string, patch: unknown, path: string[] = []): string {
@@ -493,7 +506,7 @@ const rawLayer = Layer.effect(
               result["$schema"] = "https://opencode.ai/config.json"
               result = mergeDeep(result, rest)
               await fsNode.writeFile(
-                path.join(Global.Path.config, Runtime.isPawWork() ? "pawwork.json" : "opencode.json"),
+                path.join(Global.Path.config, "folonite.json"),
                 JSON.stringify(result, null, 2),
               )
               await fsNode.unlink(legacy)
@@ -547,7 +560,7 @@ const rawLayer = Layer.effect(
 
         const pluginScopeForSource = Effect.fnUntraced(function* (source: string) {
           if (source.startsWith("http://") || source.startsWith("https://")) return "global"
-          if (source === "OPENCODE_CONFIG_CONTENT") return "local"
+          if (source === "FOLONITE_CONFIG_CONTENT") return "local"
           if (yield* InstanceRef.use((ctx) => Effect.succeed(Instance.containsPath(source, ctx)))) return "local"
           return "global"
         })
@@ -603,12 +616,12 @@ const rawLayer = Layer.effect(
         const global = yield* getGlobal()
         yield* merge(Global.Path.config, global, "global")
 
-        if (Flag.OPENCODE_CONFIG) {
-          yield* merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG))
-          log.debug("loaded custom config", { path: Flag.OPENCODE_CONFIG })
+        if (Flag.FOLONITE_CONFIG) {
+          yield* merge(Flag.FOLONITE_CONFIG, yield* loadFile(Flag.FOLONITE_CONFIG))
+          log.debug("loaded custom config", { path: Flag.FOLONITE_CONFIG })
         }
 
-        if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+        if (!Flag.FOLONITE_DISABLE_PROJECT_CONFIG) {
           for (const file of yield* ConfigPaths.files(projectConfigNames(), ctx.directory, ctx.worktree).pipe(
             Effect.orDie,
           )) {
@@ -622,20 +635,14 @@ const rawLayer = Layer.effect(
 
         const directories = yield* ConfigPaths.directories(ctx.directory, ctx.worktree)
 
-        const pawworkConfigDir = Flag.PAWWORK_CONFIG_DIR
-        if (Runtime.isPawWork() && pawworkConfigDir) {
-          log.debug("loading config from PAWWORK_CONFIG_DIR", { path: pawworkConfigDir })
-        } else if (Flag.OPENCODE_CONFIG_DIR) {
-          log.debug("loading config from OPENCODE_CONFIG_DIR", { path: Flag.OPENCODE_CONFIG_DIR })
+        if (Flag.FOLONITE_CONFIG_DIR) {
+          log.debug("loading config from FOLONITE_CONFIG_DIR", { path: Flag.FOLONITE_CONFIG_DIR })
         }
 
         const deps: Fiber.Fiber<void, never>[] = []
 
         for (const dir of directories) {
-          const configFiles =
-            Runtime.isPawWork() && pawworkConfigDir && dir === pawworkConfigDir
-              ? globalConfigFiles()
-              : projectConfigFilesForDirectory(dir)
+          const configFiles = dir === Global.Path.config ? globalConfigFiles() : projectConfigFilesForDirectory(dir)
 
           if (configFiles.length > 0) {
             for (const file of configFiles) {
@@ -651,13 +658,15 @@ const rawLayer = Layer.effect(
           if (shouldGenerateInDirectory(dir)) {
             yield* ensureGitignore(dir).pipe(Effect.orDie)
 
-            const dep = yield* Effect.promise(async () => {
-              try {
-                await installDependencies(dir)
-              } catch (error) {
-                log.warn("background dependency install failed", { dir, error: String(error) })
-              }
-            }).pipe(Effect.forkDetach)
+            const dep = yield* Effect.forkScoped(
+              Effect.promise(async () => {
+                try {
+                  await installDependencies(dir)
+                } catch (error) {
+                  log.error("failed to install dependencies", { dir, error })
+                }
+              }),
+            )
             deps.push(dep)
           }
 
@@ -670,14 +679,14 @@ const rawLayer = Layer.effect(
           yield* mergePluginOrigins(dir, list)
         }
 
-        if (process.env.OPENCODE_CONFIG_CONTENT) {
-          const source = "OPENCODE_CONFIG_CONTENT"
-          const next = yield* loadConfig(process.env.OPENCODE_CONFIG_CONTENT, {
+        if (process.env.FOLONITE_CONFIG_CONTENT) {
+          const source = "FOLONITE_CONFIG_CONTENT"
+          const next = yield* loadConfig(process.env.FOLONITE_CONFIG_CONTENT, {
             dir: ctx.directory,
             source,
           })
           yield* merge(source, next, "local")
-          log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
+          log.debug("loaded custom config from FOLONITE_CONFIG_CONTENT")
         }
 
         const activeAccount = Option.getOrUndefined(
@@ -697,8 +706,8 @@ const rawLayer = Layer.effect(
               { concurrency: 2 },
             )
             if (Option.isSome(tokenOpt)) {
-              process.env["OPENCODE_CONSOLE_TOKEN"] = tokenOpt.value
-              yield* env.set("OPENCODE_CONSOLE_TOKEN", tokenOpt.value)
+              process.env["FOLONITE_CONSOLE_TOKEN"] = tokenOpt.value
+              yield* env.set("FOLONITE_CONSOLE_TOKEN", tokenOpt.value)
             }
 
             if (Option.isSome(configOpt)) {
@@ -725,7 +734,7 @@ const rawLayer = Layer.effect(
 
         const managedDir = ConfigManaged.managedConfigDir()
         if (existsSync(managedDir)) {
-          for (const file of Runtime.isPawWork() ? globalConfigFiles() : OPENCODE_PROJECT_CONFIG_FILES) {
+          for (const file of globalConfigFiles()) {
             const source = path.join(managedDir, file)
             yield* merge(source, yield* loadFile(source), "global")
           }
@@ -752,8 +761,8 @@ const rawLayer = Layer.effect(
           })
         }
 
-        if (Flag.OPENCODE_PERMISSION) {
-          result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+        if (Flag.FOLONITE_PERMISSION) {
+          result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.FOLONITE_PERMISSION))
         }
 
         if (result.tools) {
@@ -775,10 +784,10 @@ const rawLayer = Layer.effect(
           result.share = "auto"
         }
 
-        if (Flag.OPENCODE_DISABLE_AUTOCOMPACT) {
+        if (Flag.FOLONITE_DISABLE_AUTOCOMPACT) {
           result.compaction = { ...result.compaction, auto: false }
         }
-        if (Flag.OPENCODE_DISABLE_PRUNE) {
+        if (Flag.FOLONITE_DISABLE_PRUNE) {
           result.compaction = { ...result.compaction, prune: false }
         }
 

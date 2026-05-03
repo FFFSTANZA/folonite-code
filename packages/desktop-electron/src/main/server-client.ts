@@ -14,11 +14,11 @@ export function buildExportUrl(server: Pick<ServerReadyData, "url">, directory: 
 
 export function buildAuthHeader(server: Pick<ServerReadyData, "username" | "password">): Record<string, string> {
   if (server.username || server.password) {
-    // Fallback `"opencode"` username when only password is set matches main/index.ts:170
+    // Fallback `"folonite"` username when only password is set matches main/index.ts:170
     // (the existing internal-fetch path) so dev installs that omit username still authenticate.
     return {
       Authorization:
-        "Basic " + Buffer.from(`${server.username ?? "opencode"}:${server.password ?? ""}`).toString("base64"),
+        "Basic " + Buffer.from(`${server.username ?? "Folonite"}:${server.password ?? ""}`).toString("base64"),
     }
   }
   return {}

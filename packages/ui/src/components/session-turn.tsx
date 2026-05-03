@@ -31,7 +31,9 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function unwrap(message: string) {
-  const text = message.replace(/^Error:\s*/, "").trim()
+  const text = message
+    .replace(/^Error:\s*/, "")
+    .trim()
 
   const parse = (value: string) => {
     try {
@@ -57,7 +59,7 @@ function unwrap(message: string) {
     }
   }
 
-  if (!record(json)) return message
+  if (!record(json)) return text
 
   const err = record(json.error) ? json.error : undefined
   if (err) {

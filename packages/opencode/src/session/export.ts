@@ -17,8 +17,8 @@ import { ProviderID, ModelID } from "../provider/schema"
 import { Instance } from "../project/instance"
 import { Global } from "../global"
 
-export function getRuntimeNamespace(): "pawwork" | "opencode" {
-  return Runtime.isPawWork() ? "pawwork" : "opencode"
+export function getRuntimeNamespace(): "folonite" | "opencode" {
+  return "folonite"
 }
 
 async function hashFile(p: string) {
@@ -110,13 +110,13 @@ export namespace Export {
 
   export type Snapshot = {
     schema_version: 1
-    format: "pawwork-session-export"
+    format: "folonite-session-export"
     exported_at: number
     root_session_id: SessionID
     runtime_context: {
       app_version: string
       build_channel?: string
-      runtime_namespace: "pawwork" | "opencode"
+      runtime_namespace: "folonite" | "opencode"
       platform: NodeJS.Platform
       os_version: string
       locale: string
@@ -283,10 +283,15 @@ export namespace Export {
     }
     const candidates: Array<{ kind: string; file: string }> = [
       { kind: "global", file: path.join(Global.Path.config, "AGENTS.md") },
-      ...(worktree ? [{ kind: "project", file: path.join(worktree, "AGENTS.md") }] : []),
-      // Bundled pawwork prompt — present in the repo at packages/opencode/src/session/prompt/pawwork.txt.
+      ...(worktree
+        ? [
+            { kind: "project", file: path.join(worktree, "AGENTS.md") },
+            { kind: "project", file: path.join(worktree, "FOLONITE.md") },
+          ]
+        : []),
+      // Bundled folonite prompt — present in the repo at packages/opencode/src/session/prompt/folonite.txt.
       // hashFile silently returns undefined and the entry is skipped if the file is missing.
-      { kind: "bundled", file: path.join(__dirname, "prompt", "pawwork.txt") },
+      { kind: "bundled", file: path.join(__dirname, "prompt", "folonite.txt") },
     ]
     for (const c of candidates) {
       const hash = yield* Effect.promise(() => hashFile(c.file))
@@ -349,7 +354,7 @@ export namespace Export {
     const model_refs = yield* collectModelRefs(tree)
     return {
       schema_version: 1 as const,
-      format: "pawwork-session-export" as const,
+      format: "folonite-session-export" as const,
       exported_at: Date.now(),
       root_session_id: root.id,
       runtime_context: {

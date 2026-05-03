@@ -24,6 +24,8 @@ export const DialogSelectProvider: Component = () => {
     if (id === "openai") return language.t("dialog.provider.openai.note")
     if (id.startsWith("github-copilot")) return language.t("dialog.provider.copilot.note")
     if (id === "opencode-go") return language.t("dialog.provider.opencodeGo.tagline")
+    if (id === "folonite-ash-2") return language.t("provider.connect.foloniteAsh2.tagline")
+
   }
 
   return (
@@ -40,12 +42,15 @@ export const DialogSelectProvider: Component = () => {
         filterKeys={["id", "name"]}
         groupBy={(x) => (popularProviders.includes(x.id) ? popularGroup() : otherGroup())}
         sortBy={(a, b) => {
+          if (a.id === "folonite-ash-2") return -1
+          if (b.id === "folonite-ash-2") return 1
           if (a.id === CUSTOM_ID) return -1
           if (b.id === CUSTOM_ID) return 1
           if (popularProviders.includes(a.id) && popularProviders.includes(b.id))
             return popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id)
           return a.name.localeCompare(b.name)
         }}
+
         sortGroupsBy={(a, b) => {
           const popular = popularGroup()
           if (a.category === popular && b.category !== popular) return -1
@@ -65,19 +70,21 @@ export const DialogSelectProvider: Component = () => {
           <div class="px-1.25 w-full flex items-center gap-x-3">
             <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
             <span>{i.name}</span>
-            <Show when={i.id === "opencode"}>
-              <div class="text-13-regular text-text-weak">{language.t("dialog.provider.opencode.tagline")}</div>
-            </Show>
             <Show when={i.id === CUSTOM_ID}>
               <Tag>{language.t("settings.providers.tag.custom")}</Tag>
             </Show>
-            <Show when={i.id === "opencode"}>
+            <Show
+              when={
+                i.id === "anthropic" ||
+                i.id === "openai" ||
+                i.id === "opencode-go" ||
+                i.id === "folonite-ash-2"
+              }
+            >
               <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
             </Show>
+
             <Show when={note(i.id)}>{(value) => <div class="text-13-regular text-text-weak">{value()}</div>}</Show>
-            <Show when={i.id === "opencode-go"}>
-              <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
-            </Show>
           </div>
         )}
       </List>

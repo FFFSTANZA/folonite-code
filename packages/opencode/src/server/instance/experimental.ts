@@ -142,7 +142,7 @@ export const ExperimentalRoutes = lazy(() =>
       "/console/switch",
       describeRoute({
         summary: "Switch active Console org",
-        description: "Persist a new active Console account/org selection for the current local OpenCode state.",
+        description: "Persist a new active Console account/org selection for the current local Folonite state.",
         operationId: "experimental.console.switchOrg",
         responses: {
           200: {
@@ -352,7 +352,7 @@ export const ExperimentalRoutes = lazy(() =>
       describeRoute({
         summary: "List sessions",
         description:
-          "Get a list of all OpenCode sessions across projects. Defaults to most recently updated; use sort=created for creation-time order. Archived sessions are excluded by default.",
+          "Get a list of all Folonite sessions across projects. Defaults to most recently updated; use sort=created for creation-time order. Archived sessions are excluded by default.",
         operationId: "experimental.session.list",
         responses: {
           200: {

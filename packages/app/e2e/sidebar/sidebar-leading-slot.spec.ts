@@ -1,8 +1,8 @@
 import { expect, test } from "../fixtures"
 import { openSidebar, withSession } from "../actions"
-import { pawworkSidebarSelector } from "../selectors"
+import { foloniteSidebarSelector } from "../selectors"
 
-test("pawwork sidebar merges pin into the status slot with a stable title baseline", async ({
+test("folonite sidebar merges pin into the status slot with a stable title baseline", async ({
   page,
   sdk,
   gotoSession,
@@ -12,7 +12,7 @@ test("pawwork sidebar merges pin into the status slot with a stable title baseli
     await gotoSession(session.id)
     await openSidebar(page)
 
-    const sidebar = page.locator(pawworkSidebarSelector).first()
+    const sidebar = page.locator(foloniteSidebarSelector).first()
     const row = sidebar.locator(`[data-session-id="${session.id}"]`).first()
     const title = row.locator("span", { hasText: `i150 regression ${stamp}` }).first()
 
@@ -34,7 +34,7 @@ test("pawwork sidebar merges pin into the status slot with a stable title baseli
     await row.locator('[data-action="session-row-menu"]').click()
     await page.getByRole("menuitem", { name: /pin session/i }).click()
     const pinnedRow = sidebar
-      .locator(`[data-component="pawwork-sidebar-pinned"] [data-session-id="${session.id}"]`)
+      .locator(`[data-component="folonite-sidebar-pinned"] [data-session-id="${session.id}"]`)
       .first()
     await expect(pinnedRow).toBeVisible()
 
@@ -45,7 +45,7 @@ test("pawwork sidebar merges pin into the status slot with a stable title baseli
     expect(await leftOf(pinnedTitle)).toBe(baseline)
 
     // Pin button should occupy the row's leading slot, not a separate column.
-    const pinButton = pinnedRow.locator('[data-action="pawwork-session-pin"][data-pinned="true"]').first()
+    const pinButton = pinnedRow.locator('[data-action="folonite-session-pin"][data-pinned="true"]').first()
     await expect(pinButton).toBeVisible()
     const pinRect = await pinButton.evaluate((el) => el.getBoundingClientRect())
     const rowRect = await pinnedRow.evaluate((el) => el.getBoundingClientRect())
@@ -54,7 +54,7 @@ test("pawwork sidebar merges pin into the status slot with a stable title baseli
   })
 })
 
-test("pawwork sidebar keeps title width stable when the row action appears", async ({ page, sdk, gotoSession }) => {
+test("folonite sidebar keeps title width stable when the row action appears", async ({ page, sdk, gotoSession }) => {
   const STAMP = Date.now()
   const TITLE = `i192 regression long session title that should keep a stable truncation width ${STAMP}`
 
@@ -62,7 +62,7 @@ test("pawwork sidebar keeps title width stable when the row action appears", asy
     await gotoSession(session.id)
     await openSidebar(page)
 
-    const sidebar = page.locator(pawworkSidebarSelector).first()
+    const sidebar = page.locator(foloniteSidebarSelector).first()
     const row = sidebar.locator(`[data-session-id="${session.id}"]`).first()
     const titleNode = row.locator("span", { hasText: TITLE }).first()
     const menu = row.locator('[data-action="session-row-menu"]').first()

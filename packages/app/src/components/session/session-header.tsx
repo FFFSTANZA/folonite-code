@@ -13,7 +13,7 @@ import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useShellSurface } from "@/context/shell-surface"
 import { useSync } from "@/context/sync"
-import { PawworkWorktreeBadge } from "@/pages/layout/pawwork-worktree-badge"
+import { FoloniteWorktreeBadge } from "@/pages/layout/folonite-worktree-badge"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { decode64 } from "@/utils/base64"
 import { StatusPopover } from "../status-popover"
@@ -82,34 +82,34 @@ export function SessionHeader() {
     openDirectory(activeWorktreeDirectory())
   }
 
-  const [leftMount, setLeftMount] = createSignal<HTMLElement>()
+  const [centerMount, setCenterMount] = createSignal<HTMLElement>()
   const [rightMount, setRightMount] = createSignal<HTMLElement>()
 
   onMount(() => {
-    setLeftMount(document.getElementById("pawwork-titlebar-left") ?? undefined)
-    setRightMount(document.getElementById("pawwork-titlebar-right") ?? undefined)
+    setCenterMount(document.getElementById("folonite-titlebar-center") ?? undefined)
+    setRightMount(document.getElementById("folonite-titlebar-right") ?? undefined)
   })
 
   return (
     <>
-      <Show when={!shellSurface.settingsOpen() && leftMount()}>
+      <Show when={!shellSurface.settingsOpen() && centerMount()}>
         {(mount) => (
           <Portal mount={mount()}>
-            <div class="hidden md:flex w-full min-w-0 max-w-[720px] items-center overflow-hidden text-13-medium">
+            <div class="hidden md:flex w-full min-w-0 max-w-[800px] items-center justify-center overflow-hidden text-14-medium gap-3 mx-auto">
               <Show
                 when={params.id}
-                fallback={<div class="min-w-0 truncate text-text-strong">{homeTitle()}</div>}
+                fallback={<div class="min-w-0 truncate text-text-strong text-16-medium">{homeTitle()}</div>}
               >
-                <span class="max-w-full shrink-0 truncate text-13-medium text-text-strong" title={sessionTitle()}>
+                <span class="max-w-full shrink-0 truncate text-14-semibold text-text-strong" title={sessionTitle()}>
                   {sessionTitle()}
                 </span>
-                <div class="ml-3 flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                   <Show when={projectDirectory()}>
                     <Button
                       type="button"
                       variant="ghost"
-                      size="small"
-                      class="group h-6 max-w-[180px] min-w-0 shrink items-center gap-1 rounded px-1 shadow-none text-13-regular text-text-weak hover:text-text-strong"
+                      size="medium"
+                      class="group h-8 max-w-[240px] min-w-0 shrink items-center gap-2 rounded-lg px-2.5 shadow-none text-13-medium text-text-weak hover:text-text-strong hover:bg-surface-base-hover transition-all"
                       onClick={openProjectDirectory}
                       aria-label={
                         canOpenProjectDirectory() ? language.t("session.header.open.ariaLabel", { app: fileManagerLabel() }) : undefined
@@ -121,13 +121,13 @@ export function SessionHeader() {
                       }
                       disabled={!canOpenProjectDirectory()}
                     >
-                      <Icon name="folder" size="small" class="shrink-0 text-text-weak transition-colors group-hover:text-text-strong" />
+                      <Icon name="folder" size="small" class="shrink-0 text-icon-weak transition-colors group-hover:text-text-strong" />
                       <span class="min-w-0 truncate">{name()}</span>
                     </Button>
                   </Show>
                   <Show when={activeWorktree()}>
                     {(worktree) => (
-                      <PawworkWorktreeBadge
+                      <FoloniteWorktreeBadge
                         name={worktree().name}
                         branch={worktree().branch}
                         directory={worktree().directory}

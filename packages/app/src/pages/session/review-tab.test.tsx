@@ -51,7 +51,7 @@ afterAll(() => {
 })
 
 describe("SessionReviewTab", () => {
-  test("keeps PawWork review diffs in unified mode without exposing style switching", () => {
+  test("keeps Folonite review diffs in unified mode without exposing style switching", () => {
     const dispose = createRoot((dispose) => {
       SessionReviewTab({
         diffs: () => [

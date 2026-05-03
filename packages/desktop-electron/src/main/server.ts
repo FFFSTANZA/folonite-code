@@ -2,7 +2,7 @@ import { app } from "electron"
 import path from "node:path"
 import { DEFAULT_SERVER_URL_KEY, WSL_ENABLED_KEY } from "./constants"
 import { rendererOrigin } from "./renderer-protocol"
-import { PAWWORK_RUNTIME, runtimeRoots } from "./runtime-namespace"
+import { FOLONITE_RUNTIME, runtimeRoots } from "./runtime-namespace"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
 
@@ -58,8 +58,8 @@ export function setWslConfig(config: WslConfig) {
 export async function spawnLocalServer(hostname: string, port: number, password: string) {
   prepareServerEnv(password)
   await configureProxyDispatcher(process.env)
-  const { Log, Server } = await import("virtual:opencode-server")
-  await Log.init({ print: false, level: "WARN" })
+  const { Log, Server } = await import("virtual:folonite-server")
+  await Log.init({ print: true, level: "INFO" })
   const listener = await Server.listen({
     port,
     hostname,
@@ -107,12 +107,12 @@ function buildServerEnv(password: string) {
   }
   return {
     ...mergedEnv,
-    OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: "true",
-    OPENCODE_EXPERIMENTAL_FILEWATCHER: "true",
-    OPENCODE_CLIENT: PAWWORK_RUNTIME.client,
-    OPENCODE_SERVER_USERNAME: PAWWORK_RUNTIME.serverUsername,
-    OPENCODE_SERVER_PASSWORD: password,
-    PAWWORK_RUNTIME_NAMESPACE: "pawwork",
+    FOLONITE_EXPERIMENTAL_ICON_DISCOVERY: "true",
+    FOLONITE_EXPERIMENTAL_FILEWATCHER: "true",
+    FOLONITE_CLIENT: FOLONITE_RUNTIME.client,
+    FOLONITE_SERVER_USERNAME: FOLONITE_RUNTIME.serverUsername,
+    FOLONITE_SERVER_PASSWORD: password,
+    FOLONITE_RUNTIME_NAMESPACE: "folonite",
     ...(ghConfigDir ? { GH_CONFIG_DIR: ghConfigDir } : {}),
     XDG_DATA_HOME: roots.data,
     XDG_CACHE_HOME: roots.cache,
@@ -223,7 +223,7 @@ export async function checkHealth(url: string, password?: string | null): Promis
 
   const headers = new Headers()
   if (password) {
-    const auth = Buffer.from(`${PAWWORK_RUNTIME.serverUsername}:${password}`).toString("base64")
+    const auth = Buffer.from(`${FOLONITE_RUNTIME.serverUsername}:${password}`).toString("base64")
     headers.set("authorization", `Basic ${auth}`)
   }
 

@@ -220,7 +220,7 @@ describe("Instruction.resolve", () => {
 })
 
 describe("projectFiles gate", () => {
-  test("PawWork mode keeps CLAUDE.md even when OPENCODE_DISABLE_CLAUDE_CODE_PROMPT is set", () => {
+  test("PawWork mode keeps CLAUDE.md even when FOLONITE_DISABLE_CLAUDE_CODE_PROMPT is set", () => {
     // Regression for issue #230 acceptance #6: a PawWork process inheriting the
     // disable flag must still discover project-level CLAUDE.md as compatibility.
     expect(projectFiles({ isPawWork: true, disableClaudeCodePrompt: true })).toEqual([
@@ -238,7 +238,7 @@ describe("projectFiles gate", () => {
     ])
   })
 
-  test("opencode CLI mode drops CLAUDE.md when OPENCODE_DISABLE_CLAUDE_CODE_PROMPT is set", () => {
+  test("opencode CLI mode drops CLAUDE.md when FOLONITE_DISABLE_CLAUDE_CODE_PROMPT is set", () => {
     expect(projectFiles({ isPawWork: false, disableClaudeCodePrompt: true })).toEqual([
       "AGENTS.md",
       "CONTEXT.md",
@@ -256,8 +256,8 @@ describe("projectFiles gate", () => {
 
 describe("Instruction.system", () => {
   test("loads both project and global AGENTS.md when both exist", async () => {
-    const originalConfigDir = process.env["OPENCODE_CONFIG_DIR"]
-    delete process.env["OPENCODE_CONFIG_DIR"]
+    const originalConfigDir = process.env["FOLONITE_CONFIG_DIR"]
+    delete process.env["FOLONITE_CONFIG_DIR"]
 
     await using globalTmp = await tmpdir({
       init: async (dir) => {
@@ -299,30 +299,30 @@ describe("Instruction.system", () => {
     } finally {
       ;(Global.Path as { config: string }).config = originalGlobalConfig
       if (originalConfigDir === undefined) {
-        delete process.env["OPENCODE_CONFIG_DIR"]
+        delete process.env["FOLONITE_CONFIG_DIR"]
       } else {
-        process.env["OPENCODE_CONFIG_DIR"] = originalConfigDir
+        process.env["FOLONITE_CONFIG_DIR"] = originalConfigDir
       }
     }
   })
 })
 
-describe("Instruction.systemPaths OPENCODE_CONFIG_DIR", () => {
+describe("Instruction.systemPaths FOLONITE_CONFIG_DIR", () => {
   let originalConfigDir: string | undefined
 
   beforeEach(() => {
-    originalConfigDir = process.env["OPENCODE_CONFIG_DIR"]
+    originalConfigDir = process.env["FOLONITE_CONFIG_DIR"]
   })
 
   afterEach(() => {
     if (originalConfigDir === undefined) {
-      delete process.env["OPENCODE_CONFIG_DIR"]
+      delete process.env["FOLONITE_CONFIG_DIR"]
     } else {
-      process.env["OPENCODE_CONFIG_DIR"] = originalConfigDir
+      process.env["FOLONITE_CONFIG_DIR"] = originalConfigDir
     }
   })
 
-  test("prefers OPENCODE_CONFIG_DIR AGENTS.md over global when both exist", async () => {
+  test("prefers FOLONITE_CONFIG_DIR AGENTS.md over global when both exist", async () => {
     await using profileTmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(path.join(dir, "AGENTS.md"), "# Profile Instructions")
@@ -335,7 +335,7 @@ describe("Instruction.systemPaths OPENCODE_CONFIG_DIR", () => {
     })
     await using projectTmp = await tmpdir()
 
-    process.env["OPENCODE_CONFIG_DIR"] = profileTmp.path
+    process.env["FOLONITE_CONFIG_DIR"] = profileTmp.path
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -358,7 +358,7 @@ describe("Instruction.systemPaths OPENCODE_CONFIG_DIR", () => {
     }
   })
 
-  test("falls back to global AGENTS.md when OPENCODE_CONFIG_DIR has no AGENTS.md", async () => {
+  test("falls back to global AGENTS.md when FOLONITE_CONFIG_DIR has no AGENTS.md", async () => {
     await using profileTmp = await tmpdir()
     await using globalTmp = await tmpdir({
       init: async (dir) => {
@@ -367,7 +367,7 @@ describe("Instruction.systemPaths OPENCODE_CONFIG_DIR", () => {
     })
     await using projectTmp = await tmpdir()
 
-    process.env["OPENCODE_CONFIG_DIR"] = profileTmp.path
+    process.env["FOLONITE_CONFIG_DIR"] = profileTmp.path
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -390,7 +390,7 @@ describe("Instruction.systemPaths OPENCODE_CONFIG_DIR", () => {
     }
   })
 
-  test("uses global AGENTS.md when OPENCODE_CONFIG_DIR is not set", async () => {
+  test("uses global AGENTS.md when FOLONITE_CONFIG_DIR is not set", async () => {
     await using globalTmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(path.join(dir, "AGENTS.md"), "# Global Instructions")
@@ -398,7 +398,7 @@ describe("Instruction.systemPaths OPENCODE_CONFIG_DIR", () => {
     })
     await using projectTmp = await tmpdir()
 
-    delete process.env["OPENCODE_CONFIG_DIR"]
+    delete process.env["FOLONITE_CONFIG_DIR"]
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -423,30 +423,30 @@ describe("Instruction.systemPaths OPENCODE_CONFIG_DIR", () => {
 
 describe("Instruction.systemPaths PawWork runtime config dir", () => {
   const original = {
-    opencodeConfigDir: process.env.OPENCODE_CONFIG_DIR,
-    pawworkConfigDir: process.env.PAWWORK_CONFIG_DIR,
-    runtimeNamespace: process.env.PAWWORK_RUNTIME_NAMESPACE,
-    disableProjectConfig: process.env.OPENCODE_DISABLE_PROJECT_CONFIG,
-    testHome: process.env.OPENCODE_TEST_HOME,
-    disableClaudePrompt: process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT,
+    opencodeConfigDir: process.env.FOLONITE_CONFIG_DIR,
+    pawworkConfigDir: process.env.FOLONITE_CONFIG_DIR,
+    runtimeNamespace: process.env.FOLONITE_RUNTIME_NAMESPACE,
+    disableProjectConfig: process.env.FOLONITE_DISABLE_PROJECT_CONFIG,
+    testHome: process.env.FOLONITE_TEST_HOME,
+    disableClaudePrompt: process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT,
   }
 
   afterEach(() => {
-    if (original.opencodeConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
-    else process.env.OPENCODE_CONFIG_DIR = original.opencodeConfigDir
-    if (original.pawworkConfigDir === undefined) delete process.env.PAWWORK_CONFIG_DIR
-    else process.env.PAWWORK_CONFIG_DIR = original.pawworkConfigDir
-    if (original.runtimeNamespace === undefined) delete process.env.PAWWORK_RUNTIME_NAMESPACE
-    else process.env.PAWWORK_RUNTIME_NAMESPACE = original.runtimeNamespace
-    if (original.disableProjectConfig === undefined) delete process.env.OPENCODE_DISABLE_PROJECT_CONFIG
-    else process.env.OPENCODE_DISABLE_PROJECT_CONFIG = original.disableProjectConfig
-    if (original.testHome === undefined) delete process.env.OPENCODE_TEST_HOME
-    else process.env.OPENCODE_TEST_HOME = original.testHome
-    if (original.disableClaudePrompt === undefined) delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
-    else process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT = original.disableClaudePrompt
+    if (original.opencodeConfigDir === undefined) delete process.env.FOLONITE_CONFIG_DIR
+    else process.env.FOLONITE_CONFIG_DIR = original.opencodeConfigDir
+    if (original.pawworkConfigDir === undefined) delete process.env.FOLONITE_CONFIG_DIR
+    else process.env.FOLONITE_CONFIG_DIR = original.pawworkConfigDir
+    if (original.runtimeNamespace === undefined) delete process.env.FOLONITE_RUNTIME_NAMESPACE
+    else process.env.FOLONITE_RUNTIME_NAMESPACE = original.runtimeNamespace
+    if (original.disableProjectConfig === undefined) delete process.env.FOLONITE_DISABLE_PROJECT_CONFIG
+    else process.env.FOLONITE_DISABLE_PROJECT_CONFIG = original.disableProjectConfig
+    if (original.testHome === undefined) delete process.env.FOLONITE_TEST_HOME
+    else process.env.FOLONITE_TEST_HOME = original.testHome
+    if (original.disableClaudePrompt === undefined) delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
+    else process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT = original.disableClaudePrompt
   })
 
-  test("ignores OPENCODE_CONFIG_DIR AGENTS.md in PawWork runtime mode", async () => {
+  test("ignores FOLONITE_CONFIG_DIR AGENTS.md in PawWork runtime mode", async () => {
     await using profileTmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(path.join(dir, "AGENTS.md"), "# OpenCode Profile Instructions")
@@ -459,9 +459,9 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     })
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_CONFIG_DIR = profileTmp.path
-    delete process.env.PAWWORK_CONFIG_DIR
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_CONFIG_DIR = profileTmp.path
+    delete process.env.FOLONITE_CONFIG_DIR
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -484,7 +484,7 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     }
   })
 
-  test("prefers PAWWORK_CONFIG_DIR AGENTS.md over global when both exist", async () => {
+  test("prefers FOLONITE_CONFIG_DIR AGENTS.md over global when both exist", async () => {
     await using profileTmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(path.join(dir, "AGENTS.md"), "# PawWork Profile Instructions")
@@ -497,9 +497,9 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     })
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    delete process.env.OPENCODE_CONFIG_DIR
-    process.env.PAWWORK_CONFIG_DIR = profileTmp.path
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    delete process.env.FOLONITE_CONFIG_DIR
+    process.env.FOLONITE_CONFIG_DIR = profileTmp.path
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -524,7 +524,7 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
 
   test("sources() reports ~/.claude/CLAUDE.md as ignored with reason when present in PawWork mode", async () => {
     // Acceptance criterion #7: diagnostics explain why the global Claude Code fallback
-    // was ignored. Uses OPENCODE_TEST_HOME so Global.Path.home resolves to a tmpdir,
+    // was ignored. Uses FOLONITE_TEST_HOME so Global.Path.home resolves to a tmpdir,
     // making the test deterministic across CI environments.
     await using fakeHome = await tmpdir({
       init: async (dir) => {
@@ -534,11 +534,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     await using globalTmp = await tmpdir()
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    delete process.env.PAWWORK_CONFIG_DIR
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -567,7 +567,7 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
   })
 
   test("sources() reports priority-skipped global instruction file as considered", async () => {
-    // Acceptance criterion #7 covers "considered" sources. When both PAWWORK_CONFIG_DIR
+    // Acceptance criterion #7 covers "considered" sources. When both FOLONITE_CONFIG_DIR
     // and Global.Path.config have AGENTS.md, only the higher-priority one is loaded; the
     // other should appear as considered with a priority-skipped reason.
     await using fakeHome = await tmpdir()
@@ -583,11 +583,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     })
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -631,11 +631,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
       },
     })
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -677,11 +677,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
       },
     })
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -720,11 +720,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
       },
     })
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -753,19 +753,19 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     // Acceptance criterion #7: URL contributions to system() must also appear in the
     // diagnostic so prompt and diagnostic stay in lockstep. Uses an unreachable URL
     // so the assertion accepts either fetch outcome deterministically.
-    const originalConfig = process.env.OPENCODE_CONFIG_CONTENT
+    const originalConfig = process.env.FOLONITE_CONFIG_CONTENT
     await using fakeHome = await tmpdir()
     await using pawworkConfig = await tmpdir()
     await using globalTmp = await tmpdir()
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
 
-    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+    process.env.FOLONITE_CONFIG_CONTENT = JSON.stringify({
       instructions: ["http://127.0.0.1:1/never-listening.md"],
     })
     const originalGlobalConfig = Global.Path.config
@@ -791,8 +791,8 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
       })
     } finally {
       ;(Global.Path as { config: string }).config = originalGlobalConfig
-      if (originalConfig === undefined) delete process.env.OPENCODE_CONFIG_CONTENT
-      else process.env.OPENCODE_CONFIG_CONTENT = originalConfig
+      if (originalConfig === undefined) delete process.env.FOLONITE_CONFIG_CONTENT
+      else process.env.FOLONITE_CONFIG_CONTENT = originalConfig
     }
   })
 
@@ -800,7 +800,7 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     // Acceptance criterion #7 / parity with system(): non-URL config.instructions
     // entries are glob-resolved into the system prompt; the diagnostic must mirror
     // that so debugging reflects what the model actually sees.
-    const originalConfig = process.env.OPENCODE_CONFIG_CONTENT
+    const originalConfig = process.env.FOLONITE_CONFIG_CONTENT
     await using fakeHome = await tmpdir()
     await using pawworkConfig = await tmpdir({
       init: async (dir) => {
@@ -810,14 +810,14 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     await using globalTmp = await tmpdir()
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.OPENCODE_DISABLE_PROJECT_CONFIG = "1"
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_DISABLE_PROJECT_CONFIG = "1"
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
 
-    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+    process.env.FOLONITE_CONFIG_CONTENT = JSON.stringify({
       instructions: ["rules/extra.md"],
     })
     const originalGlobalConfig = Global.Path.config
@@ -840,8 +840,8 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
       })
     } finally {
       ;(Global.Path as { config: string }).config = originalGlobalConfig
-      if (originalConfig === undefined) delete process.env.OPENCODE_CONFIG_CONTENT
-      else process.env.OPENCODE_CONFIG_CONTENT = originalConfig
+      if (originalConfig === undefined) delete process.env.FOLONITE_CONFIG_CONTENT
+      else process.env.FOLONITE_CONFIG_CONTENT = originalConfig
     }
   })
 
@@ -857,11 +857,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     await using globalTmp = await tmpdir()
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    delete process.env.PAWWORK_CONFIG_DIR
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -893,11 +893,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     await using globalTmp = await tmpdir()
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -931,11 +931,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
       },
     })
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -970,11 +970,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
       },
     })
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -996,7 +996,7 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     }
   })
 
-  test("loads PawWork global AGENTS.md from PAWWORK_CONFIG_DIR", async () => {
+  test("loads PawWork global AGENTS.md from FOLONITE_CONFIG_DIR", async () => {
     await using fakeHome = await tmpdir()
     await using pawworkConfig = await tmpdir({
       init: async (dir) => {
@@ -1006,11 +1006,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     await using globalTmp = await tmpdir()
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -1044,11 +1044,11 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     await using globalTmp = await tmpdir()
     await using projectTmp = await tmpdir()
 
-    delete process.env.PAWWORK_RUNTIME_NAMESPACE
-    process.env.OPENCODE_TEST_HOME = fakeHome.path
-    delete process.env.PAWWORK_CONFIG_DIR
-    delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
+    delete process.env.FOLONITE_RUNTIME_NAMESPACE
+    process.env.FOLONITE_TEST_HOME = fakeHome.path
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_CONFIG_DIR
+    delete process.env.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 
@@ -1071,7 +1071,7 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     }
   })
 
-  test("resolves relative instruction paths from PAWWORK_CONFIG_DIR when project config is disabled", async () => {
+  test("resolves relative instruction paths from FOLONITE_CONFIG_DIR when project config is disabled", async () => {
     await using pawworkConfig = await tmpdir({
       init: async (dir) => {
         await Bun.write(path.join(dir, "rules", "extra.md"), "# PawWork Relative Instructions")
@@ -1089,10 +1089,10 @@ describe("Instruction.systemPaths PawWork runtime config dir", () => {
     })
     await using projectTmp = await tmpdir()
 
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
-    process.env.OPENCODE_DISABLE_PROJECT_CONFIG = "1"
-    process.env.OPENCODE_CONFIG_DIR = opencodeConfig.path
-    process.env.PAWWORK_CONFIG_DIR = pawworkConfig.path
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
+    process.env.FOLONITE_DISABLE_PROJECT_CONFIG = "1"
+    process.env.FOLONITE_CONFIG_DIR = opencodeConfig.path
+    process.env.FOLONITE_CONFIG_DIR = pawworkConfig.path
     const originalGlobalConfig = Global.Path.config
     ;(Global.Path as { config: string }).config = globalTmp.path
 

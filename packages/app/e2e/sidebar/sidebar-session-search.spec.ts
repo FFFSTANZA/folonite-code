@@ -1,7 +1,7 @@
 import { test, expect } from "../fixtures"
 import { openPalette } from "../actions"
 
-test("command palette prioritizes pinned and recent PawWork sessions", async ({ page, sdk, gotoSession }) => {
+test("command palette prioritizes pinned and recent Folonite sessions", async ({ page, sdk, gotoSession }) => {
   const stamp = Date.now()
   const older = await sdk.session.create({ title: `Alpha brief ${stamp}` }).then((r) => r.data)
   const pinned = await sdk.session.create({ title: `Mango brief ${stamp}` }).then((r) => r.data)
@@ -11,10 +11,10 @@ test("command palette prioritizes pinned and recent PawWork sessions", async ({ 
 
   await page.addInitScript((sessionID) => {
     localStorage.setItem(
-      "pawwork.global.dat:layout.page",
+      "folonite.global.dat:layout.page",
       JSON.stringify({
-        pawworkPinnedSessions: [sessionID],
-        pawworkSortMode: "time",
+        folonitePinnedSessions: [sessionID],
+        foloniteSortMode: "time",
       }),
     )
   }, pinned.id)
@@ -23,8 +23,8 @@ test("command palette prioritizes pinned and recent PawWork sessions", async ({ 
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const raw = localStorage.getItem("pawwork.global.dat:layout.page")
-        const next = raw ? (JSON.parse(raw) as { pawworkPinnedSessions?: string[] }).pawworkPinnedSessions : []
+        const raw = localStorage.getItem("folonite.global.dat:layout.page")
+        const next = raw ? (JSON.parse(raw) as { folonitePinnedSessions?: string[] }).folonitePinnedSessions : []
         return next ?? []
       }),
     )

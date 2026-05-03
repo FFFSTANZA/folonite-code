@@ -27,6 +27,7 @@ import {
   Suspense,
 } from "solid-js"
 import { Dynamic } from "solid-js/web"
+import { AuthProvider } from "@/context/auth"
 import { CommandProvider } from "@/context/command"
 import { CommentsProvider } from "@/context/comments"
 import { FileProvider } from "@/context/file"
@@ -80,7 +81,7 @@ function UiI18nBridge(props: ParentProps) {
 
 declare global {
   interface Window {
-    __OPENCODE__?: {
+    __FOLONITE__?: {
       updaterEnabled?: boolean
       deepLinks?: string[]
       wsl?: boolean
@@ -235,28 +236,30 @@ export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
     <MetaProvider>
       <Font />
       <ThemeProvider
-        defaultTheme="pawwork"
+        defaultTheme="folonite"
         storageKeys={{
-          themeId: "pawwork-theme-id",
-          colorScheme: "pawwork-color-scheme",
-          cssLight: "pawwork-theme-css-light",
-          cssDark: "pawwork-theme-css-dark",
+          themeId: "folonite-theme-id",
+          colorScheme: "folonite-color-scheme",
+          cssLight: "folonite-theme-css-light",
+          cssDark: "folonite-theme-css-dark",
         }}
       >
         <LanguageProvider locale={props.locale}>
           <UiI18nBridge>
-            <ErrorBoundary fallback={(error) => <ErrorPage error={error} />}>
-              <QueryProvider>
-                <DialogProvider>
-                  <MarkedProvider>
-                    <FileComponentProvider component={File}>
-                      <AboutModal />
-                      {props.children}
-                    </FileComponentProvider>
-                  </MarkedProvider>
-                </DialogProvider>
-              </QueryProvider>
-            </ErrorBoundary>
+            <AuthProvider>
+              <ErrorBoundary fallback={(error) => <ErrorPage error={error} />}>
+                <QueryProvider>
+                  <DialogProvider>
+                    <MarkedProvider>
+                      <FileComponentProvider component={File}>
+                        <AboutModal />
+                        {props.children}
+                      </FileComponentProvider>
+                    </MarkedProvider>
+                  </DialogProvider>
+                </QueryProvider>
+              </ErrorBoundary>
+            </AuthProvider>
           </UiI18nBridge>
         </LanguageProvider>
       </ThemeProvider>

@@ -9,7 +9,7 @@ const root = resolve(dir, "../..")
 const html = async (name: string) => Bun.file(join(dir, name)).text()
 
 /**
- * Electron loads packaged renderer HTML via the privileged `pawwork-renderer:`
+ * Electron loads packaged renderer HTML via the privileged `folonite-renderer:`
  * protocol. Absolute paths like `src="/foo.js"` resolve to that origin root
  * instead of the nested renderer output directory.
  *

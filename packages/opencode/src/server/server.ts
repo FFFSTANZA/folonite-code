@@ -13,6 +13,8 @@ import { UIRoutes } from "./routes/ui"
 import { GlobalRoutes } from "./routes/global"
 import { InstanceMiddleware } from "./routes/instance/middleware"
 import { WorkspaceRoutes } from "./routes/control/workspace"
+import { AuthRoutes } from "./routes/auth"
+
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -38,6 +40,8 @@ function create(opts: { cors?: string[] }) {
     .use(CompressionMiddleware)
     .use(CorsMiddleware(opts))
     .route("/global", GlobalRoutes())
+    .route("/auth", AuthRoutes())
+
 
   const runtime = adapter.create(app)
 

@@ -17,14 +17,14 @@ import { tmpdir } from "../fixture/fixture"
 
 Log.init({ print: false })
 
-const disableDefault = process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS
-process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = "1"
+const disableDefault = process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS
+process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS = "1"
 
 const { Flag } = await import("@opencode-ai/core/flag/flag")
-const experimental = Flag.OPENCODE_EXPERIMENTAL_WORKSPACES
+const experimental = Flag.FOLONITE_EXPERIMENTAL_WORKSPACES
 
 // @ts-expect-error - Flag is readonly at type level but mutable at runtime for test toggling
-Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = true
+Flag.FOLONITE_EXPERIMENTAL_WORKSPACES = true
 
 afterEach(async () => {
   await Instance.disposeAll()
@@ -32,11 +32,11 @@ afterEach(async () => {
 })
 
 afterAll(() => {
-  if (disableDefault === undefined) delete process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS
-  else process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = disableDefault
+  if (disableDefault === undefined) delete process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS
+  else process.env.FOLONITE_DISABLE_DEFAULT_PLUGINS = disableDefault
 
   // @ts-expect-error - Flag is readonly at type level but mutable at runtime for test toggling
-  Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = experimental
+  Flag.FOLONITE_EXPERIMENTAL_WORKSPACES = experimental
 })
 
 function wait(ms = 50) {

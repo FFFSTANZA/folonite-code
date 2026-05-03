@@ -1,30 +1,30 @@
-# PawWork
+# Folonite
 
 **Open-source AI agent that works out of the box on your desktop.**
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![macOS](https://img.shields.io/badge/macOS-signed_and_notarized-black.svg)](https://github.com/Astro-Han/pawwork/releases/latest)
-[![Windows](https://img.shields.io/badge/Windows_x64-unsigned-blue.svg)](https://github.com/Astro-Han/pawwork/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-signed_and_notarized-black.svg)](https://github.com/fffstanza/folonite-code/releases/latest)
+[![Windows](https://img.shields.io/badge/Windows_x64-unsigned-blue.svg)](https://github.com/fffstanza/folonite-code/releases/latest)
 
 [中文说明](README_CN.md)
 
-PawWork is an open-source alternative to Codex App and Claude Desktop. It brings AI agent work into a polished desktop app for files, documents, spreadsheets, research, writing, code, and local tasks.
+Folonite is an open-source alternative to Codex App and Claude Desktop. It brings AI agent work into a polished desktop app for files, documents, spreadsheets, research, writing, code, and local tasks.
 
-Start without a terminal, API key, or paid model plan. PawWork includes a free plan powered by OpenCode Zen, built-in web search, task cards, and support for your own model accounts when you want more choice or control.
+Start without a terminal, API key, or paid model plan. Folonite includes a free plan powered by Folonite Core, built-in web search, task cards, and support for your own model accounts when you want more choice or control.
 
-![PawWork - Open-source AI agent that works out of the box on your desktop](assets/readme/pawwork-cover.png)
+![Folonite - Open-source AI agent that works out of the box on your desktop](assets/readme/folonite-cover.png)
 
-## Why PawWork
+## Why Folonite
 
-PawWork is built for people who want AI agents to do real desktop work, not only chat in a browser or write code inside an IDE.
+Folonite is built for people who want AI agents to do real desktop work, not only chat in a browser or write code inside an IDE.
 
-- **Less setup:** download the app, choose a workspace, and start with the included OpenCode Zen free plan.
+- **Less setup:** download the app, choose a workspace, and start with the included Folonite Core free plan.
 - **Real desktop work:** work with local files, documents, spreadsheets, notes, web research, code, and generated outputs.
 - **Task cards:** start from concrete tasks instead of a blank prompt.
 - **Model choice:** connect OpenAI, Claude, DeepSeek, Gemini, Kimi, GLM, OpenAI-compatible providers, and supported coding plans.
 - **Open-source control:** inspect the code, choose your workspace, connect the accounts you trust, and keep important actions reviewable.
 
-## What You Can Ask PawWork To Do
+## What You Can Ask Folonite To Do
 
 ### Documents and Data
 
@@ -51,42 +51,42 @@ PawWork is built for people who want AI agents to do real desktop work, not only
 
 1. Choose a workspace folder.
 2. Pick a task card or describe what you want in everyday language.
-3. Let PawWork work with the files, tools, models, and search it needs.
+3. Let Folonite work with the files, tools, models, and search it needs.
 4. Review the steps, outputs, and files before you use the result.
 
 ## Models, Plans, and Search
 
-PawWork includes a free plan powered by OpenCode Zen, plus built-in web search with a free quota. You can start without bringing your own API key.
+Folonite includes a free plan powered by Folonite Core, plus built-in web search with a free quota. You can start without bringing your own API key.
 
-When you want more model choice or control, connect your own accounts. PawWork supports API keys, OAuth where available, OpenAI-compatible providers, and supported coding plans, including OpenAI, Claude, DeepSeek, Gemini, Kimi, GLM, and more.
+When you want more model choice or control, connect your own accounts. Folonite supports API keys, OAuth where available, OpenAI-compatible providers, and supported coding plans, including OpenAI, Claude, DeepSeek, Gemini, Kimi, GLM, and more.
 
 ## Download
 
-Download the latest macOS and Windows builds from [GitHub Releases](https://github.com/Astro-Han/pawwork/releases/latest).
+Download the latest macOS and Windows builds from [GitHub Releases](https://github.com/fffstanza/folonite-code/releases/latest).
 
 - **macOS:** download the `.dmg`. Release builds are signed and notarized by Apple.
 - **Windows:** download the Windows x64 `.exe`. Windows builds are available and currently unsigned, so SmartScreen may appear on first launch.
 
-PawWork is early and moving fast. Release notes describe what changed in each build.
+Folonite is early and moving fast. Release notes describe what changed in each build.
 
 ## Build From Source
 
 Requires [Bun](https://bun.sh) v1.2+.
 
 ```bash
-git clone https://github.com/Astro-Han/pawwork.git
-cd pawwork
+git clone https://github.com/fffstanza/folonite-code.git
+cd folonite
 bun install
 bun run dev:desktop
 ```
 
 ## Built on OpenCode
 
-PawWork is built on a fork of [OpenCode](https://github.com/anomalyco/opencode). We keep the agent engine, rebuild the desktop product experience, and add PawWork-specific workflows, model defaults, and everyday-work entry points.
+Folonite is built on a fork of [OpenCode](https://github.com/anomalyco/opencode). We keep the agent engine, rebuild the desktop product experience, and add Folonite-specific workflows, model defaults, and everyday-work entry points.
 
 Thanks to the OpenCode project and community.
 
-PawWork bundles [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) by iOfficeAI to handle Word, Excel, and PowerPoint files locally. Thanks to iOfficeAI for the Apache-2.0 open-source OfficeCLI project.
+Folonite bundles [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) by iOfficeAI to handle Word, Excel, and PowerPoint files locally. Thanks to iOfficeAI for the Apache-2.0 open-source OfficeCLI project.
 
 ## License
 

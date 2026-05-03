@@ -28,7 +28,7 @@ describe("desktop context window helpers", () => {
       sessionID: null,
       route: "/",
       locale: "en",
-      title: "PawWork",
+      title: "Folonite",
     })
   })
 

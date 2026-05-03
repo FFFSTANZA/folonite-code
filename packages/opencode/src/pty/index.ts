@@ -189,14 +189,14 @@ export namespace Pty {
           ...input.env,
           ...shell.env,
           TERM: "xterm-256color",
-          OPENCODE_TERMINAL: "1",
+          FOLONITE_TERMINAL: "1",
         } as Record<string, string>)
         // bun-pty merges with the parent process environment internally, so
         // deleting these keys is not enough for PTY sessions. Override with
         // empty values to prevent PawWork's internal server credentials from
         // being visible inside user terminals.
-        env.OPENCODE_SERVER_USERNAME = envValueCaseInsensitive(input.env, "OPENCODE_SERVER_USERNAME") ?? ""
-        env.OPENCODE_SERVER_PASSWORD = envValueCaseInsensitive(input.env, "OPENCODE_SERVER_PASSWORD") ?? ""
+        env.FOLONITE_SERVER_USERNAME = envValueCaseInsensitive(input.env, "FOLONITE_SERVER_USERNAME") ?? ""
+        env.FOLONITE_SERVER_PASSWORD = envValueCaseInsensitive(input.env, "FOLONITE_SERVER_PASSWORD") ?? ""
 
         if (process.platform === "win32") {
           env.LC_ALL = "C.UTF-8"

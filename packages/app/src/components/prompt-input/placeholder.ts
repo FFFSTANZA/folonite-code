@@ -1,15 +1,15 @@
-import type { PawworkSkillName } from "@/components/session/pawwork-skill-meta"
+import type { FoloniteSkillName } from "@/components/session/folonite-skill-meta"
 
 type PromptPlaceholderInput = {
   mode: "normal" | "shell"
   commentCount: number
   example: string
   suggest: boolean
-  selectedSkill?: PawworkSkillName
+  selectedSkill?: FoloniteSkillName
   t: (key: string, params?: Record<string, string>) => string
 }
 
-const SKILL_PLACEHOLDER_KEY: Record<PawworkSkillName, string> = {
+const SKILL_PLACEHOLDER_KEY: Record<FoloniteSkillName, string> = {
   "document-processing": "session.new.placeholder.document",
   "data-analysis": "session.new.placeholder.analysis",
   "writing-assistant": "session.new.placeholder.writing",

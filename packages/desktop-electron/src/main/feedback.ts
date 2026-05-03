@@ -79,14 +79,14 @@ export function feedbackDialogLabels(locale: MenuLocale) {
     en: {
       title: "Prepare problem report?",
       message:
-        "PawWork will copy a short summary to your clipboard, save a full problem report file locally, and open the feedback form.\n\nUpload the full problem report file if the form asks for details. You can delete the local full report file after submission.",
+        "Folonite will copy a short summary to your clipboard, save a full problem report file locally, and open the feedback form.\n\nUpload the full problem report file if the form asks for details. You can delete the local full report file after submission.",
       confirm: "Copy summary and open form",
       cancel: "Cancel",
       failedTitle: "Problem Report Failed",
       failedMessage: "Could not prepare the problem report. You can try Report a Problem again.",
       formOpenFailedTitle: "Feedback Form Did Not Open",
       formOpenFailedMessage:
-        "PawWork prepared the problem report, but could not open the feedback form. Open this URL manually to finish submitting feedback.",
+        "Folonite prepared the problem report, but could not open the feedback form. Open this URL manually to finish submitting feedback.",
     },
     zh: {
       title: "准备问题报告？",

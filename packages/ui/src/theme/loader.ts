@@ -2,7 +2,7 @@ import type { DesktopTheme, ResolvedTheme } from "./types"
 import { resolveThemeVariant, themeToCss } from "./resolve"
 
 let activeTheme: DesktopTheme | null = null
-const THEME_STYLE_ID = "oc-theme"
+const THEME_STYLE_ID = "folonite-theme"
 
 function ensureLoaderStyleElement(): HTMLStyleElement {
   const existing = document.getElementById(THEME_STYLE_ID) as HTMLStyleElement | null
@@ -27,7 +27,7 @@ export function applyTheme(theme: DesktopTheme, themeId?: string): void {
 }
 
 function buildThemeCss(light: ResolvedTheme, dark: ResolvedTheme, themeId: string): string {
-  const isDefaultTheme = themeId === "oc-2"
+  const isDefaultTheme = themeId === "folonite"
   const lightCss = themeToCss(light)
   const darkCss = themeToCss(dark)
 

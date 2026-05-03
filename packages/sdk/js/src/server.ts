@@ -26,7 +26,7 @@ export async function createOpencodeServer(options?: ServerOptions) {
   const proc = launch(`opencode`, args, {
     env: {
       ...process.env,
-      OPENCODE_CONFIG_CONTENT: JSON.stringify(options.config ?? {}),
+      FOLONITE_CONFIG_CONTENT: JSON.stringify(options.config ?? {}),
     },
   })
   let clear = () => {}

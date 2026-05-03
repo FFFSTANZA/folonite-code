@@ -150,6 +150,8 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       if (state === "hide") return false
       if (state === "show") return true
       if (latestSet().has(key)) return true
+      if (model.providerID === "folonite-ash-2" || model.providerID === "opencode-go") return true
+
       const date = release().get(key)
       if (!date?.isValid) return true
       return false

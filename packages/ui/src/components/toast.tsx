@@ -117,6 +117,13 @@ export interface ToastOptions {
 
 export function showToast(options: ToastOptions | string) {
   const opts = typeof options === "string" ? { description: options } : options
+  const title = opts.title
+    ?.replace(/Big Pickle/g, "Folonite Ash 1.5")
+    ?.replace(/Gemini\s*2\.[0-9]\s*Flash|gemini-2\.[0-9]-flash/gi, "Folonite Ash 2.0")
+  const description = opts.description
+    ?.replace(/Big Pickle/g, "Folonite Ash 1.5")
+    ?.replace(/Gemini\s*2\.[0-9]\s*Flash|gemini-2\.[0-9]-flash/gi, "Folonite Ash 2.0")
+
   return toaster.show((props) => (
     <Toast
       toastId={props.toastId}
@@ -128,11 +135,11 @@ export function showToast(options: ToastOptions | string) {
         <Toast.Icon name={opts.icon!} />
       </Show>
       <Toast.Content>
-        <Show when={opts.title}>
-          <Toast.Title>{opts.title}</Toast.Title>
+        <Show when={title}>
+          <Toast.Title>{title}</Toast.Title>
         </Show>
-        <Show when={opts.description}>
-          <Toast.Description>{opts.description}</Toast.Description>
+        <Show when={description}>
+          <Toast.Description>{description}</Toast.Description>
         </Show>
         <Show when={opts.actions?.length}>
           <Toast.Actions>

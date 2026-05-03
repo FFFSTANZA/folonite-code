@@ -9,7 +9,7 @@ import { lazy } from "@/util/lazy"
 import { Filesystem } from "../util/filesystem"
 import { Flock } from "../util/flock"
 import { Hash } from "../util/hash"
-import { withPawWorkProviders } from "./pawwork-providers"
+import { withFoloniteProviders } from "./folonite-providers"
 
 // Try to import bundled snapshot (generated at build time)
 // Falls back to undefined in dev mode when snapshot doesn't exist
@@ -179,11 +179,11 @@ const PublishProvider = z
 const PublishCatalog = z.record(z.string(), PublishProvider)
 
 function url() {
-  return Flag.OPENCODE_MODELS_URL || "https://models.dev"
+  return Flag.FOLONITE_MODELS_URL || "https://models.dev"
 }
 
 function modelsPathOverride() {
-  return process.env["OPENCODE_MODELS_PATH"]
+  return process.env["FOLONITE_MODELS_PATH"]
 }
 
 export function version() {
@@ -218,7 +218,7 @@ function parseCatalog(text: string): Catalog {
 
 async function validateCatalog(catalog: Catalog) {
   const runtime = await import("./provider")
-  const withLocalProviders = withPawWorkProviders(catalog)
+  const withLocalProviders = withFoloniteProviders(catalog)
   for (const provider of Object.values(withLocalProviders)) {
     runtime.fromModelsDevProvider(provider)
   }
@@ -241,13 +241,13 @@ async function publishCandidate(text: string) {
   await atomicWriteFile(filepath, text)
   catalogVersion++
   Data.reset()
-  return withPawWorkProviders(catalog)
+  return withFoloniteProviders(catalog)
 }
 
 async function loadCandidate(text: string) {
   const catalog = parseCatalog(text)
   await validateCatalog(catalog)
-  return withPawWorkProviders(catalog)
+  return withFoloniteProviders(catalog)
 }
 
 export const Data = lazy(async () => {
@@ -259,7 +259,7 @@ export const Data = lazy(async () => {
     .then((m) => m.snapshot as Record<string, unknown>)
     .catch(() => undefined)
   if (snapshot) return snapshot
-  if (Flag.OPENCODE_DISABLE_MODELS_FETCH) return {}
+  if (Flag.FOLONITE_DISABLE_MODELS_FETCH) return {}
   return Flock.withLock(`models-dev:${filepath}`, async () => {
     const overridePath = modelsPathOverride()
     const result = await Filesystem.readJson(overridePath ?? filepath).catch(() => {})
@@ -285,7 +285,7 @@ export const Data = lazy(async () => {
 
 export async function get() {
   const result = await Data()
-  return withPawWorkProviders(result as Record<string, Provider>)
+  return withFoloniteProviders(result as Record<string, Provider>)
 }
 
 export async function getWithVersion() {
@@ -295,7 +295,7 @@ export async function getWithVersion() {
     const after = version()
     if (before === after) {
       return {
-        providers: withPawWorkProviders(result as Record<string, Provider>),
+        providers: withFoloniteProviders(result as Record<string, Provider>),
         version: after,
       }
     }
@@ -349,7 +349,7 @@ export namespace ModelsDev {
   export const version = ModelsDevVersionValue
 }
 
-if (!Flag.OPENCODE_DISABLE_MODELS_FETCH && !process.argv.includes("--get-yargs-completions")) {
+if (!Flag.FOLONITE_DISABLE_MODELS_FETCH && !process.argv.includes("--get-yargs-completions")) {
   void refresh()
   setInterval(
     async () => {

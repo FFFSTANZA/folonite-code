@@ -28,8 +28,8 @@ describe("PawWork runtime namespace", () => {
 
   test("plan files use .pawwork in git projects", async () => {
     await using tmp = await tmpdir({ git: true })
-    const previous = process.env.PAWWORK_RUNTIME_NAMESPACE
-    process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
+    const previous = process.env.FOLONITE_RUNTIME_NAMESPACE
+    process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
 
     try {
       await Instance.provide({
@@ -41,8 +41,8 @@ describe("PawWork runtime namespace", () => {
         },
       })
     } finally {
-      if (previous === undefined) delete process.env.PAWWORK_RUNTIME_NAMESPACE
-      else process.env.PAWWORK_RUNTIME_NAMESPACE = previous
+      if (previous === undefined) delete process.env.FOLONITE_RUNTIME_NAMESPACE
+      else process.env.FOLONITE_RUNTIME_NAMESPACE = previous
     }
   })
 })

@@ -18,9 +18,9 @@ async function assertAllRenderedInSet(page: any, allowedLabels: string[]): Promi
 }
 
 test("zh labels localize every variant that appears for the current model", async ({ page, project }) => {
-  // LanguageProvider reads from pawwork.global.dat:language (JSON {locale}), not oc_locale cookie
+  // LanguageProvider reads from folonite.global.dat:language (JSON {locale}), not oc_locale cookie
   await page.addInitScript(() => {
-    localStorage.setItem("pawwork.global.dat:language", JSON.stringify({ locale: "zh" }))
+    localStorage.setItem("folonite.global.dat:language", JSON.stringify({ locale: "zh" }))
   })
   await project.open()
   await page.locator(promptVariantSelector).click()
@@ -30,7 +30,7 @@ test("zh labels localize every variant that appears for the current model", asyn
 
 test("en labels localize every variant that appears for the current model", async ({ page, project }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("pawwork.global.dat:language", JSON.stringify({ locale: "en" }))
+    localStorage.setItem("folonite.global.dat:language", JSON.stringify({ locale: "en" }))
   })
   await project.open()
   await page.locator(promptVariantSelector).click()

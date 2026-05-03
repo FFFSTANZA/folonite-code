@@ -16,10 +16,10 @@ const rendererError = {
   summary: "ManualSmokeError: report flow smoke check",
   details: [
     "ManualSmokeError: report flow smoke check",
-    "    at real desktop smoke (/tmp/pawwork-real-report)",
+    "    at real desktop smoke (/tmp/folonite-real-report)",
     "",
     "Context",
-    '{"kind":"manual-smoke","directory":"/tmp/pawwork-real-report","storage":"manual.dat","key":"manual-key"}',
+    '{"kind":"manual-smoke","directory":"/tmp/folonite-real-report","storage":"manual.dat","key":"manual-key"}',
   ].join("\n"),
 }
 
@@ -32,14 +32,14 @@ function buildSmokeEnv(homeDir) {
     ...process.env,
     CI: "true",
     HOME: homeDir,
-    PAWWORK_CI_SMOKE: "true",
-    PAWWORK_CI_SMOKE_HOME: homeDir,
+    FOLONITE_CI_SMOKE: "true",
+    FOLONITE_CI_SMOKE_HOME: homeDir,
     XDG_DATA_HOME: homeDir,
     XDG_CACHE_HOME: homeDir,
     XDG_CONFIG_HOME: homeDir,
     XDG_STATE_HOME: homeDir,
-    OPENCODE_CHANNEL: "dev",
-    PAWWORK_FEEDBACK_FORM_URL: process.env.PAWWORK_FEEDBACK_FORM_URL || "https://example.com/pawwork-feedback",
+    FOLONITE_CHANNEL: "dev",
+    FOLONITE_FEEDBACK_FORM_URL: process.env.FOLONITE_FEEDBACK_FORM_URL || "https://example.com/folonite-feedback",
   }
 }
 
@@ -55,7 +55,7 @@ function latestMarkdownReport(reportRoot) {
   }
 }
 
-const homeDir = mkdtempSync(join(tmpdir(), "pawwork-report-smoke-"))
+const homeDir = mkdtempSync(join(tmpdir(), "folonite-report-smoke-"))
 const app = await electron.launch({
   executablePath: require("electron/index.js"),
   args: [mainEntry],
@@ -66,7 +66,7 @@ const app = await electron.launch({
 try {
   const window = await app.firstWindow()
   await window.waitForLoadState("domcontentloaded")
-  await window.waitForFunction(() => document.title === "PawWork", null, { timeout: 60_000 })
+  await window.waitForFunction(() => document.title === "Folonite", null, { timeout: 60_000 })
   await window.waitForSelector(desktopShellMainSelector, { timeout: 60_000 })
 
   const result = await window.evaluate(async (rendererError) => {

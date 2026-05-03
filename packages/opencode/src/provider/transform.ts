@@ -33,7 +33,7 @@ function filterEmptyMessageContent(msg: ModelMessage): ModelMessage | undefined 
   return { ...msg, content: filtered } as ModelMessage
 }
 
-export const OUTPUT_TOKEN_MAX = Flag.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
+export const OUTPUT_TOKEN_MAX = Flag.FOLONITE_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
 
 // Maps npm package to the key the AI SDK expects for providerOptions
 function sdkKey(npm: string): string | undefined {

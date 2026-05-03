@@ -48,8 +48,8 @@ async function getSessionWorkspace(url: URL) {
 
 export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): MiddlewareHandler {
   return async (c, next) => {
-    const pawworkDefault = path.join(os.homedir(), "PawWork")
-    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || pawworkDefault
+    const foloniteDefault = path.join(os.homedir(), "Folonite")
+    const raw = c.req.query("directory") || c.req.header("x-opencode-directory") || foloniteDefault
     const decoded = (() => {
       try {
         return decodeURIComponent(raw)
@@ -57,10 +57,10 @@ export function WorkspaceRouterMiddleware(upgrade: UpgradeWebSocket): Middleware
         return raw
       }
     })()
-
+    
     if (!c.req.query("directory") && !c.req.header("x-opencode-directory")) {
       try {
-        mkdirSync(pawworkDefault, { recursive: true })
+        mkdirSync(foloniteDefault, { recursive: true })
       } catch {
         // Ignore: home may be unwritable or path may be a regular file
       }

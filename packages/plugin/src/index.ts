@@ -55,7 +55,7 @@ export type WorkspaceAdaptor = {
   /**
    * Environment variables to pass to spawned workspace processes.
    *
-   * Set auth.providers to opt in to OPENCODE_AUTH_CONTENT for specific providers.
+   * Set auth.providers to opt in to FOLONITE_AUTH_CONTENT for specific providers.
    * Core only forwards the requested provider entries, never the full auth store by default.
    * Treat values as secrets and avoid persisting or logging them.
    * The from parameter is reserved for future workspace copy flows; core does not pass it today.

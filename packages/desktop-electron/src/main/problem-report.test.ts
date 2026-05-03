@@ -15,7 +15,7 @@ const base = {
     route: "/session/ses_1",
     directory: "/Users/test/project",
     sessionID: "ses_1",
-    logPath: "/Users/test/Library/Logs/PawWork/main.log",
+    logPath: "/Users/test/Library/Logs/Folonite/main.log",
   },
   logTail: "line one\nline two",
   sessionExport: {
@@ -46,7 +46,7 @@ describe("problem report", () => {
 
   test("creates markdown with valid fenced JSON", () => {
     const report = buildProblemReport(base)
-    expect(report.markdown).toContain("# PawWork Problem Report")
+    expect(report.markdown).toContain("# Folonite Problem Report")
     expect(report.markdown).toContain("Upload this markdown file to the feedback form after reviewing it.")
     expect(report.markdown).not.toContain("Paste this report into the feedback form")
     const payload = parseProblemReportPayload(report.markdown)
@@ -61,15 +61,15 @@ describe("problem report", () => {
       reportId: "pwr_20260423_abc123",
       generatedAt: "2026-04-23T01:02:03.004Z",
       diagnostics: base.diagnostics,
-      reportFileName: "pawwork-problem-report-20260423-090203-004-abc123.md",
-      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-abc123.md",
+      reportFileName: "folonite-problem-report-20260423-090203-004-abc123.md",
+      reportLocationHint: "Folonite app data/.../problem-reports/folonite-problem-report-20260423-090203-004-abc123.md",
       fullReportStatus: "ready",
       recentErrors: ["[error] launch failed", "[warn] retrying"],
     })
 
-    expect(summary).toContain("PawWork Problem Report Summary")
+    expect(summary).toContain("Folonite Problem Report Summary")
     expect(summary).toContain("Report ID: pwr_20260423_abc123")
-    expect(summary).toContain("Report file: pawwork-problem-report-20260423-090203-004-abc123.md")
+    expect(summary).toContain("Report file: folonite-problem-report-20260423-090203-004-abc123.md")
     expect(summary).toContain("Full report: ready for manual upload")
     expect(summary).toContain("[error] launch failed")
     expect(summary).not.toContain(base.diagnostics.logPath)
@@ -81,10 +81,10 @@ describe("problem report", () => {
 
   test("includes renderer error details in the short summary and full report", () => {
     const rendererError = {
-      summary: "PawWork hit a local state problem. storage=pawwork.workspace.project.abc123.dat key=workspace:vcs",
+      summary: "Folonite hit a local state problem. storage=folonite.workspace.project.abc123.dat key=workspace:vcs",
       details: [
         "ChildStoreError: Failed to create persisted cache",
-        'cache=vcs, storage=pawwork.workspace.project.abc123.dat, key=workspace:vcs, directory="/Users/test/project"',
+        'cache=vcs, storage=folonite.workspace.project.abc123.dat, key=workspace:vcs, directory="/Users/test/project"',
         "Caused by:",
         "TypeError: storage init failed",
       ].join("\n"),
@@ -95,19 +95,19 @@ describe("problem report", () => {
       reportId: report.reportId,
       generatedAt: report.generatedAt,
       diagnostics: base.diagnostics,
-      reportFileName: "pawwork-problem-report.md",
-      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report.md",
+      reportFileName: "folonite-problem-report.md",
+      reportLocationHint: "Folonite app data/.../problem-reports/folonite-problem-report.md",
       fullReportStatus: "ready",
       recentErrors: [],
       rendererError,
     })
 
     expect(payload.rendererError).toEqual(rendererError)
-    expect(summary).toContain("Renderer error: PawWork hit a local state problem.")
+    expect(summary).toContain("Renderer error: Folonite hit a local state problem.")
     expect(summary).toContain("storage=[redacted]")
     expect(summary).toContain("key=[redacted]")
     expect(summary).not.toContain("/Users/test/project")
-    expect(summary).not.toContain("pawwork.workspace.project.abc123.dat")
+    expect(summary).not.toContain("folonite.workspace.project.abc123.dat")
     expect(summary).not.toContain("workspace:vcs")
   })
 
@@ -133,8 +133,8 @@ describe("problem report", () => {
       reportId: "pwr_20260423_errors",
       generatedAt: "2026-04-23T01:02:03.004Z",
       diagnostics: base.diagnostics,
-      reportFileName: "pawwork-problem-report-20260423-090203-004-errors.md",
-      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-errors.md",
+      reportFileName: "folonite-problem-report-20260423-090203-004-errors.md",
+      reportLocationHint: "Folonite app data/.../problem-reports/folonite-problem-report-20260423-090203-004-errors.md",
       fullReportStatus: "ready",
       recentErrors: Array.from({ length: 20 }, (_, index) => `[error] failure ${index}\nstack line ${index}`),
     })
@@ -151,8 +151,8 @@ describe("problem report", () => {
       reportId: "pwr_long_errors",
       generatedAt: "2026-04-23T01:02:03.004Z",
       diagnostics: base.diagnostics,
-      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_long_errors.md",
-      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_long_errors.md",
+      reportFileName: "folonite-problem-report-20260423-090203-004-pwr_long_errors.md",
+      reportLocationHint: "Folonite app data/.../problem-reports/folonite-problem-report-20260423-090203-004-pwr_long_errors.md",
       fullReportStatus: "ready",
       recentErrors: [`[error] tool output ${toolOutput}`],
     })
@@ -172,8 +172,8 @@ describe("problem report", () => {
         ...base.diagnostics,
         route: `/session/new?prompt=${encodeURIComponent(prompt)}#${"hash".repeat(200)}`,
       },
-      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_prompt_route.md",
-      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_prompt_route.md",
+      reportFileName: "folonite-problem-report-20260423-090203-004-pwr_prompt_route.md",
+      reportLocationHint: "Folonite app data/.../problem-reports/folonite-problem-report-20260423-090203-004-pwr_prompt_route.md",
       fullReportStatus: "ready",
       recentErrors: [],
     })
@@ -194,8 +194,8 @@ describe("problem report", () => {
         ...base.diagnostics,
         sessionID: `${longSessionID}/C:\\Users\\name\\secret`,
       },
-      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_long_session.md",
-      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_long_session.md",
+      reportFileName: "folonite-problem-report-20260423-090203-004-pwr_long_session.md",
+      reportLocationHint: "Folonite app data/.../problem-reports/folonite-problem-report-20260423-090203-004-pwr_long_session.md",
       fullReportStatus: "ready",
       recentErrors: [],
     })
@@ -214,10 +214,10 @@ describe("problem report", () => {
         ...base.diagnostics,
         platform: "win32",
         directory: "C:\\Users\\张 三\\Project Space",
-        logPath: "C:\\Users\\张 三\\AppData\\Roaming\\PawWork\\logs\\main.log",
+        logPath: "C:\\Users\\张 三\\AppData\\Roaming\\Folonite\\logs\\main.log",
       },
-      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_windows_paths.md",
-      reportLocationHint: "%APPDATA%/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_windows_paths.md",
+      reportFileName: "folonite-problem-report-20260423-090203-004-pwr_windows_paths.md",
+      reportLocationHint: "%APPDATA%/.../problem-reports/folonite-problem-report-20260423-090203-004-pwr_windows_paths.md",
       fullReportStatus: "ready",
       recentErrors: ["[error] failed to launch C:\\Users\\张 三\\Project Space\\app.log"],
     })
@@ -238,21 +238,21 @@ describe("problem report", () => {
         ...base.diagnostics,
         platform: "linux",
         directory: "/home/alice/workspace/project",
-        logPath: "/home/alice/.config/PawWork/logs/main.log",
+        logPath: "/home/alice/.config/Folonite/logs/main.log",
       },
-      reportFileName: "pawwork-problem-report-20260423-090203-004-pwr_unix_paths.md",
-      reportLocationHint: "PawWork app data/.../problem-reports/pawwork-problem-report-20260423-090203-004-pwr_unix_paths.md",
+      reportFileName: "folonite-problem-report-20260423-090203-004-pwr_unix_paths.md",
+      reportLocationHint: "Folonite app data/.../problem-reports/folonite-problem-report-20260423-090203-004-pwr_unix_paths.md",
       fullReportStatus: "ready",
       recentErrors: [
         "[error] failed reading /home/alice/workspace/project/src/index.ts",
-        "[warn] temp output at /tmp/pawwork/session/output.log",
+        "[warn] temp output at /tmp/folonite/session/output.log",
         "[error] network path \\\\server\\share\\alice\\secret.log",
       ],
     })
 
     expect(summary).toContain("[path]")
     expect(summary).not.toContain("/home/alice")
-    expect(summary).not.toContain("/tmp/pawwork")
+    expect(summary).not.toContain("/tmp/folonite")
     expect(summary).not.toContain("\\\\server\\share")
     expect(summary).not.toContain("secret.log")
   })

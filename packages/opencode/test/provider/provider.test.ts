@@ -64,14 +64,14 @@ async function defaultModel() {
 
 test("OpenCode Zen and OpenCode Go providers remain discoverable in PawWork runtime mode", async () => {
   await using tmp = await tmpdir({ git: true })
-  const previous = process.env.PAWWORK_RUNTIME_NAMESPACE
-  process.env.PAWWORK_RUNTIME_NAMESPACE = "pawwork"
+  const previous = process.env.FOLONITE_RUNTIME_NAMESPACE
+  process.env.FOLONITE_RUNTIME_NAMESPACE = "pawwork"
 
   try {
     await Instance.provide({
       directory: tmp.path,
       init: async () => {
-        set("OPENCODE_API_KEY", "test-api-key")
+        set("FOLONITE_API_KEY", "test-api-key")
       },
       fn: async () => {
         const providers = await list()
@@ -80,8 +80,8 @@ test("OpenCode Zen and OpenCode Go providers remain discoverable in PawWork runt
       },
     })
   } finally {
-    if (previous === undefined) delete process.env.PAWWORK_RUNTIME_NAMESPACE
-    else process.env.PAWWORK_RUNTIME_NAMESPACE = previous
+    if (previous === undefined) delete process.env.FOLONITE_RUNTIME_NAMESPACE
+    else process.env.FOLONITE_RUNTIME_NAMESPACE = previous
   }
 })
 
@@ -411,7 +411,7 @@ test("opencode e2e env routes getLanguage through the test llm url", async () =>
   await Instance.provide({
     directory: tmp.path,
     init: async () => {
-      set("OPENCODE_E2E_LLM_URL", e2eURL)
+      set("FOLONITE_E2E_LLM_URL", e2eURL)
     },
     fn: async () => {
       const model = await getModel(ProviderID.make("opencode"), ModelID.make("gpt-5-nano"))
@@ -442,7 +442,7 @@ test("non-opencode models ignore the opencode e2e llm url override", async () =>
     directory: tmp.path,
     init: async () => {
       set("ANTHROPIC_API_KEY", "test-api-key")
-      set("OPENCODE_E2E_LLM_URL", e2eURL)
+      set("FOLONITE_E2E_LLM_URL", e2eURL)
     },
     fn: async () => {
       const model = await getModel(ProviderID.anthropic, ModelID.make("claude-sonnet-4-20250514"))

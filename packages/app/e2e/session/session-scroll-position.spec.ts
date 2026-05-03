@@ -124,19 +124,19 @@ async function installTimelineScrollProbe(page: Page) {
       const viewport = first ? document.querySelector(turnListSelector)?.closest(scrollViewportSelector) : undefined
       if (viewport instanceof HTMLElement) viewport.addEventListener("scroll", push, { passive: true })
       const win = window as typeof window & {
-        __opencode_e2e?: Record<string, unknown> & {
+        __folonite_e2e?: Record<string, unknown> & {
           timelineScrollProbe?: { stop: () => unknown }
         }
       }
-      win.__opencode_e2e = {
-        ...(win.__opencode_e2e ?? {}),
+      win.__folonite_e2e = {
+        ...(win.__folonite_e2e ?? {}),
         timelineScrollProbe: {
           stop() {
             cancelAnimationFrame(frame)
             observer.disconnect()
             if (viewport instanceof HTMLElement) viewport.removeEventListener("scroll", push)
             push()
-            delete win.__opencode_e2e?.timelineScrollProbe
+            delete win.__folonite_e2e?.timelineScrollProbe
             return samples
           },
         },
@@ -149,11 +149,11 @@ async function installTimelineScrollProbe(page: Page) {
 async function stopTimelineScrollProbe(page: Page) {
   return page.evaluate(() => {
     const win = window as typeof window & {
-      __opencode_e2e?: {
+      __folonite_e2e?: {
         timelineScrollProbe?: { stop: () => unknown }
       }
     }
-    const probe = win.__opencode_e2e?.timelineScrollProbe
+    const probe = win.__folonite_e2e?.timelineScrollProbe
     if (!probe) throw new Error("timeline scroll probe was not installed")
     return probe.stop()
   }) as Promise<TimelineScrollSample[]>
@@ -171,9 +171,9 @@ async function sendVisiblePrompt(input: { page: Page; text: string; submitKey?: 
 async function installPageErrorProbe(page: Page) {
   await page.addInitScript(() => {
     const win = window as typeof window & {
-      __opencode_session_page_errors?: CapturedPageError[]
+      __folonite_session_page_errors?: CapturedPageError[]
     }
-    win.__opencode_session_page_errors = []
+    win.__folonite_session_page_errors = []
     const describe = (value: unknown) => {
       if (value instanceof Error) return value.stack || value.message
       if (typeof value === "string") return value
@@ -184,14 +184,14 @@ async function installPageErrorProbe(page: Page) {
       }
     }
     window.addEventListener("error", (event) => {
-      win.__opencode_session_page_errors?.push({
+      win.__folonite_session_page_errors?.push({
         type: "error",
         message: event.message,
         detail: describe(event.error),
       })
     })
     window.addEventListener("unhandledrejection", (event) => {
-      win.__opencode_session_page_errors?.push({
+      win.__folonite_session_page_errors?.push({
         type: "unhandledrejection",
         message: describe(event.reason),
       })
@@ -202,9 +202,9 @@ async function installPageErrorProbe(page: Page) {
 async function readPageErrorProbe(page: Page) {
   return page.evaluate(() => {
     const win = window as typeof window & {
-      __opencode_session_page_errors?: CapturedPageError[]
+      __folonite_session_page_errors?: CapturedPageError[]
     }
-    return win.__opencode_session_page_errors ?? []
+    return win.__folonite_session_page_errors ?? []
   }) as Promise<CapturedPageError[]>
 }
 
@@ -327,18 +327,18 @@ async function installSessionTransitionProbe(page: Page, messageOwners: Record<s
       })
       observer.observe(document.body, { childList: true, subtree: true })
       const win = window as typeof window & {
-        __opencode_e2e?: Record<string, unknown> & {
+        __folonite_e2e?: Record<string, unknown> & {
           sessionTransitionProbe?: { stop: () => unknown }
         }
       }
-      win.__opencode_e2e = {
-        ...win.__opencode_e2e,
+      win.__folonite_e2e = {
+        ...win.__folonite_e2e,
         sessionTransitionProbe: {
           stop() {
             cancelAnimationFrame(frame)
             observer.disconnect()
             push()
-            delete win.__opencode_e2e?.sessionTransitionProbe
+            delete win.__folonite_e2e?.sessionTransitionProbe
             return samples
           },
         },
@@ -358,11 +358,11 @@ async function installSessionTransitionProbe(page: Page, messageOwners: Record<s
 async function stopSessionTransitionProbe(page: Page) {
   return page.evaluate(() => {
     const win = window as typeof window & {
-      __opencode_e2e?: {
+      __folonite_e2e?: {
         sessionTransitionProbe?: { stop: () => unknown }
       }
     }
-    const probe = win.__opencode_e2e?.sessionTransitionProbe
+    const probe = win.__folonite_e2e?.sessionTransitionProbe
     if (!probe) throw new Error("session transition probe was not installed")
     return probe.stop()
   }) as Promise<SessionTransitionSample[]>

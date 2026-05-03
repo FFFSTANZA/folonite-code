@@ -79,18 +79,18 @@ import {
 } from "./layout/deep-links"
 import { createInlineEditorController } from "./layout/inline-editor"
 import {
-  pawworkSessionDirectories,
-  sortPawworkSidebarSessions,
-} from "./layout/pawwork-session-source"
+  foloniteSessionDirectories,
+  sortFoloniteSidebarSessions,
+} from "./layout/folonite-session-source"
 import {
-  buildPawworkSessionWindow,
-  nextPawworkSessionWindowLimit,
-  PAWWORK_SESSION_WINDOW_INITIAL,
-  sortPawworkSessionWindowSessions,
-} from "./layout/pawwork-session-window"
+  buildFoloniteSessionWindow,
+  nextFoloniteSessionWindowLimit,
+  FOLONITE_SESSION_WINDOW_INITIAL,
+  sortFoloniteSessionWindowSessions,
+} from "./layout/folonite-session-window"
 import { type WorkspaceSidebarContext } from "./layout/sidebar-workspace"
-import { PawworkSidebar, type PawworkSidebarSession } from "./layout/pawwork-sidebar"
-import { PawworkTitlebar } from "./layout/pawwork-titlebar"
+import { FoloniteSidebar, type FoloniteSidebarSession } from "./layout/folonite-sidebar"
+import { FoloniteTitlebar } from "./layout/folonite-titlebar"
 import { SettingsPage, type SettingsPageTab } from "@/components/settings-page"
 import { DialogDeleteSession } from "@/components/dialog-delete-session"
 
@@ -106,8 +106,8 @@ export default function Layout(props: ParentProps) {
       workspaceBranchName: {} as Record<string, Record<string, string>>,
       workspaceExpanded: {} as Record<string, boolean>,
       gettingStartedDismissed: false,
-      pawworkPinnedSessions: [] as string[],
-      pawworkSortMode: "time" as "time" | "project",
+      folonitePinnedSessions: [] as string[],
+      foloniteSortMode: "time" as "time" | "project",
     }),
   )
 
@@ -157,7 +157,7 @@ export default function Layout(props: ParentProps) {
   }
   const colorSchemeLabel = (scheme: ColorScheme) => language.t(colorSchemeKey[scheme])
   const currentDir = createMemo(() => route().dir)
-  const pawworkSidebar = createMemo(() => globalSync.data.project.length <= 1)
+  const foloniteSidebar = createMemo(() => globalSync.data.project.length <= 1)
 
   const [state, setState] = createStore({
     autoselect: !initialDirectory,
@@ -530,15 +530,15 @@ export default function Layout(props: ParentProps) {
     return result
   })
 
-  const [pawworkSessionWindowState, setPawworkSessionWindowState] = createStore({
-    limit: PAWWORK_SESSION_WINDOW_INITIAL,
+  const [foloniteSessionWindowState, setFoloniteSessionWindowState] = createStore({
+    limit: FOLONITE_SESSION_WINDOW_INITIAL,
     normal: [] as Session[],
     pinned: [] as Session[],
     active: undefined as Session | undefined,
     hasMore: false,
     loading: false,
   })
-  let pawworkSessionWindowRev = 0
+  let foloniteSessionWindowRev = 0
 
   const findLoadedSession = (sessionID: string | undefined) => {
     if (!sessionID) return
@@ -547,7 +547,7 @@ export default function Layout(props: ParentProps) {
       const found = dirStore.session.find((session) => session.id === sessionID)
       if (found && !found.time?.archived) return found
     }
-    return pawworkSessionWindowState.normal.find((session) => session.id === sessionID)
+    return foloniteSessionWindowState.normal.find((session) => session.id === sessionID)
   }
 
   const loadSessionByID = async (sessionID: string | undefined) => {
@@ -571,61 +571,61 @@ export default function Layout(props: ParentProps) {
     return getFilename(session.directory)
   }
 
-  const pawworkSessionWindow = createMemo(() =>
-    buildPawworkSessionWindow({
-      normal: pawworkSessionWindowState.normal,
-      pinned: pawworkSessionWindowState.pinned,
-      active: pawworkSessionWindowState.active,
-      limit: pawworkSessionWindowState.limit,
-      hasMore: pawworkSessionWindowState.hasMore,
+  const foloniteSessionWindow = createMemo(() =>
+    buildFoloniteSessionWindow({
+      normal: foloniteSessionWindowState.normal,
+      pinned: foloniteSessionWindowState.pinned,
+      active: foloniteSessionWindowState.active,
+      limit: foloniteSessionWindowState.limit,
+      hasMore: foloniteSessionWindowState.hasMore,
     }),
   )
 
-  const pawworkSessions = createMemo(() => {
-    const rows = pawworkSessionWindow().sessions.map((session) => ({
+  const foloniteSessions = createMemo(() => {
+    const rows = foloniteSessionWindow().sessions.map((session) => ({
       session,
       slug: base64Encode(session.directory),
       projectLabel: projectLabelForSession(session),
       created: session.time.created,
     }))
-    return sortPawworkSidebarSessions(rows.map((item) => ({ ...item, id: item.session.id }))).map(({ id: _, ...item }) => item)
+    return sortFoloniteSidebarSessions(rows.map((item) => ({ ...item, id: item.session.id }))).map(({ id: _, ...item }) => item)
   })
 
-  async function loadPawworkSessionWindow() {
+  async function loadFoloniteSessionWindow() {
     if (!pageReady()) return
     if (!layoutReady()) return
     if (!globalSync.ready) return
-    const rev = ++pawworkSessionWindowRev
-    setPawworkSessionWindowState("loading", true)
+    const rev = ++foloniteSessionWindowRev
+    setFoloniteSessionWindowState("loading", true)
     try {
       const response = await globalSDK.client.experimental.session.list({
         roots: true,
-        limit: pawworkSessionWindowState.limit,
+        limit: foloniteSessionWindowState.limit,
         sort: "created",
       })
-      if (rev !== pawworkSessionWindowRev) return
+      if (rev !== foloniteSessionWindowRev) return
       const normal = ((response.data ?? []) as Session[]).filter((session) => !session.time?.archived)
       const loaded = new Map(normal.map((session) => [session.id, session]))
       const pinned = (
         await Promise.all(
-          store.pawworkPinnedSessions.map(async (id) => loaded.get(id) ?? (await loadSessionByID(id))),
+          store.folonitePinnedSessions.map(async (id) => loaded.get(id) ?? (await loadSessionByID(id))),
         )
       ).filter((session): session is Session => !!session)
       const active = params.id ? (loaded.get(params.id) ?? (await loadSessionByID(params.id))) : undefined
 
-      if (rev !== pawworkSessionWindowRev) return
+      if (rev !== foloniteSessionWindowRev) return
       batch(() => {
-        setPawworkSessionWindowState("normal", reconcile(sortPawworkSessionWindowSessions(normal), { key: "id" }))
-        setPawworkSessionWindowState("pinned", reconcile(pinned, { key: "id" }))
-        setPawworkSessionWindowState("active", active)
-        setPawworkSessionWindowState("hasMore", !!response.response.headers.get("x-next-cursor"))
-        setPawworkSessionWindowState("loading", false)
+        setFoloniteSessionWindowState("normal", reconcile(sortFoloniteSessionWindowSessions(normal), { key: "id" }))
+        setFoloniteSessionWindowState("pinned", reconcile(pinned, { key: "id" }))
+        setFoloniteSessionWindowState("active", active)
+        setFoloniteSessionWindowState("hasMore", !!response.response.headers.get("x-next-cursor"))
+        setFoloniteSessionWindowState("loading", false)
       })
     } catch (error) {
-      if (rev !== pawworkSessionWindowRev) return
-      setPawworkSessionWindowState("loading", false)
+      if (rev !== foloniteSessionWindowRev) return
+      setFoloniteSessionWindowState("loading", false)
       showToast({
-        title: language.t("toast.session.listFailed.title", { project: "PawWork" }),
+        title: language.t("toast.session.listFailed.title", { project: "Folonite" }),
         description: errorMessage(error, language.t("common.requestFailed")),
       })
     }
@@ -638,38 +638,38 @@ export default function Layout(props: ParentProps) {
         layoutReady(),
         globalSync.ready,
         globalSDK.url,
-        pawworkSessionWindowState.limit,
-        store.pawworkPinnedSessions.join("\0"),
+        foloniteSessionWindowState.limit,
+        store.folonitePinnedSessions.join("\0"),
         params.id,
       ] as const,
       () => {
-        void loadPawworkSessionWindow()
+        void loadFoloniteSessionWindow()
       },
     ),
   )
 
-  const upsertPawworkWindowSession = (info: Session) => {
+  const upsertFoloniteWindowSession = (info: Session) => {
     if (info.parentID || info.time?.archived) return
     batch(() => {
-      setPawworkSessionWindowState("normal", (current) =>
-        sortPawworkSessionWindowSessions([...current.filter((session) => session.id !== info.id), info]),
+      setFoloniteSessionWindowState("normal", (current) =>
+        sortFoloniteSessionWindowSessions([...current.filter((session) => session.id !== info.id), info]),
       )
-      if (store.pawworkPinnedSessions.includes(info.id)) {
-        setPawworkSessionWindowState("pinned", (current) =>
-          sortPawworkSessionWindowSessions([...current.filter((session) => session.id !== info.id), info]),
+      if (store.folonitePinnedSessions.includes(info.id)) {
+        setFoloniteSessionWindowState("pinned", (current) =>
+          sortFoloniteSessionWindowSessions([...current.filter((session) => session.id !== info.id), info]),
         )
       }
       if (params.id === info.id) {
-        setPawworkSessionWindowState("active", info)
+        setFoloniteSessionWindowState("active", info)
       }
     })
   }
 
-  const removePawworkWindowSession = (sessionID: string) => {
-    setPawworkSessionWindowState("normal", (current) => current.filter((session) => session.id !== sessionID))
-    setPawworkSessionWindowState("pinned", (current) => current.filter((session) => session.id !== sessionID))
-    if (pawworkSessionWindowState.active?.id === sessionID) {
-      setPawworkSessionWindowState("active", undefined)
+  const removeFoloniteWindowSession = (sessionID: string) => {
+    setFoloniteSessionWindowState("normal", (current) => current.filter((session) => session.id !== sessionID))
+    setFoloniteSessionWindowState("pinned", (current) => current.filter((session) => session.id !== sessionID))
+    if (foloniteSessionWindowState.active?.id === sessionID) {
+      setFoloniteSessionWindowState("active", undefined)
     }
   }
 
@@ -677,20 +677,20 @@ export default function Layout(props: ParentProps) {
     globalSDK.event.listen((event) => {
       const details = event.details
       if (details.type === "session.created") {
-        upsertPawworkWindowSession(details.properties.info)
+        upsertFoloniteWindowSession(details.properties.info)
         return
       }
       if (details.type === "session.updated") {
         const info = details.properties.info
         if (info.time?.archived) {
-          removePawworkWindowSession(info.id)
+          removeFoloniteWindowSession(info.id)
           return
         }
-        upsertPawworkWindowSession(info)
+        upsertFoloniteWindowSession(info)
         return
       }
       if (details.type === "session.deleted") {
-        removePawworkWindowSession(details.properties.info.id)
+        removeFoloniteWindowSession(details.properties.info.id)
       }
     }),
   )
@@ -1011,7 +1011,7 @@ export default function Layout(props: ParentProps) {
     }
   }
 
-  async function renamePawworkSession(session: Session, next: string) {
+  async function renameFoloniteSession(session: Session, next: string) {
     const title = next.trim()
     if (!title || title === (session.title ?? "")) return
 
@@ -1038,15 +1038,15 @@ export default function Layout(props: ParentProps) {
   }
 
   function togglePinnedSession(sessionID: string) {
-    setStore("pawworkPinnedSessions", (current) => {
+    setStore("folonitePinnedSessions", (current) => {
       const next = current.filter((id) => id !== sessionID)
       if (next.length !== current.length) return next
       return [sessionID, ...current]
     })
   }
 
-  function setPawworkSortMode(mode: "time" | "project") {
-    setStore("pawworkSortMode", mode)
+  function setFoloniteSortMode(mode: "time" | "project") {
+    setStore("foloniteSortMode", mode)
   }
 
   // Export hits the embedded sidecar via main-process IPC. When the user has
@@ -1064,7 +1064,7 @@ export default function Layout(props: ParentProps) {
     const sanitized = slugSource.replace(/[\\/:*?"<>|]/g, "-").slice(0, 32)
     const slug = /[\p{L}\p{N}]/u.test(sanitized) ? sanitized : session.id.slice(-8)
     const stamp = new Date().toISOString().replace(/[:T]/g, "-").replace(/\..+$/, "")
-    const defaultName = `pawwork-session-${slug}-${stamp}.json`
+    const defaultName = `folonite-session-${slug}-${stamp}.json`
 
     let result: { ok: true; path: string } | { ok: false; error: string }
     try {
@@ -1275,7 +1275,7 @@ export default function Layout(props: ParentProps) {
     ]
 
     // Only surface theme-switching commands when more than one theme ships.
-    // Phase 1 bundles only the pawwork theme, so cycling and per-theme set
+    // Phase 1 bundles only the folonite theme, so cycling and per-theme set
     // commands are no-ops that would clutter the command palette.
     if (availableThemeEntries().length > 1) {
       commands.push({
@@ -1301,7 +1301,7 @@ export default function Layout(props: ParentProps) {
     }
 
     // Only register color-scheme commands when the current theme actually
-    // supports switching. The bundled pawwork theme forces light for Phase 1.
+    // supports switching. The bundled folonite theme forces light for Phase 1.
     if (theme.canSwitchColorScheme()) {
       commands.push({
         id: "theme.scheme.cycle",
@@ -1513,7 +1513,7 @@ export default function Layout(props: ParentProps) {
     navigate(`/${base64Encode(session.directory)}/session/${session.id}`)
   }
 
-  function openPawworkHome(directory?: string) {
+  function openFoloniteHome(directory?: string) {
     const root = directory ? projectRoot(directory) : currentProject()?.worktree ?? projectRoot(currentDir())
     if (!root) {
       chooseProject()
@@ -2030,7 +2030,7 @@ export default function Layout(props: ParentProps) {
   }
 
   function workspaceIds(project: LocalProject | undefined) {
-    return pawworkSessionDirectories({
+    return foloniteSessionDirectories({
       project,
       activeProjectWorktree: currentProject()?.worktree,
       currentDirectory: currentDir(),
@@ -2137,37 +2137,37 @@ export default function Layout(props: ParentProps) {
   }
 
   const projects = () => layout.projects.list()
-  const showMorePawworkSessions = () => {
-    if (pawworkSessionWindowState.loading) return
-    setPawworkSessionWindowState("limit", (limit) => nextPawworkSessionWindowLimit(limit))
+  const showMoreFoloniteSessions = () => {
+    if (foloniteSessionWindowState.loading) return
+    setFoloniteSessionWindowState("limit", (limit) => nextFoloniteSessionWindowLimit(limit))
   }
-  const renderPawworkPanel = (
-    sessions: Accessor<PawworkSidebarSession[]>,
+  const renderFolonitePanel = (
+    sessions: Accessor<FoloniteSidebarSession[]>,
     options?: { directory?: string; scope?: "main" | "peek" },
   ) => (
-    <PawworkSidebar
+    <FoloniteSidebar
       scope={options?.scope}
       sessions={sessions}
       sessionWindow={() => ({
-        canShowMore: pawworkSessionWindow().canShowMore,
-        capReached: pawworkSessionWindow().capReached,
-        loading: pawworkSessionWindowState.loading,
+        canShowMore: foloniteSessionWindow().canShowMore,
+        capReached: foloniteSessionWindow().capReached,
+        loading: foloniteSessionWindowState.loading,
       })}
       showProjectEmptyState={projects().length === 0}
       activeSessionID={() => params.id}
-      pinnedIDs={() => store.pawworkPinnedSessions}
-      sortMode={() => store.pawworkSortMode}
+      pinnedIDs={() => store.folonitePinnedSessions}
+      sortMode={() => store.foloniteSortMode}
       setScrollContainerRef={workspaceSidebarCtx.setScrollContainerRef}
       prefetchSession={prefetchSession}
-      onRenameSession={renamePawworkSession}
+      onRenameSession={renameFoloniteSession}
       onTogglePinnedSession={togglePinnedSession}
       exportSessionAvailable={exportSessionAvailable}
       onExportSession={exportSession}
       onDeleteSession={confirmDeleteSession}
-      onSetSortMode={setPawworkSortMode}
-      onShowMore={showMorePawworkSessions}
+      onSetSortMode={setFoloniteSortMode}
+      onShowMore={showMoreFoloniteSessions}
       onSearchOlderSessions={() => command.show()}
-      onNew={() => openPawworkHome(options?.directory)}
+      onNew={() => openFoloniteHome(options?.directory)}
       onSearch={() => command.show()}
       onOpenProject={chooseProject}
       onOpenSettings={openSettings}
@@ -2176,12 +2176,12 @@ export default function Layout(props: ParentProps) {
     />
   )
   const sidebarContent = () =>
-    renderPawworkPanel(pawworkSessions, { directory: currentProject()?.worktree, scope: "main" })
+    renderFolonitePanel(foloniteSessions, { directory: currentProject()?.worktree, scope: "main" })
 
   return (
     <LayoutPageContext.Provider
       value={{
-        pinnedIDs: () => store.pawworkPinnedSessions,
+        pinnedIDs: () => store.folonitePinnedSessions,
         workspaceOrderFor: (worktree: string) => store.workspaceOrder[worktree],
         openProject: () => {
           void chooseProject()
@@ -2215,7 +2215,7 @@ export default function Layout(props: ParentProps) {
           class="flex flex-1 min-h-0 min-w-0 flex-col"
         >
           <Titlebar />
-          <PawworkTitlebar visible={settingsOpen} title={() => language.t("sidebar.settings")} />
+          <FoloniteTitlebar visible={settingsOpen} title={() => language.t("sidebar.settings")} />
           <div class="flex-1 min-h-0 min-w-0 flex">
           <div class="flex-1 min-h-0 relative">
             <div class="size-full relative overflow-x-hidden">
@@ -2297,7 +2297,7 @@ export default function Layout(props: ParentProps) {
             </div>
           </div>
           {import.meta.env.DEV &&
-            !((window as typeof window & { __opencode_e2e?: unknown }).__opencode_e2e) &&
+            !((window as typeof window & { __folonite_e2e?: unknown }).__folonite_e2e) &&
             <DebugBar />}
           </div>
         </div>

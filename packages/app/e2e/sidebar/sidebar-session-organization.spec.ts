@@ -1,8 +1,8 @@
 import { test, expect } from "../fixtures"
 import { openSidebar } from "../actions"
-import { inlineInputSelector, pawworkSidebarSelector } from "../selectors"
+import { inlineInputSelector, foloniteSidebarSelector } from "../selectors"
 
-test("users can pin, rename, and regroup sessions in the PawWork sidebar", async ({ page, sdk, gotoSession }) => {
+test("users can pin, rename, and regroup sessions in the Folonite sidebar", async ({ page, sdk, gotoSession }) => {
   const stamp = Date.now()
   const one = await sdk.session.create({ title: `Ops weekly ${stamp}` }).then((r) => r.data)
   const two = await sdk.session.create({ title: `Board draft ${stamp}` }).then((r) => r.data)
@@ -12,13 +12,13 @@ test("users can pin, rename, and regroup sessions in the PawWork sidebar", async
   await gotoSession(one.id)
   await openSidebar(page)
 
-  const sidebar = page.locator(pawworkSidebarSelector).first()
+  const sidebar = page.locator(foloniteSidebarSelector).first()
   const row = sidebar.locator(`[data-session-id="${two.id}"]`).first()
 
   await row.hover()
   await row.locator('[data-action="session-row-menu"]').click()
   await page.getByRole("menuitem", { name: /pin session/i }).click()
-  await expect(sidebar.locator(`[data-component="pawwork-sidebar-pinned"] [data-session-id="${two.id}"]`)).toBeVisible()
+  await expect(sidebar.locator(`[data-component="folonite-sidebar-pinned"] [data-session-id="${two.id}"]`)).toBeVisible()
 
   const renameRow = sidebar.locator(`[data-session-id="${one.id}"]`).first()
   await renameRow.hover()
@@ -31,6 +31,6 @@ test("users can pin, rename, and regroup sessions in the PawWork sidebar", async
   await input.press("Enter")
   await expect(sidebar.locator(`[data-session-id="${one.id}"]`)).toContainText(`Ops weekly renamed ${stamp}`)
 
-  await sidebar.locator('[data-action="pawwork-sort-mode"]').click()
-  await expect(sidebar.locator('[data-component="pawwork-group-header"]')).toHaveCount(1)
+  await sidebar.locator('[data-action="folonite-sort-mode"]').click()
+  await expect(sidebar.locator('[data-component="folonite-group-header"]')).toHaveCount(1)
 })

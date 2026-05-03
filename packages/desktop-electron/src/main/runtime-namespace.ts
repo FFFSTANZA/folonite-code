@@ -1,10 +1,10 @@
 import { join } from "node:path"
 
-export const PAWWORK_RUNTIME = {
+export const FOLONITE_RUNTIME = {
   client: "desktop",
-  serverUsername: "PawWork",
-  settingsStore: "pawwork.settings",
-  databaseName: "pawwork.db",
+  serverUsername: "Folonite",
+  settingsStore: "folonite.settings",
+  databaseName: "folonite.db",
 } as const
 
 export function runtimeRoots(userData: string) {
@@ -17,5 +17,5 @@ export function runtimeRoots(userData: string) {
 }
 
 export function databasePathForUserData(userData: string) {
-  return join(runtimeRoots(userData).data, "pawwork", PAWWORK_RUNTIME.databaseName)
+  return join(runtimeRoots(userData).data, "folonite", FOLONITE_RUNTIME.databaseName)
 }

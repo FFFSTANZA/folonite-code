@@ -21,7 +21,7 @@ const labels: Record<MenuLocale, Labels> = {
   en: {
     busy: {
       title: "Update Check in Progress",
-      message: "PawWork is already checking for updates.",
+      message: "Folonite is already checking for updates.",
     },
     disabled: {
       title: "Updates Unavailable",

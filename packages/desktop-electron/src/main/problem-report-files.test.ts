@@ -13,7 +13,7 @@ import {
 let tempRoots: string[] = []
 
 async function tempRoot() {
-  const root = await mkdtemp(join(tmpdir(), "pawwork-report-files-"))
+  const root = await mkdtemp(join(tmpdir(), "folonite-report-files-"))
   tempRoots.push(root)
   return root
 }
@@ -35,8 +35,8 @@ describe("problem report files", () => {
       generatedAt,
     })
 
-    expect(first).toBe("pawwork-problem-report-20260423-090203-004-pwr_abc123.md")
-    expect(second).toBe("pawwork-problem-report-20260423-090203-004-pwr_def456.md")
+    expect(first).toBe("folonite-problem-report-20260423-090203-004-pwr_abc123.md")
+    expect(second).toBe("folonite-problem-report-20260423-090203-004-pwr_def456.md")
   })
 
   test("rejects report ids that cannot be cleaned up safely", () => {
@@ -102,16 +102,16 @@ describe("problem report files", () => {
   test("creates a user-facing location hint without full local paths", () => {
     expect(
       reportLocationHint({
-        fileName: "pawwork-problem-report-20260423-010203-004-pwr_abc123.md",
+        fileName: "folonite-problem-report-20260423-010203-004-pwr_abc123.md",
         platform: "darwin",
       }),
-    ).toBe("PawWork app data/.../problem-reports/pawwork-problem-report-20260423-010203-004-pwr_abc123.md")
+    ).toBe("Folonite app data/.../problem-reports/folonite-problem-report-20260423-010203-004-pwr_abc123.md")
     expect(
       reportLocationHint({
-        fileName: "pawwork-problem-report-20260423-010203-004-pwr_abc123.md",
+        fileName: "folonite-problem-report-20260423-010203-004-pwr_abc123.md",
         platform: "win32",
       }),
-    ).toBe("%APPDATA%/.../problem-reports/pawwork-problem-report-20260423-010203-004-pwr_abc123.md")
+    ).toBe("%APPDATA%/.../problem-reports/folonite-problem-report-20260423-010203-004-pwr_abc123.md")
   })
 
   test("cleanup keeps current report and skips non-regular or non-matching entries", async () => {
@@ -122,10 +122,10 @@ describe("problem report files", () => {
       generatedAt: "2026-04-23T01:02:03.004Z",
       markdown: "current",
     })
-    const old = join(root, "pawwork-problem-report-20260423-010203-004-pwr_old.md")
+    const old = join(root, "folonite-problem-report-20260423-010203-004-pwr_old.md")
     const other = join(root, "notes.md")
-    const dir = join(root, "pawwork-problem-report-20260423-010203-004-pwr_dir.md")
-    const link = join(root, "pawwork-problem-report-20260423-010203-004-pwr_link.md")
+    const dir = join(root, "folonite-problem-report-20260423-010203-004-pwr_dir.md")
+    const link = join(root, "folonite-problem-report-20260423-010203-004-pwr_link.md")
     await writeFile(old, "old")
     await writeFile(other, "other")
     await mkdir(dir)
@@ -148,8 +148,8 @@ describe("problem report files", () => {
       generatedAt: "2026-04-23T01:02:03.004Z",
       markdown: "current",
     })
-    const newestArchived = join(root, "pawwork-problem-report-20260423-010203-004-pwr_newest.md")
-    const oldestArchived = join(root, "pawwork-problem-report-20260423-010203-004-pwr_oldest.md")
+    const newestArchived = join(root, "folonite-problem-report-20260423-010203-004-pwr_newest.md")
+    const oldestArchived = join(root, "folonite-problem-report-20260423-010203-004-pwr_oldest.md")
     await writeFile(newestArchived, "newest")
     await writeFile(oldestArchived, "oldest")
 

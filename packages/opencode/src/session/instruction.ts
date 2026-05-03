@@ -9,33 +9,33 @@ import { withTransientReadRetry } from "@/util/effect-http-client"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
 import { Log } from "@opencode-ai/core/util/log"
-import { Runtime } from "@opencode-ai/core/runtime"
 import type { MessageV2 } from "./message-v2"
 import type { MessageID } from "./schema"
 
 const log = Log.create({ service: "instruction" })
 
-// PawWork keeps project-level CLAUDE.md as compatibility (issue #230, acceptance #6),
-// even if a parent process inherits OPENCODE_DISABLE_CLAUDE_CODE_PROMPT. The flag only
+// Folonite keeps project-level CLAUDE.md as compatibility (issue #230, acceptance #6),
+// even if a parent process inherits FOLONITE_DISABLE_CLAUDE_CODE_PROMPT. The flag only
 // suppresses Claude Code interop in plain opencode CLI mode. Exported so the gate can
 // be unit tested without mutating module-scope flags.
-export function projectFiles(deps: { isPawWork: boolean; disableClaudeCodePrompt: boolean }): string[] {
+export function projectFiles(deps: { isFolonite: boolean; disableClaudeCodePrompt: boolean }): string[] {
   return [
     "AGENTS.md",
-    ...(deps.isPawWork || !deps.disableClaudeCodePrompt ? ["CLAUDE.md"] : []),
+    "FOLONITE.md",
+    ...(deps.isFolonite || !deps.disableClaudeCodePrompt ? ["CLAUDE.md"] : []),
     "CONTEXT.md", // deprecated
   ]
 }
 
 function FILES() {
   return projectFiles({
-    isPawWork: Runtime.isPawWork(),
-    disableClaudeCodePrompt: Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT,
+    isFolonite: true,
+    disableClaudeCodePrompt: Flag.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT,
   })
 }
 
 function configDir() {
-  return Runtime.isPawWork() ? Flag.PAWWORK_CONFIG_DIR : Flag.OPENCODE_CONFIG_DIR
+  return Flag.FOLONITE_CONFIG_DIR
 }
 
 function globalInstructionFiles() {
@@ -45,11 +45,11 @@ function globalInstructionFiles() {
     files.push(path.join(dir, "AGENTS.md"))
   }
   files.push(path.join(Global.Path.config, "AGENTS.md"))
-  // PawWork product baseline never falls back to global ~/.claude/CLAUDE.md (issue #230,
+  // Folonite product baseline never falls back to global ~/.claude/CLAUDE.md (issue #230,
   // acceptance #5). The flag still gates the fallback for plain opencode CLI users so
-  // their Claude Code interop is unchanged. Read Global.Path.home so OPENCODE_TEST_HOME
+  // their Claude Code interop is unchanged. Read Global.Path.home so FOLONITE_TEST_HOME
   // can stub the home directory deterministically; os.homedir() is locked at process start.
-  if (!Runtime.isPawWork() && !Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT) {
+  if (!Flag.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT) {
     files.push(path.join(Global.Path.home, ".claude", "CLAUDE.md"))
   }
   return files
@@ -110,14 +110,14 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
       )
 
       const relative = Effect.fnUntraced(function* (instruction: string) {
-        if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+        if (!Flag.FOLONITE_DISABLE_PROJECT_CONFIG) {
           return yield* fs
             .globUp(instruction, Instance.directory, Instance.worktree)
             .pipe(Effect.catch(() => Effect.succeed([] as string[])))
         }
         const dir = configDir()
         if (!dir) {
-          const env = Runtime.isPawWork() ? "PAWWORK_CONFIG_DIR" : "OPENCODE_CONFIG_DIR"
+          const env = "FOLONITE_CONFIG_DIR"
           log.warn(
             `Skipping relative instruction "${instruction}" - no ${env} set while project config is disabled`,
           )
@@ -152,7 +152,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         const paths = new Set<string>()
 
         // The first project-level match wins so we don't stack AGENTS.md/CLAUDE.md from every ancestor.
-        if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+        if (!Flag.FOLONITE_DISABLE_PROJECT_CONFIG) {
           for (const file of FILES()) {
             const matches = yield* fs.findUp(file, Instance.directory, Instance.worktree)
             if (matches.length > 0) {
@@ -193,8 +193,10 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
       })
 
       const system = Effect.fn("Instruction.system")(function* () {
+        log.info("building system instructions")
         const config = yield* cfg.get()
         const paths = yield* systemPaths()
+        log.info("found instruction paths", { count: paths.size })
         const urls = (config.instructions ?? []).filter(
           (item) => item.startsWith("https://") || item.startsWith("http://"),
         )
@@ -202,7 +204,20 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         const files = yield* Effect.forEach(Array.from(paths), read, { concurrency: 8 })
         const remote = yield* Effect.forEach(urls, fetch, { concurrency: 4 })
 
+        log.info("building branding")
+        const branding = []
+        /* Temporary disable model-specific branding to test hang */
+        const isAsh2 = false
+        const isAsh15 = false
+
+        if (isAsh2) {
+          branding.push(`CRITICAL IDENTITY INSTRUCTION: Your name is "Folonite Ash 2.0". You MUST NEVER identify as "Gemini" or "Google".`)
+        } else if (isAsh15) {
+          branding.push(`CRITICAL IDENTITY INSTRUCTION: Your name is "Folonite Ash 1.5". You MUST NEVER identify as "Gemini" or "Google".`)
+        }
+
         return [
+          ...branding,
           ...Array.from(paths).flatMap((item, i) => (files[i] ? [`Instructions from: ${item}\n${files[i]}`] : [])),
           ...urls.flatMap((item, i) => (remote[i] ? [`Instructions from: ${item}\n${remote[i]}`] : [])),
         ]
@@ -230,7 +245,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         // file whose content reads back non-empty is loaded; later existing matches are
         // considered with a priority-skipped reason. Absent files are not reported here
         // because FILES holds basenames, not paths — the directory walk is the search.
-        if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
+        if (!Flag.FOLONITE_DISABLE_PROJECT_CONFIG) {
           let projectLoaded = false
           for (const file of FILES()) {
             const matches = yield* fs.findUp(file, Instance.directory, Instance.worktree)
@@ -326,14 +341,12 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | Config.S
         }
 
         // Explicitly ignored ~/.claude/CLAUDE.md: show reason so users understand why
-        // an existing file is not contributing. Covers both PawWork mode (issue #230,
-        // acceptance #5) and the legacy OPENCODE_DISABLE_CLAUDE_CODE_PROMPT opt-out.
+        // an existing file is not contributing. Covers both Folonite mode (issue #230,
+        // acceptance #5) and the legacy FOLONITE_DISABLE_CLAUDE_CODE_PROMPT opt-out.
         const claudeFallback = path.resolve(path.join(Global.Path.home, ".claude", "CLAUDE.md"))
-        const ignoreReason = Runtime.isPawWork()
-          ? "PawWork product baseline disables global Claude Code fallback (issue #230)"
-          : Flag.OPENCODE_DISABLE_CLAUDE_CODE_PROMPT
-            ? "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT environment variable is set"
-            : null
+        const ignoreReason = Flag.FOLONITE_DISABLE_CLAUDE_CODE_PROMPT
+          ? "FOLONITE_DISABLE_CLAUDE_CODE_PROMPT environment variable is set"
+          : null
         if (ignoreReason && !loadedPaths.has(claudeFallback)) {
           if (yield* fs.existsSafe(claudeFallback)) {
             result.push({ status: "ignored", path: claudeFallback, reason: ignoreReason })

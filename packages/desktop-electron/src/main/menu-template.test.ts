@@ -14,7 +14,7 @@ const stubDeps: MenuTemplateDeps = {
 
 const baseOptions = {
   deps: stubDeps,
-  appName: "PawWork",
+  appName: "Folonite",
   locale: "en" as const,
   feedbackEnabled: true,
 }
@@ -26,13 +26,13 @@ test("Windows template has 6 top-level menus: File / Edit / View / Go / Window /
   expect(labels).toEqual(["File", "Edit", "View", "Go", "Window", "Help"])
 })
 
-test("Windows Help submenu contains 'Check for Updates' and 'About PawWork'", () => {
+test("Windows Help submenu contains 'Check for Updates' and 'About Folonite'", () => {
   const tpl = buildWindowsMenuTemplate(baseOptions)
   const help = tpl.find((m) => m.label === "Help")
   expect(help).toBeDefined()
   const labels = (help?.submenu ?? []).map((s) => s.label)
   expect(labels).toContain("Check for Updates...")
-  expect(labels).toContain("About PawWork")
+  expect(labels).toContain("About Folonite")
 })
 
 test("Windows New Session accelerator matches macOS (CmdOrCtrl+Shift+S)", () => {
@@ -54,10 +54,10 @@ test("Windows accelerators use CmdOrCtrl + Alt (no bare Cmd or Option)", () => {
   expect(accels.some((a) => a === "CmdOrCtrl+Shift+S")).toBe(true)
 })
 
-test("macOS template still has 7 top-level menus including PawWork app menu", () => {
+test("macOS template still has 7 top-level menus including Folonite app menu", () => {
   const tpl = buildMacosMenuTemplate(baseOptions)
   expect(tpl).toHaveLength(7)
-  expect(tpl[0].label).toBe("PawWork")
+  expect(tpl[0].label).toBe("Folonite")
 })
 
 test("macOS About menu item still uses role:about (system About panel)", () => {

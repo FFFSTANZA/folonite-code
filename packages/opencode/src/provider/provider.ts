@@ -42,7 +42,7 @@ function shouldUseCopilotResponsesApi(modelID: string): boolean {
 }
 
 function e2eLLMURL(envs: Record<string, string | undefined>) {
-  const url = envs.OPENCODE_E2E_LLM_URL
+  const url = envs.FOLONITE_E2E_LLM_URL
   if (typeof url !== "string" || url === "") return
   return url
 }
@@ -187,6 +187,23 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         options: ok ? {} : { apiKey: "public" },
       }
     }),
+    "folonite-ash-2": Effect.fnUntraced(function* (input: Info) {
+      const env = yield* dep.env()
+      const hasKey = iife(() => {
+        if (input.env.some((item) => env[item])) return true
+        return false
+      })
+      const ok =
+        hasKey ||
+        Boolean(yield* dep.auth(input.id)) ||
+        Boolean((yield* dep.config()).provider?.["folonite-ash-2"]?.options?.apiKey)
+
+      return {
+        autoload: Object.keys(input.models).length > 0,
+        options: ok ? {} : { apiKey: "public" },
+      }
+    }),
+
     openai: () =>
       Effect.succeed({
         autoload: false,
@@ -1374,7 +1391,7 @@ const layer: Layer.Layer<
               (providerID === ProviderID.openrouter && modelID === "openai/gpt-5-chat")
             )
               delete provider.models[modelID]
-            if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete provider.models[modelID]
+            if (model.status === "alpha" && !Flag.FOLONITE_ENABLE_EXPERIMENTAL_MODELS) delete provider.models[modelID]
             if (model.status === "deprecated") delete provider.models[modelID]
             if (
               (configProvider?.blacklist && configProvider.blacklist.includes(modelID)) ||

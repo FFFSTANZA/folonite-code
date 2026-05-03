@@ -56,7 +56,7 @@ export const sansDefault = "System Sans"
 const monoFallback =
   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
 const sansFallback = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-const pawworkSansFallback = "system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif"
+const foloniteSansFallback = "system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif"
 
 const monoBase = monoFallback
 const sansBase = sansFallback
@@ -95,7 +95,7 @@ export function sansFontFamily(font: string | undefined) {
 export function resolveSansFontFamily(input: { themeID?: string; font?: string }) {
   const font = input.font?.trim()
   if (font) return sansFontFamily(font)
-  if (input.themeID === "pawwork") return pawworkSansFallback
+  if (input.themeID === "folonite") return foloniteSansFallback
   return sansFontFamily(undefined)
 }
 
