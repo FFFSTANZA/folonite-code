@@ -2,7 +2,7 @@ import type { Component, JSX } from "solid-js"
 import { createMemo, Match, splitProps, Switch } from "solid-js"
 import sprite from "./provider-icons/sprite.svg"
 import { iconNames, type IconName } from "./provider-icons/types"
-import { Mark } from "./logo"
+import { FoloniteIconSVG, Mark } from "./logo"
 
 export type ProviderIconProps = JSX.SVGElementTags["svg"] & {
   id: string
@@ -27,7 +27,7 @@ export const ProviderIcon: Component<ProviderIconProps> = (props) => {
       }
     >
       <Match when={local.id === "opencode" || local.id === "opencode-go" || local.id === "folonite-ash-2" || local.id === "big-pickle"}>
-        <Mark
+        <FoloniteIconSVG
           class={`${local.class ?? ""} shrink-0`}
           {...(rest as any)}
         />

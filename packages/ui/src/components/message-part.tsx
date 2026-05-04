@@ -1063,7 +1063,8 @@ export function UserMessageDisplay(props: { message: UserMessage; parts: PartTyp
     const modelID = props.message.model?.modelID
     if (!providerID || !modelID) return ""
     const match = data.store.provider?.all?.find((p) => p.id === providerID)
-    return match?.models?.[modelID]?.name ?? modelID
+    const name = match?.models?.[modelID]?.name ?? modelID
+    return name === "Big Pickle" ? "Folonite Ash 1.5" : name
   })
   const stamp = createMemo(() => {
     const created = props.message.time?.created
@@ -1447,7 +1448,8 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     if (props.message.role !== "assistant") return ""
     const message = props.message as AssistantMessage
     const match = data.store.provider?.all?.find((p) => p.id === message.providerID)
-    return match?.models?.[message.modelID]?.name ?? message.modelID
+    const name = match?.models?.[message.modelID]?.name ?? message.modelID
+    return name === "Big Pickle" ? "Folonite Ash 1.5" : name
   })
 
   const duration = createMemo(() => {

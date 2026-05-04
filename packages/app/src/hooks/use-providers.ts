@@ -44,21 +44,10 @@ export function useProviders() {
       }),
     ]
 
-    const opencode = all.find((p) => p.id === "opencode")
-    if (opencode && !all.find((p) => p.id === "folonite-ash-2")) {
-      all.push({
-        ...opencode,
-        id: "folonite-ash-2",
-        name: "Folonite Ash 2.0",
-      })
-    }
-
     return {
       ...data,
       all,
     }
-
-
   }
   return {
     all: () => providers().all,
