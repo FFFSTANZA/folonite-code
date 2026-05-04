@@ -1,4 +1,4 @@
-import { ComponentProps } from "solid-js"
+import { splitProps, type JSX } from "solid-js"
 
 const FoloniteMarkShape = (props: { fill: string }) => {
   return (
@@ -15,13 +15,15 @@ const FoloniteMarkShape = (props: { fill: string }) => {
   )
 }
 
-export const FoloniteIconSVG = (props: { class?: string }) => {
+export const FoloniteIconSVG = (props: JSX.SVGElementTags["svg"]) => {
+  const [local, rest] = splitProps(props, ["class", "classList"])
   return (
     <svg
       viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      classList={{ [props.class ?? ""]: !!props.class }}
+      classList={{ [local.class ?? ""]: !!local.class, ...local.classList }}
+      {...rest}
     >
       <path
         d="M20 12C20 10.8954 20.8954 10 22 10H44C45.1046 10 46 10.8954 46 12V18C46 19.1046 45.1046 20 44 20H22C20.8954 20 20 19.1046 20 18V12Z"

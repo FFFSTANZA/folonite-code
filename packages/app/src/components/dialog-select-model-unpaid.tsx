@@ -106,10 +106,12 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
               >
                 {(i) => (
                   <div class="w-full flex items-center gap-x-3">
-                    <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
+                    <ProviderIcon data-slot="list-item-extra-icon" id={i.id} class="size-5 shrink-0 icon-strong-base" />
                     <span>{i.name}</span>
                     <Show when={i.id === "anthropic" || i.id === "openai" || i.id === "opencode-go" || i.id === "folonite-ash-2"}>
-                      <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
+                      <Tag class={i.id === "folonite-ash-2" ? "tag-gold" : ""}>
+                        {language.t("dialog.provider.tag.recommended")}
+                      </Tag>
                     </Show>
                     <Show when={i.id === "anthropic"}>
                       <div class="text-13-regular text-text-weak">{language.t("dialog.provider.anthropic.note")}</div>

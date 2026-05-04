@@ -68,7 +68,7 @@ export const DialogSelectProvider: Component = () => {
       >
         {(i) => (
           <div class="px-1.25 w-full flex items-center gap-x-3">
-            <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
+            <ProviderIcon data-slot="list-item-extra-icon" id={i.id} class="size-5 shrink-0 icon-strong-base" />
             <span>{i.name}</span>
             <Show when={i.id === CUSTOM_ID}>
               <Tag>{language.t("settings.providers.tag.custom")}</Tag>
@@ -81,7 +81,9 @@ export const DialogSelectProvider: Component = () => {
                 i.id === "folonite-ash-2"
               }
             >
-              <Tag>{language.t("dialog.provider.tag.recommended")}</Tag>
+              <Tag class={i.id === "folonite-ash-2" ? "tag-gold" : ""}>
+                {language.t("dialog.provider.tag.recommended")}
+              </Tag>
             </Show>
 
             <Show when={note(i.id)}>{(value) => <div class="text-13-regular text-text-weak">{value()}</div>}</Show>
